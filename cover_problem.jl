@@ -41,9 +41,11 @@ immutable CoverProblem
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams)
         # preprocess setXset scores matrix for numerical solution
         setXset_scores = mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs]
+        min_score = 0.0
         for i in eachindex(setXset_scores)
             if !isfinite(setXset_scores[i])
-                warn("Infinite setXset score at position $(ind2sub(i))")
+                warn("Infinite setXset score at position $(ind2sub(size(setXset_scores), i))")
+            elseif setXset_scores[i] < min_score
                 min_score = setXset_scores[i]
             end
         end
