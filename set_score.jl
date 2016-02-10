@@ -19,5 +19,7 @@ function logpvalue(a_size::Integer, b_size::Integer,
     elseif tail == :both
         min(2.0*min(logcdf(distr, isect_size),
             logccdf(distr, isect_size-1)), 1.0)
+    else
+        throw(ArgumentError("Unsupported tail specifier ($tail)"))
     end
 end
