@@ -4,7 +4,6 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 0
         @fact OESC.ntiles(sm) --> 0
-        @fact OESC.tiles(sm) --> Vector{Int}[]
         @fact OESC.nsets(sm) --> 0
     end
 
@@ -12,7 +11,6 @@ facts("SetMosaic") do
         sm = OESC.SetMosaic(Set{Symbol}[], Set([:a, :b]))
         @fact OESC.nelements(sm) --> 2
         @fact OESC.ntiles(sm) --> 0
-        @fact OESC.tiles(sm) --> Vector{Int}[]
         @fact OESC.nsets(sm) --> 0
     end
 
@@ -21,7 +19,6 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 0
         @fact OESC.ntiles(sm) --> 0
-        @fact OESC.tiles(sm) --> Vector{Int}[]
         @fact OESC.nsets(sm) --> 1
     end
 
@@ -30,8 +27,7 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 1
         @fact OESC.ntiles(sm) --> 1
-        println("tiles=$(OESC.tiles(sm))")
-        @fact OESC.tiles(sm) --> Vector{Int}[Int[1]]
+        @fact OESC.tile(sm, 1) --> [1]
         @fact OESC.nsets(sm) --> 1
     end
 
@@ -40,7 +36,7 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 1
         @fact OESC.ntiles(sm) --> 1
-        @fact OESC.tiles(sm) --> Vector{Int}[Int[1]]
+        @fact OESC.tile(sm, 1) --> [1]
         @fact OESC.nsets(sm) --> 2
     end
 
@@ -49,7 +45,8 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 2
         @fact OESC.ntiles(sm) --> 2
-        @pending OESC.tiles(sm) --> Vector{Int}[Int[1], Int[2]] # FIXME
+        @pending OESC.tile(sm, 1) --> [1] # FIXME
+        @pending OESC.tile(sm, 2) --> [2] # FIXME
         @fact OESC.nsets(sm) --> 2
     end
 
@@ -58,7 +55,7 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 1
         @fact OESC.ntiles(sm) --> 1
-        @fact OESC.tiles(sm) --> Vector{Int}[Int[1]]
+        @fact OESC.tile(sm, 1) --> [1]
         @fact OESC.nsets(sm) --> 2
     end
 
@@ -67,7 +64,8 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 2
         @fact OESC.ntiles(sm) --> 2
-        @pending OESC.tiles(sm) --> Vector{Int}[Int[1], Int[2]] # FIXME
+        @pending OESC.tile(sm, 1) --> [1] # FIXME
+        @pending OESC.tile(sm, 2) --> [2] # FIXME
         @fact OESC.nsets(sm) --> 3
     end
 
@@ -76,7 +74,9 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 4
         @fact OESC.ntiles(sm) --> 3
-        @pending OESC.tiles(sm) --> Vector{Int}[Int[1, 2], Int[3], Int[4]] # FIXME
+        @pending OESC.tile(sm, 1) --> [1, 2] # FIXME
+        @pending OESC.tile(sm, 2) --> [3] # FIXME
+        @pending OESC.tile(sm, 3) --> [4] # FIXME
         @fact OESC.nsets(sm) --> 3
     end
 
@@ -85,7 +85,8 @@ facts("SetMosaic") do
 
         @fact OESC.nelements(sm) --> 4
         @fact OESC.ntiles(sm) --> 2
-        @pending OESC.tiles(sm) --> Vector{Int}[Int[1, 2], Int[3, 4]] # FIXME sets order
+        @pending OESC.tile(sm, 1) --> [1, 2] # FIXME
+        @pending OESC.tile(sm, 2) --> [3, 4] # FIXME
         @fact OESC.nsets(sm) --> 3
     end
 end
@@ -97,7 +98,6 @@ facts("MaskedSetMosaic") do
         @fact OESC.unmask(msm) --> sm
         @fact OESC.nelements(msm) --> 0
         @fact OESC.ntiles(msm) --> 0
-        @fact OESC.tiles(msm) --> Vector{Int}[]
         @fact OESC.nsets(msm) --> 0
         @fact OESC.nmasked_pertile(msm) --> Int[]
         @fact OESC.nunmasked_pertile(msm) --> Int[]
@@ -109,7 +109,6 @@ facts("MaskedSetMosaic") do
         @fact OESC.unmask(msm) --> sm
         @fact OESC.nelements(msm) --> 2
         @fact OESC.ntiles(msm) --> 0
-        @fact OESC.tiles(msm) --> Vector{Int}[]
         @fact OESC.nsets(msm) --> 0
         @fact OESC.nmasked(msm) --> 1
         @fact OESC.nunmasked(msm) --> 1

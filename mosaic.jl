@@ -13,7 +13,7 @@ end
 function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     if isempty(sets)
         # no sets -- no tiles
-        return Matrix{Bool}(0,0), Vector{Vector{Int}}()
+        return SparseMaskMatrix(0, length(elm2ix)), SparseMaskMatrix(length(elm2ix), 0), SparseMaskMatrix(0, 0)
     end
 
     # build set-X-element membership matrix
@@ -24,40 +24,93 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
         end
     end
     # squash element-X-set matrix (duplicate rows) into membership-mask-to-tile dict
-    membership2tile = Dict{Vector{Bool}, Vector{Int}}()
+    membership2tile = Dict{Vector{Int}, Vector{Int}}()
     sizehint!(membership2tile, length(elm2ix))
     for i in 1:size(setXelm, 2)
-        mask = setXelm[:, i]
-        if haskey(membership2tile, mask)
-            push!(membership2tile[mask], i)
+        set_ixs = find(setXelm[:, i])
+        if haskey(membership2tile, set_ixs)
+            push!(membership2tile[set_ixs], i)
         else
-            membership2tile[mask] = fill(i, 1)
+            membership2tile[set_ixs] = fill(i, 1)
         end
     end
-    # build tile-X-set membership matrix
-    tileXset = fill(false, length(membership2tile), length(sets))
-    tiles = Vector{Vector{Int}}()
-    sizehint!(tiles, length(tileXset))
-    for (mask, tile) in membership2tile
-        push!(tiles, tile)
-        tileXset[length(tiles), :] = mask
+
+    # build tile-X-set and element-X-tile membership matrices
+    set2tile_ixs = [Vector{Int}() for _ in 1:length(sets)]
+    tile_elm_ranges = Vector{Int}()
+    elm_ixs = Vector{Int}()
+    for (set_ixs, tile_elm_ixs) in membership2tile
+        push!(tile_elm_ranges, length(elm_ixs)+1)
+        tile_ix = length(tile_elm_ranges)
+        append!(elm_ixs, tile_elm_ixs)
+
+        for set_ix in set_ixs
+            push!(set2tile_ixs[set_ix], tile_ix)
+        end
     end
-    tileXset, tiles
+    push!(tile_elm_ranges, length(elm_ixs)+1)
+
+    set_tile_ranges = Vector{Int}()
+    tile_ixs = Vector{Int}()
+    for (set_ix, set_tile_ixs) in enumerate(set2tile_ixs)
+        push!(set_tile_ranges, length(tile_ixs)+1)
+        append!(tile_ixs, set_tile_ixs)
+    end
+    push!(set_tile_ranges, length(tile_ixs)+1)
+
+    sparse_mask(setXelm),
+    SparseMaskMatrix(length(elm2ix), length(tile_elm_ranges)-1, tile_elm_ranges, elm_ixs), # elmXtile
+    SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
 end
 
-function _setXset_scores(tileXset::Matrix{Bool}, total_size::Int, set_sizes::Vector{Int}, tile_sizes::Vector{Int})
-    res = Matrix{Float64}(size(tileXset, 2), size(tileXset, 2))
-    @inbounds for set1_ix in 1:size(tileXset, 2)
+function _isect_size(set1_ixs::StridedVector{Int}, set2_ixs::StridedVector{Int}, tile_sizes::Vector{Int})
+    j = 1
+    i = 1
+    res = 0
+    set1_ix = 0
+    set2_ix = 0
+    @inbounds while i <= length(set1_ixs) && j <= length(set2_ixs)
+        if set1_ix==0
+            set1_ix = set1_ixs[i]
+        end
+        if set2_ix==0
+            set2_ix = set2_ixs[j]
+        end
+        if set1_ix < set2_ix
+            i += 1
+            set1_ix = 0
+        elseif set1_ix > set2_ix
+            j += 1
+            set2_ix = 0
+        else
+            res += tile_sizes[set1_ix]
+            i += 1
+            j += 1
+            set1_ix = set2_ix = 0
+        end
+    end
+    return res
+end
+
+function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes::Vector{Int}, tile_sizes::Vector{Int})
+    nsets = size(tileXset, 2)
+    res = Matrix{Float64}(nsets, nsets)
+    @inbounds for set1_ix in 1:nsets
         res[set1_ix, set1_ix] = 0.0
-        for set2_ix in (set1_ix+1):size(tileXset, 2)
-            isect_size = 0
-            for tile_ix in eachindex(tile_sizes)
-                if tileXset[tile_ix, set1_ix] && tileXset[tile_ix, set2_ix]
-                    isect_size += tile_sizes[tile_ix]
-                end
-            end
+        if set1_ix == nsets break end
+        set1_tiles = slice(tileXset, :, set1_ix)
+        for set2_ix in (set1_ix+1):nsets
+            set2_tiles = slice(tileXset, :, set2_ix)
             # one-sided Fisher's P-value
-            res[set1_ix, set2_ix] = res[set2_ix, set1_ix] = logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size, isect_size, tail=:left);
+            res[set2_ix, set1_ix] =
+                logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size,
+                          _isect_size(set1_tiles, set2_tiles, tile_sizes), tail=:left)
+        end
+    end
+    # symmetrize
+    @inbounds for set2_ix in 1:nsets
+        for set1_ix in (set2_ix+1):nsets
+            res[set2_ix, set1_ix] = res[set1_ix, set2_ix]
         end
     end
     return res
@@ -88,8 +141,9 @@ immutable SetMosaic{T,S}
 
     set_sizes::Vector{Int}
 
-    tileXset::Matrix{Bool}  # rows = tiles, cols = sets from collection, true if tile is a subset of a set
-    tiles::Vector{Vector{Int}} # tile elements
+    setXelm::SparseMaskMatrix  # set-to-element mask
+    elmXtile::SparseMaskMatrix  # element-to-tile mask
+    tileXset::SparseMaskMatrix  # rows = tiles, cols = sets from collection, true if tile is a subset of a set
 
     setXset_scores::Matrix{Float64}
 
@@ -98,13 +152,13 @@ immutable SetMosaic{T,S}
     """
     function Base.call{T}(::Type{SetMosaic}, sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
         ix2elm, elm2ix = _encode_elements(all_elms)
-        tileXset, tiles = _prepare_tiles(sets, elm2ix)
-        tile_sizes = Int[length(tile) for tile in tiles]
+        elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
+        tile_sizes = Int[length(slice(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in sets]
         new{T, Int}(ix2elm, elm2ix,
                     collect(eachindex(sets)), Dict(Pair{Int,Int}[Pair(i,i) for i in eachindex(sets)]),
                     set_sizes,
-                    tileXset, tiles, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
+                    elmXset, elmXtile, tileXset, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
 
     """
@@ -112,20 +166,22 @@ immutable SetMosaic{T,S}
     """
     function Base.call{T, S}(::Type{SetMosaic}, sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
         ix2elm, elm2ix = _encode_elements(all_elms)
-        tileXset, tiles = _prepare_tiles(values(sets), elm2ix)
-        tile_sizes = Int[length(tile) for tile in tiles]
+        elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
+        tile_sizes = Int[length(slice(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in values(sets)]
         new{T, S}(ix2elm, elm2ix,
                   collect(keys(sets)), Dict{S, Int}(Pair{S,Int}[Pair(s, i) for (i, s) in enumerate(keys(sets))]),
                   set_sizes,
-                  tileXset, tiles, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
+                  elmXset, elmXtile, tileXset, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
 end
 
 nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
-ntiles(mosaic::SetMosaic) = length(mosaic.tiles)
+ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)
 nsets(mosaic::SetMosaic) = size(mosaic.tileXset, 2)
-tiles(mosaic::SetMosaic) = mosaic.tiles
+
+tile(mosaic::SetMosaic, tile_ix::Integer) = slice(mosaic.elmXtile, :, tile_ix)
+set(mosaic::SetMosaic, set_ix::Integer) = slice(mosaic.elmXset, :, set_ix)
 
 """
     `SetMosaic` with an elements mask on top.
@@ -143,8 +199,7 @@ type MaskedSetMosaic{T,S}
 
       are squashed.
     """
-    tileXset::Matrix{Bool}
-    tiles::Vector{Vector{Int}} # tile elements
+    tileXset::SparseMaskMatrix
     total_masked::Int      # total number of masked elements
     nmasked_pertile::Vector{Int}   # number of masked elements in a tile
     nunmasked_pertile::Vector{Int} # number of unmasked elements in a tile
@@ -153,73 +208,75 @@ type MaskedSetMosaic{T,S}
 
     function MaskedSetMosaic(original::SetMosaic{T, S}, mask::Vector{Bool},
                              setixs::Vector{Int},
-                             tileXset::Matrix{Bool}, tiles::Vector{Vector{Int}},
+                             tileXset::SparseMaskMatrix,
                              total_masked::Number,
                              nmasked_pertile::Vector{Int}, nunmasked_pertile::Vector{Int},
                              nmasked_perset::Vector{Int}, nunmasked_perset::Vector{Int}
     )
-        new(original, mask, setixs, tileXset, tiles, total_masked,
+        new(original, mask, setixs, tileXset, total_masked,
             nmasked_pertile, nunmasked_pertile,
             nmasked_perset, nunmasked_perset)
     end
 
-    function Base.call{T,S}(::Type{MaskedSetMosaic}, mosaic::SetMosaic{T, S}, mask::Vector{Bool})
-        length(mask) == nelements(mosaic) ||
-            throw(ArgumentError("Mask length ($(length(mask))) should match the number of elements ($(nelements(mosaic)))"))
-        #println("mask=", mask)
-        # get the tiles that overlap with the mask
-        # with tiles it's faster than with the sets because no element is repeated
-        tileixs = Vector{Int}()
-        for i in 1:length(mosaic.tiles)
-            #println("Tile #$i")
-            for e in mosaic.tiles[i]
-                if mask[e]
-                    #println("Masked element $e is in tile $i: $(mosaic.tiles[i])")
-                    push!(tileixs, i)
-                    break
-                end
+    function Base.call{T,S}(::Type{MaskedSetMosaic}, mosaic::SetMosaic{T, S}, elmask::Vector{Bool})
+        length(elmask) == nelements(mosaic) ||
+            throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
+        #println("elmask=", elmask)
+        # get the sets that overlap with the elements mask
+        setmask = fill(false, nsets(mosaic))
+        for i in eachindex(elmask)
+            if elmask[i]
+                setmask[slice(mosaic.setXelm, :, i)] = true
             end
         end
-        #println("masked tiles=$tileixs")
-        # mask of sets that overlap with the masked elements
-        setmask = squeeze(any(mosaic.tileXset[tileixs, :], 1), 1)
+        orig_setixs = find(setmask)
         #println("setmask=$setmask")
-        subsetXtile = mosaic.tileXset[:, setmask]'
-        #println("subsetXtile=$subsetXtile")
         # detect and squash tiles that have the same membership pattern wrt the masked sets
-        membership2tile = Dict{Vector{Bool}, Vector{Int}}()
+        subsetXtile = fill(false, length(orig_setixs), ntiles(mosaic))
+        for (new_setix, orig_setix) in enumerate(orig_setixs)
+            subsetXtile[new_setix, slice(mosaic.tileXset, :, orig_setix)] = true
+        end
+        #println("subsetXtile=$subsetXtile")
+        membership2tile = Dict{Vector{Int}, Vector{Int}}()
         sizehint!(membership2tile, size(subsetXtile, 2))
         for i in 1:size(subsetXtile, 2)
-            tile_mask = subsetXtile[:, i]
-            if haskey(membership2tile, tile_mask)
-                push!(membership2tile[tile_mask], i)
+            set_ixs = find(subsetXtile[:, i])
+            if haskey(membership2tile, set_ixs)
+                push!(membership2tile[set_ixs], i)
             else
-                membership2tile[tile_mask] = Vector{Int}([i])
+                membership2tile[set_ixs] = Vector{Int}([i])
             end
         end
         # build tile-to-set membership matrix
-        tileXset = fill(false, length(membership2tile), size(subsetXtile, 1))
-        tiles = Vector{Vector{Int}}()
-        nmasked_pertile = Vector{Int}(length(membership2tile))
-        nunmasked_pertile = Vector{Int}(length(membership2tile))
-        sizehint!(tiles, length(tileXset))
-        for (tile_mask, tile_ixs) in membership2tile
-            tile_ix = length(tiles)+1
-            push!(tiles, sort!(vcat(mosaic.tiles[tile_ixs]...)))
-            tileXset[tile_ix, :] = tile_mask
-            nmasked_pertile[tile_ix] = sum(mask[tiles[tile_ix]])
-            nunmasked_pertile[tile_ix] = length(tiles[tile_ix]) - nmasked_pertile[tile_ix]
+        nmasked_pertile = fill(0, length(membership2tile))
+        nunmasked_pertile = fill(0, length(membership2tile))
+        set2tile_ixs = [Vector{Int}() for _ in 1:length(orig_setixs)]
+        for (tile_ix, (tile_set_ixs, old_tile_ixs)) in enumerate(membership2tile)
+            for set_ix in tile_set_ixs
+                push!(set2tile_ixs[set_ix], tile_ix)
+            end
+            for old_tile_ix in old_tile_ixs
+                oldtile_elms = slice(mosaic.elmXtile, :, old_tile_ix)
+                n_oldtile_masked = 0
+                for eix in oldtile_elms
+                    if elmask[eix]
+                        n_oldtile_masked += 1
+                    end
+                end
+                nmasked_pertile[tile_ix] += n_oldtile_masked
+                nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
+            end
         end
+        tileXset = sparse_mask(length(nmasked_pertile), length(orig_setixs), set2tile_ixs)
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
-        setixs = find(setmask)
         for set_ix in eachindex(nmasked_perset)
-            nmasked_perset[set_ix] = sum(nmasked_pertile[tileXset[:,set_ix]])
-            nunmasked_perset[set_ix] = mosaic.set_sizes[setixs[set_ix]] - nmasked_perset[set_ix]
+            nmasked_perset[set_ix] = sum(nmasked_pertile[slice(tileXset, :, set_ix)])
+            nunmasked_perset[set_ix] = mosaic.set_sizes[orig_setixs[set_ix]] - nmasked_perset[set_ix]
         end
         #println("tileXset=$tileXset")
-        new{T,S}(mosaic, mask, setixs, tileXset, tiles,
-                 sum(mask), nmasked_pertile, nunmasked_pertile,
+        new{T,S}(mosaic, elmask, orig_setixs, tileXset,
+                 sum(elmask), nmasked_pertile, nunmasked_pertile,
                  nmasked_perset, nunmasked_perset)
     end
 end
@@ -229,8 +286,7 @@ mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}) = mask(mosaic, Bool[in(e, sel) fo
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
-tiles(mosaic::MaskedSetMosaic) = mosaic.tiles
-ntiles(mosaic::MaskedSetMosaic) = length(mosaic.tiles)
+ntiles(mosaic::MaskedSetMosaic) = size(mosaic.tileXset, 1)
 nsets(mosaic::MaskedSetMosaic) = size(mosaic.tileXset, 2)
 nmasked(mosaic::MaskedSetMosaic) = mosaic.total_masked
 nunmasked(mosaic::MaskedSetMosaic) = nelements(mosaic) - mosaic.total_masked
@@ -242,7 +298,7 @@ nunmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nunmasked_perset
 function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
     # copy everything, except the original mosaic (leave the reference to the same object)
     MaskedSetMosaic{T,S}(mosaic.original, copy(mosaic.mask), copy(mosaic.setixs),
-                    copy(mosaic.tileXset), copy(mosaic.tiles), mosaic.total_masked,
+                    copy(mosaic.tileXset), mosaic.total_masked,
                     copy(mosaic.nmasked_pertile), copy(mosaic.nunmasked_pertile),
                     copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
 end
@@ -256,12 +312,15 @@ function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVe
     nsets(mosaic) == length(setmask) ||
         throw(ArgumentError("Mask length ($(lenght(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
     mosaic.setixs = mosaic.setixs[setmask]
-    mosaic.tileXset = mosaic.tileXset[:, setmask]
-    tile_ixs = find(squeeze(any(mosaic.tileXset, 2), 2))
-    mosaic.tileXset = mosaic.tileXset[tile_ixs, :] # remove unused tiles
-    mosaic.tiles = mosaic.tiles[tile_ixs]
-    mosaic.nmasked_pertile = mosaic.nmasked_pertile[tile_ixs]
-    mosaic.nunmasked_pertile = mosaic.nunmasked_pertile[tile_ixs]
+    tileXset = mosaic.tileXset[:, setmask]
+    tile_mask = fill(false, ntiles(mosaic))
+    tile_mask[tileXset.rowval] = true
+    old2new_tile_ixs = cumsum(tile_mask)
+    old_tile_ixs = find(tile_mask)
+    mosaic.tileXset = SparseMaskMatrix(length(old_tile_ixs), tileXset.n,
+                                       tileXset.colptr, old2new_tile_ixs[tileXset.rowval]) # remove unused tiles
+    mosaic.nmasked_pertile = mosaic.nmasked_pertile[old_tile_ixs]
+    mosaic.nunmasked_pertile = mosaic.nunmasked_pertile[old_tile_ixs]
     mosaic.nmasked_perset = mosaic.nmasked_perset[setmask]
     mosaic.nunmasked_perset = mosaic.nunmasked_perset[setmask]
     return mosaic
