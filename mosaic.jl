@@ -63,6 +63,15 @@ function _setXset_scores(tileXset::Matrix{Bool}, total_size::Int, set_sizes::Vec
     return res
 end
 
+# unlike Base.union() does not use recursion
+function _union{T}(::Type{T}, sets)
+    res = Set{T}()
+    for set in sets
+        union!(res, set)
+    end
+    return res
+end
+
 """
   Encodes a collection of (overlapping) sets as
   a mosaic of non-overlapping "tiles".
@@ -87,7 +96,7 @@ immutable SetMosaic{T,S}
     """
       Constructs `SetMosaic` for a given nameless sets collection.
     """
-    function Base.call{T}(::Type{SetMosaic}, sets::Vector{Set{T}}, all_elms::Set{T} = union(Set{T}(), sets...))
+    function Base.call{T}(::Type{SetMosaic}, sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
         ix2elm, elm2ix = _encode_elements(all_elms)
         tileXset, tiles = _prepare_tiles(sets, elm2ix)
         tile_sizes = Int[length(tile) for tile in tiles]
@@ -101,7 +110,7 @@ immutable SetMosaic{T,S}
     """
       Constructs `SetMosaic` for a given named sets collection.
     """
-    function Base.call{T, S}(::Type{SetMosaic}, sets::Dict{S, Set{T}}, all_elms::Set{T} = union(Set{T}(), values(sets)...))
+    function Base.call{T, S}(::Type{SetMosaic}, sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
         ix2elm, elm2ix = _encode_elements(all_elms)
         tileXset, tiles = _prepare_tiles(values(sets), elm2ix)
         tile_sizes = Int[length(tile) for tile in tiles]
