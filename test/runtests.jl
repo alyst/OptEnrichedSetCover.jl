@@ -2,4 +2,15 @@ using OptEnrichedSetCover
 using Base.Test
 
 # write your own tests here
-@test 1 == 2
+
+my_tests = [
+  "test_set_score.jl",
+  "test_mosaic.jl",
+  "test_cover_problem.jl",
+  "test_cover_enumerator.jl"
+]
+
+for t in my_tests
+  message("Testing $t...")
+  include(t)
+end
