@@ -47,10 +47,15 @@ end
 
 function _setXset_scores(tileXset::Matrix{Bool}, total_size::Int, set_sizes::Vector{Int}, tile_sizes::Vector{Int})
     res = Matrix{Float64}(size(tileXset, 2), size(tileXset, 2))
-    for set1_ix in 1:size(tileXset, 2)
+    @inbounds for set1_ix in 1:size(tileXset, 2)
         res[set1_ix, set1_ix] = 0.0
         for set2_ix in (set1_ix+1):size(tileXset, 2)
-            isect_size = sum(tile_ix -> tileXset[tile_ix, set1_ix] & tileXset[tile_ix, set2_ix] ? tile_sizes[tile_ix] : 0, eachindex(tile_sizes))
+            isect_size = 0
+            for tile_ix in eachindex(tile_sizes)
+                if tileXset[tile_ix, set1_ix] && tileXset[tile_ix, set2_ix]
+                    isect_size += tile_sizes[tile_ix]
+                end
+            end
             # one-sided Fisher's P-value
             res[set1_ix, set2_ix] = res[set2_ix, set1_ix] = logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size, isect_size, tail=:left);
         end
