@@ -189,7 +189,7 @@ set(mosaic::SetMosaic, set_ix::Integer) = slice(mosaic.elmXset, :, set_ix)
 """
 type MaskedSetMosaic{T,S}
     original::SetMosaic{T,S}    # original mosaic
-    mask::Vector{Bool}          # elements mask
+    elmask::BitVector           # elements mask
     setixs::Vector{Int}         # original indices of the included sets
 
     """
@@ -206,19 +206,19 @@ type MaskedSetMosaic{T,S}
     nmasked_perset::Vector{Int}   # number of masked elements in a set
     nunmasked_perset::Vector{Int} # number of unmasked elements in a set
 
-    function MaskedSetMosaic(original::SetMosaic{T, S}, mask::Vector{Bool},
+    function MaskedSetMosaic(original::SetMosaic{T, S}, elmask::BitVector,
                              setixs::Vector{Int},
                              tileXset::SparseMaskMatrix,
                              total_masked::Number,
                              nmasked_pertile::Vector{Int}, nunmasked_pertile::Vector{Int},
                              nmasked_perset::Vector{Int}, nunmasked_perset::Vector{Int}
     )
-        new(original, mask, setixs, tileXset, total_masked,
+        new(original, elmask, setixs, tileXset, total_masked,
             nmasked_pertile, nunmasked_pertile,
             nmasked_perset, nunmasked_perset)
     end
 
-    function Base.call{T,S}(::Type{MaskedSetMosaic}, mosaic::SetMosaic{T, S}, elmask::Vector{Bool})
+    function Base.call{T,S}(::Type{MaskedSetMosaic}, mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}})
         length(elmask) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
         #println("elmask=", elmask)
@@ -281,7 +281,7 @@ type MaskedSetMosaic{T,S}
     end
 end
 
-mask(mosaic::SetMosaic, mask::Vector{Bool}) = MaskedSetMosaic(mosaic, mask)
+mask(mosaic::SetMosaic, mask::Union{BitVector,Vector{Bool}}) = MaskedSetMosaic(mosaic, mask)
 mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}) = mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm])
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
@@ -297,7 +297,7 @@ nunmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nunmasked_perset
 
 function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
     # copy everything, except the original mosaic (leave the reference to the same object)
-    MaskedSetMosaic{T,S}(mosaic.original, copy(mosaic.mask), copy(mosaic.setixs),
+    MaskedSetMosaic{T,S}(mosaic.original, copy(mosaic.elmask), copy(mosaic.setixs),
                     copy(mosaic.tileXset), mosaic.total_masked,
                     copy(mosaic.nmasked_pertile), copy(mosaic.nunmasked_pertile),
                     copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
