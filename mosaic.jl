@@ -224,7 +224,7 @@ type MaskedSetMosaic{T,S}
         #println("elmask=", elmask)
         # get the sets that overlap with the elements mask
         setmask = fill(false, nsets(mosaic))
-        for i in eachindex(elmask)
+        @inbounds for i in eachindex(elmask)
             if elmask[i]
                 setmask[slice(mosaic.setXelm, :, i)] = true
             end
@@ -239,7 +239,7 @@ type MaskedSetMosaic{T,S}
         #println("subsetXtile=$subsetXtile")
         membership2tile = Dict{Vector{Int}, Vector{Int}}()
         sizehint!(membership2tile, size(subsetXtile, 2))
-        for i in 1:size(subsetXtile, 2)
+        @inbounds for i in 1:size(subsetXtile, 2)
             set_ixs = find(subsetXtile[:, i])
             if haskey(membership2tile, set_ixs)
                 push!(membership2tile[set_ixs], i)
@@ -251,7 +251,7 @@ type MaskedSetMosaic{T,S}
         nmasked_pertile = fill(0, length(membership2tile))
         nunmasked_pertile = fill(0, length(membership2tile))
         set2tile_ixs = [Vector{Int}() for _ in 1:length(orig_setixs)]
-        for (tile_ix, (tile_set_ixs, old_tile_ixs)) in enumerate(membership2tile)
+        @inbounds for (tile_ix, (tile_set_ixs, old_tile_ixs)) in enumerate(membership2tile)
             for set_ix in tile_set_ixs
                 push!(set2tile_ixs[set_ix], tile_ix)
             end
@@ -270,7 +270,7 @@ type MaskedSetMosaic{T,S}
         tileXset = sparse_mask(length(nmasked_pertile), length(orig_setixs), set2tile_ixs)
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
-        for set_ix in eachindex(nmasked_perset)
+        @inbounds for set_ix in eachindex(nmasked_perset)
             nmasked_perset[set_ix] = sum(nmasked_pertile[slice(tileXset, :, set_ix)])
             nunmasked_perset[set_ix] = mosaic.set_sizes[orig_setixs[set_ix]] - nmasked_perset[set_ix]
         end
