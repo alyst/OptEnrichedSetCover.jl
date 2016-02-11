@@ -9,24 +9,24 @@ end
 """
   The collection of masked set coverings.
 """
-immutable CoverCollection{T,S}
-    mosaic::MaskedSetMosaic{T,S}
+immutable CoverCollection
+    elmask::BitVector                 # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setscores::Vector{Float64}
     variants::Vector{CoverProblemResult}
 
-    function CoverCollection(mosaic::MaskedSetMosaic{T,S})
-        new(mosaic,
+    function CoverCollection(mosaic::MaskedSetMosaic)
+        new(mosaic.elmask,
             fill(NaN, nsets(mosaic.original)),
             Vector{CoverProblemResult}())
     end
 end
 
-function _setscore(covers::CoverCollection, cover::CoverProblemResult, problem::CoverProblem, setix::Int)
+function _setscore(cover::CoverProblemResult, covers::CoverCollection, mosaic::MaskedSetMosaic, problem::CoverProblem, setix::Int)
     if cover.weights[setix] > 0.0
-        orig_setix = covers.mosaic.setixs[setix]
+        orig_setix = mosaic.setixs[setix]
         delta_score = isempty(covers.variants) ? 0.0 : cover.score - covers.variants[1].score
-        setscore(covers.mosaic.original.set_sizes[orig_setix], nmasked_perset(covers.mosaic)[setix],
-                nelements(covers.mosaic), nmasked(covers.mosaic),
+        setscore(mosaic.original.set_sizes[orig_setix], nmasked_perset(mosaic)[setix],
+                nelements(mosaic), nmasked(mosaic),
                 problem.params) - log(cover.weights[setix]) + delta_score
     else
         Inf
@@ -36,18 +36,19 @@ end
 Base.length(covers::CoverCollection) = length(covers.variants)
 Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 
-function Base.convert(::Type{DataFrame}, covers::CoverCollection)
+function Base.convert(::Type{DataFrame}, covers::CoverCollection, mosaic::SetMosaic)
+    masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
     nsets = Int[sum(variant.weights.>0.0) for variant in covers.variants]
     set_ixs = vcat([find(variant.weights.>0.0)
                     for variant in covers.variants]...)
-    orig_set_ixs = covers.mosaic.setixs[set_ixs]
+    orig_set_ixs = masked_mosaic.setixs[set_ixs]
     DataFrame(cover_ix = vcat([fill(cover_ix, nset) for (cover_ix, nset) in enumerate(nsets)]...),
               set_ix = orig_set_ixs,
-              set_id = covers.mosaic.original.ix2set[orig_set_ixs],
+              set_id = masked_mosaic.original.ix2set[orig_set_ixs],
               delta_score = vcat([fill(covers.variants[cover_ix].score - covers.variants[1].score, nset)
                                  for (cover_ix, nset) in enumerate(nsets)]...),
-              nmasked = nmasked_perset(covers.mosaic)[set_ixs],
-              nunmasked = nunmasked_perset(covers.mosaic)[set_ixs],
+              nmasked = nmasked_perset(masked_mosaic)[set_ixs],
+              nunmasked = nunmasked_perset(masked_mosaic)[set_ixs],
               weight = vcat([variant.weights[variant.weights.>0]
                               for variant in covers.variants]...),
               score = covers.setscores[orig_set_ixs])
@@ -60,7 +61,7 @@ end
 function Base.collect{T,S}(etor::CoverEnumerator{T,S}; max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0)
     orig_problem = CoverProblem(etor.mosaic, etor.params)
     cur_mosaic = copy(etor.mosaic)
-    res = CoverCollection{T,S}(etor.mosaic)
+    res = CoverCollection(etor.mosaic)
     best_cover_score = NaN
     while max_covers == 0 || length(res) < max_covers
         cur_problem = CoverProblem(cur_mosaic, etor.params)
@@ -72,7 +73,7 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; max_covers::Int = 0, max_
         # get the weights of sets in the original etor.mosaic problem
         orig_weights = fill(0.0, nsets(etor.mosaic))
         orig_weights[Int[findfirst(etor.mosaic.setixs, setix) for setix in cur_mosaic.setixs]] = cur_cover.weights
-        set_scores = [_setscore(res, cur_cover, cur_problem, i) for i in eachindex(cur_cover.weights)]
+        set_scores = [_setscore(cur_cover, res, cur_mosaic, cur_problem, i) for i in eachindex(cur_cover.weights)]
         cover_score = score(orig_problem, orig_weights)
         if isempty(res)
             best_cover_score = cover_score
