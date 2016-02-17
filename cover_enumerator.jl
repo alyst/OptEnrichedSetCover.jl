@@ -25,7 +25,7 @@ function _setscore(cover::CoverProblemResult, covers::CoverCollection, mosaic::M
     if cover.weights[setix] > 0.0
         orig_setix = mosaic.setixs[setix]
         delta_score = isempty(covers.variants) ? 0.0 : cover.score - covers.variants[1].score
-        setscore(mosaic.original.set_sizes[orig_setix], nmasked_perset(mosaic)[setix],
+        singletonsetscore(mosaic.original.set_sizes[orig_setix], nmasked_perset(mosaic)[setix],
                 nelements(mosaic), nmasked(mosaic),
                 problem.params) - log(cover.weights[setix]) + delta_score
     else
