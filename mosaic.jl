@@ -310,7 +310,7 @@ end
 """
 function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVector})
     nsets(mosaic) == length(setmask) ||
-        throw(ArgumentError("Mask length ($(lenght(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
+        throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
     mosaic.setixs = mosaic.setixs[setmask]
     tileXset = mosaic.tileXset[:, setmask]
     tile_mask = fill(false, ntiles(mosaic))
