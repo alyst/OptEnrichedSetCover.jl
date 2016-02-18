@@ -11,46 +11,69 @@ end
 """
 immutable CoverCollection
     elmask::BitVector                 # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
-    set_scores::Vector{Float64}
+    setixs::Vector{Int}               # vector of the set indices in the original mosaic
+    base_setscores::Vector{Float64}   # base set scores
+    set_variantix::Vector{Int}        # best-scoring cover for the given set
     variants::Vector{CoverProblemResult}
 
-    function CoverCollection(mosaic::MaskedSetMosaic)
-        new(mosaic.elmask,
-            fill(NaN, nsets(mosaic.original)),
+    function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic)
+        nsets(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
+        # FIXME check the problem is compatible with the mosaic
+        new(mosaic.elmask, mosaic.setixs,
+            problem.set_scores,
+            zeros(Int, nsets(problem)),
             Vector{CoverProblemResult}())
     end
 end
 
-function _setscore(cover::CoverProblemResult, mosaic::MaskedSetMosaic, problem::CoverProblem, setix::Int)
+function setscore(covers::CoverCollection, setix::Int, cover::CoverProblemResult, delta_score::Float64)
     if cover.weights[setix] > 0.0
-        orig_setix = mosaic.setixs[setix]
-        singletonsetscore(mosaic.original.set_sizes[orig_setix], nmasked_perset(mosaic)[setix],
-                          nelements(mosaic), nmasked(mosaic),
-                          problem.params) - log(cover.weights[setix])
+        # problem set score + delta score for the best variant, where it was covered - log(set weight)
+        return covers.base_setscores[setix] + delta_score - log(cover.weights[setix])
     else
-        Inf
+        # the set is not selectd
+        return Inf
+    end
+end
+
+setscore(covers::CoverCollection, setix::Int, variantix::Int) = setscore(covers, setix, covers.variants[variantix],
+                                                                         covers.variants[variantix].score - covers.variants[1].score)
+
+function setscore(covers::CoverCollection, setix::Int)
+    if covers.set_variantix[setix] > 0
+        # problem set score + delta score for the best variant, where it was covered - log(set weight)
+        return setscore(covers, setix, covers.set_variantix[setix])
+    else
+        # the set not selectd
+        return Inf
     end
 end
 
 Base.length(covers::CoverCollection) = length(covers.variants)
 Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 
+"""
+    Convert `CoverCollection` intto a `DataFrame`.
+
+    * `mosaic` the original `SetMosaic`
+"""
 function Base.convert(::Type{DataFrame}, covers::CoverCollection, mosaic::SetMosaic)
     masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
     nsets = Int[sum(variant.weights.>0.0) for variant in covers.variants]
     set_ixs = vcat([find(variant.weights.>0.0)
                     for variant in covers.variants]...)
-    orig_set_ixs = masked_mosaic.setixs[set_ixs]
-    DataFrame(cover_ix = vcat([fill(cover_ix, nset) for (cover_ix, nset) in enumerate(nsets)]...),
+    orig_set_ixs = covers.setixs[set_ixs]
+    cover_ixs = vcat([fill(cover_ix, nset) for (cover_ix, nset) in enumerate(nsets)]...)
+    DataFrame(cover_ix = cover_ixs,
               set_ix = orig_set_ixs,
-              set_id = masked_mosaic.original.ix2set[orig_set_ixs],
+              set_id = mosaic.ix2set[orig_set_ixs],
               delta_score = vcat([fill(covers.variants[cover_ix].score - covers.variants[1].score, nset)
                                  for (cover_ix, nset) in enumerate(nsets)]...),
               nmasked = nmasked_perset(masked_mosaic)[set_ixs],
               nunmasked = nunmasked_perset(masked_mosaic)[set_ixs],
               weight = vcat([variant.weights[variant.weights.>0]
                               for variant in covers.variants]...),
-              score = covers.set_scores[orig_set_ixs])
+              score = [setscore(covers, set_ixs[i], cover_ixs[i]) for i in eachindex(set_ixs)])
 end
 
 """
@@ -59,7 +82,7 @@ end
 """
 function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=-100.0, max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0)
     cover_problem = CoverProblem(etor.mosaic, etor.params)
-    res = CoverCollection(etor.mosaic)
+    res = CoverCollection(cover_problem, etor.mosaic)
     while max_covers == 0 || length(res) < max_covers
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
                              solver=IpoptSolver(print_level=0))
@@ -82,30 +105,38 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 break # bad cover score, stop enumerating
             end
         end
-        if isfinite(max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) > max_set_score)
-            break # no set with good score, stop enumerating
+        if isfinite(max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) + delta_score > max_set_score)
+            break # no set with the good score, stop enumerating
         end
         scores_updated = false
         # update the set scores
         @inbounds for setix in used_setixs
-            orig_setix = etor.mosaic.setixs[setix]
             # adjust the set scores by delta
-            score = cover_problem.set_scores[setix] + delta_score
-            if (cur_cover.weights[setix]>0.0) && isfinite(score) &&
-               (isnan(res.set_scores[orig_setix]) || res.set_scores[orig_setix] > score)
-               scores_updated = true
-                res.set_scores[orig_setix] = score
+            new_score = setscore(res, setix, cur_cover, delta_score)
+            cur_score = setscore(res, setix)
+            if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
+                scores_updated = true
+                res.set_variantix[setix] = -1 # mark for setting to the cover_pos
             end
         end
         if !scores_updated
             break # the cover does not improve any score
         end
-        # save current cover
+        # save the current cover
         insert!(res.variants, cover_pos, cur_cover)
+        # update pointers to the best covers for the sets
+        for setix in eachindex(res.set_variantix)
+            if res.set_variantix[setix] == -1
+                res.set_variantix[setix] = cover_pos
+            elseif res.set_variantix[setix] >= cover_pos
+                # the variant has moved down
+                res.set_variantix[setix] += 1
+            end
+        end
         if max_covers > 0 && length(res) >= max_covers
             break # collected enough covers
         end
-        # penalize selective the same cover by penalizing every pair of sets from the cover
+        # penalize selecting the same cover by penalizing every pair of sets from the cover
         for set1_ix in used_setixs
             for set2_ix in used_setixs
                 if set1_ix != set2_ix
@@ -113,7 +144,7 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 end
             end
         end
-        if all(isfinite, res.set_scores)
+        if all(x::Int -> x > 0, res.set_variantix)
             break # no unassigned sets left
         end
     end
