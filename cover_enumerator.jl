@@ -16,6 +16,10 @@ immutable CoverCollection
     set_variantix::Vector{Int}        # best-scoring cover for the given set
     variants::Vector{CoverProblemResult}
 
+    CoverCollection() =
+        new(BitVector(), Vector{Int}(), Vector{Float64}(),
+            Vector{Int}(), Vector{CoverProblemResult}())
+
     function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic)
         nsets(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         # FIXME check the problem is compatible with the mosaic
