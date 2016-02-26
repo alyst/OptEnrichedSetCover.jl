@@ -16,7 +16,7 @@ immutable CoverCollection
     set_variantix::Vector{Int}        # best-scoring cover for the given set
     variants::Vector{CoverProblemResult}
 
-    CoverCollection() =
+    CoverCollection(empty::Void = nothing) =
         new(BitVector(), Vector{Int}(), Vector{Float64}(),
             Vector{Int}(), Vector{CoverProblemResult}())
 
