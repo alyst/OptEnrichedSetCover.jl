@@ -73,8 +73,8 @@ nsets(problem::CoverProblem) = length(problem.set_scores)
 function opt_model(problem::CoverProblem)
     m = JuMP.Model()
     ns = nsets(problem)
-    @defVar(m, 0.0 <= w[1:ns] <= 1.0)
-    @setObjective(m, :Min, dot(problem.set_scores, w) - dot(w, problem.setXset_scores * w))
+    @variable(m, 0.0 <= w[1:ns] <= 1.0)
+    @objective(m, :Min, dot(problem.set_scores, w) - dot(w, problem.setXset_scores * w))
     return m
 end
 
@@ -122,12 +122,12 @@ function optimize(problem::CoverProblem;
     #try
     # using JuMP
     m = opt_model(problem)
-    setSolver(m, solver)
+    setsolver(m, solver)
     solve(m)
-    w = copy(getValue(getVar(m, :w)))
+    w = copy(getvalue(getvar(m, :w)))
     # remove small non-zero probabilities due to optimization method errors
     w[w .< problem.params.min_weight] = 0.0
-    return CoverProblemResult(w, getObjectiveValue(m))
+    return CoverProblemResult(w, getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
