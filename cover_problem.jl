@@ -22,9 +22,11 @@ end
 Linear component of a set score.
 Doesn't take into account the overlap with the other selected sets.
 """
-function singletonsetscore(set::Number, masked::Number, total::Number, total_masked::Number, params::CoverParams)
-    #= P-value for masked-vs-set overlap enriched =# logpvalue(set, total_masked, total, masked, tail=:left) -
+function independentsetscore(set::Number, masked::Number, total::Number, total_masked::Number, params::CoverParams)
+    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(set, total_masked, total, masked, tail=:left) -
     #= P-value for unmasked-vs-set overlap enriched =# logpvalue(set, total - total_masked, total, set - masked, tail=:left)
+    @assert !isnan(res) "set=$set masked=$masked total=$total total_masked=$total_masked res NaN"
+    return res
 end
 
 """
@@ -59,7 +61,7 @@ immutable CoverProblem
             setXset_scores[i, i] = -params.reg
         end
         new(params, setXset_scores,
-            Float64[singletonsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
+            Float64[independentsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
                         nmasked_perset(mosaic)[i],
                         nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)])
     end
