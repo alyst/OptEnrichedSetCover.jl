@@ -59,7 +59,7 @@ end
 function Base.convert(::Type{SparseMaskMatrix}, mtx::Matrix{Bool})
     colptr = sizehint!(Vector{Int}(), size(mtx, 2)+1)
     rowval = Vector{Int}()
-    for j in 1:size(mtx, 2)
+    @inbounds for j in 1:size(mtx, 2)
         push!(colptr, length(rowval)+1)
         for i in 1:size(mtx, 1)
             mtx[i, j] && push!(rowval, i)
@@ -76,10 +76,10 @@ function Base.size(mtx::SparseMaskMatrix, dim::Integer)
     (1 <= dim <= 2) || throw(ArgumentError("SparseMaskMatrix does not have dimension #$dim"))
     dim == 1 ? mtx.m : mtx.n
 end
-_colrange(mtx::SparseMaskMatrix, col::Integer) = mtx.colptr[col]:(mtx.colptr[col+1]-1)
+@inline _colrange(mtx::SparseMaskMatrix, col::Integer) = mtx.colptr[col]:(mtx.colptr[col+1]-1)
 
-Base.getindex(mtx::SparseMaskMatrix, ::Colon, col::Integer) = mtx.rowval[_colrange(mtx, col)]
-function Base.getindex(mtx::SparseMaskMatrix, ::Colon, cols::Vector{Int})
+@inline Base.getindex(mtx::SparseMaskMatrix, ::Colon, col::Integer) = mtx.rowval[_colrange(mtx, col)]
+Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, cols::Vector{Int})
     rowvals = Vector{Int}()
     colptr = Vector{Int}()
     for col in cols
@@ -91,7 +91,7 @@ function Base.getindex(mtx::SparseMaskMatrix, ::Colon, cols::Vector{Int})
     SparseMaskMatrix(mtx.m, length(cols), colptr, rowvals)
 end
 
-function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::Union{Vector{Bool},BitVector})
+Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::Union{Vector{Bool},BitVector})
     length(colmask) == size(mtx, 2) || throw(ArgumentError("Column mask length should match the number of columns"))
     mtx[:, find(colmask)]
 end
