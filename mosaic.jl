@@ -58,7 +58,7 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     end
     push!(set_tile_ranges, length(tile_ixs)+1)
 
-    sparse_mask(setXelm),
+    SparseMaskMatrix(setXelm),
     SparseMaskMatrix(length(elm2ix), length(tile_elm_ranges)-1, tile_elm_ranges, elm_ixs), # elmXtile
     SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
 end
@@ -265,7 +265,7 @@ type MaskedSetMosaic{T,S}
                 nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
             end
         end
-        tileXset = sparse_mask(length(nmasked_pertile), length(orig_setixs), set2tile_ixs)
+        tileXset = SparseMaskMatrix(length(nmasked_pertile), length(orig_setixs), set2tile_ixs)
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
         @inbounds for set_ix in eachindex(nmasked_perset)
