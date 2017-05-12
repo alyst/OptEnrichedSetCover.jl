@@ -6,8 +6,8 @@ function logpvalue(a_size::Integer, b_size::Integer,
                    tail::Symbol = :left)
     ((a_size >= 0) && (b_size >= 0) && (all_size >= 0)) || throw(ArgumentError("Sets with negative number of elements"))
     ((a_size <= all_size) && (b_size <= all_size)) || throw(ArgumentError("Sets bigger that total number of elements"))
-    if isect_size > min(a_size, b_size)
-        return tail == :left ? -Inf : 0.0
+    if isect_size >= min(a_size, b_size)
+        return tail == :left ? 0.0 : -Inf
     elseif isect_size < min(0, a_size + b_size - all_size)
         return tail == :left ? -Inf : 0.0
     end
