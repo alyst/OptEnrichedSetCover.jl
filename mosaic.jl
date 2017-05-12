@@ -126,11 +126,11 @@ function _union{T}(::Type{T}, sets)
 end
 
 """
-  Encodes a collection of (overlapping) sets as
-  a mosaic of non-overlapping "tiles".
+Maintains a collection of (potentially overlapping) sets as
+a mosaic of non-overlapping "tiles".
 
-  * `T` type of elements
-  * `S` type of set keys
+* `T` type of elements
+* `S` type of set keys
 """
 immutable SetMosaic{T,S}
     ix2elm::Vector{T}       # element index to element
@@ -148,7 +148,7 @@ immutable SetMosaic{T,S}
     setXset_scores::Matrix{Float64}
 
     """
-      Constructs `SetMosaic` for a given nameless sets collection.
+    Construct `SetMosaic` for a given nameless sets collection.
     """
     function Base.call{T}(::Type{SetMosaic}, sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
         ix2elm, elm2ix = _encode_elements(all_elms)
@@ -162,7 +162,7 @@ immutable SetMosaic{T,S}
     end
 
     """
-      Constructs `SetMosaic` for a given named sets collection.
+    Constructs `SetMosaic` for a given named sets collection.
     """
     function Base.call{T, S}(::Type{SetMosaic}, sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
         ix2elm, elm2ix = _encode_elements(all_elms)
@@ -184,8 +184,8 @@ tile(mosaic::SetMosaic, tile_ix::Integer) = slice(mosaic.elmXtile, :, tile_ix)
 set(mosaic::SetMosaic, set_ix::Integer) = slice(mosaic.elmXset, :, set_ix)
 
 """
-    `SetMosaic` with an elements mask on top.
-    Sets that are not overlapping with the mask are excluded from `MaskedSetMosaic`.
+`SetMosaic` with an elements mask on top.
+Sets that are not overlapping with the mask are excluded from `MaskedSetMosaic`.
 """
 type MaskedSetMosaic{T,S}
     original::SetMosaic{T,S}    # original mosaic
@@ -304,9 +304,7 @@ function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
 end
 
 """
-  Excludes sets from the mosaic and updates the set of active tiles.
-
-  * `setmask` mask of sets to exclude
+Exclude `setmask` sets from the `mosaic` and update the set of its active tiles.
 """
 function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVector})
     nsets(mosaic) == length(setmask) ||

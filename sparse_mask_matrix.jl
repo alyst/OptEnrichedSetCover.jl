@@ -1,7 +1,7 @@
 """
-    Sparse representation of `Matrix{Bool}`, when all "falses" are "structural".
-    It uses compressed sparse column (CSC) representation, except no
-    non-zero values needs to be stored.
+Sparse representation of `Matrix{Bool}`, when all "falses" are "structural".
+It uses compressed sparse column (CSC) representation, except no
+non-zero values need to be stored.
 """
 immutable SparseMaskMatrix
     m::Int
@@ -23,7 +23,7 @@ end
 Base.copy(mtx::SparseMaskMatrix) = SparseMaskMatrix(mtx.m, mtx.n, copy(mtx.colptr), copy(mtx.rowval))
 
 """
-    Constructs the sparse mask given vector of true row indices per each column.
+Construct `SparseMaskMatrix` given vector of true row indices per each column.
 """
 function sparse_mask(m::Integer, n::Integer, rowvals_percol::Vector{Vector{Int}})
     colptr = sizehint!(Vector{Int}(), n+1)
@@ -37,10 +37,10 @@ function sparse_mask(m::Integer, n::Integer, rowvals_percol::Vector{Vector{Int}}
 end
 
 """
-    Constructs the sparse mask from the family of sets.
+Construct `SparseMaskMatrix` from the family of sets.
 
-    * `sets` family of sets, one set per column
-    * `elm2ix` mapping from set element to its index (mask row index)
+ * `sets` family of sets, one set per result column
+ * `elm2ix` mapping from set element to its index (mask row index)
 """
 function sparse_mask{T}(sets, elm2ix::Dict{T, Int})
     if isempty(sets)

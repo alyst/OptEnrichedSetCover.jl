@@ -1,5 +1,5 @@
 """
-  OESC cover problem parameters.
+OESC cover problem parameters.
 """
 immutable CoverParams
     a::Float64 # prior probability of covered element to be unmasked
@@ -19,8 +19,8 @@ immutable CoverParams
 end
 
 """
-    Linear component of a set score.
-    Doesn't take into account the overlap with the other selected sets.
+Linear component of a set score.
+Doesn't take into account the overlap with the other selected sets.
 """
 function singletonsetscore(set::Number, masked::Number, total::Number, total_masked::Number, params::CoverParams)
     #= P-value for masked-vs-set overlap enriched =# logpvalue(set, total_masked, total, masked, tail=:left) -
@@ -28,10 +28,10 @@ function singletonsetscore(set::Number, masked::Number, total::Number, total_mas
 end
 
 """
-  OESC cover problem -- choose the sets from the collection to cover
-  the masked elements. The sets selection needs to minimize the P-values of masked set overlap,
-  while maximizing the P-values of the pairwise overlap of the selected sets.
-  Fuzzy selection is possible -- each set is assigned a weight from [0, 1] range.
+OESC cover problem -- choose the sets from the collection to cover
+the masked elements. The sets selection needs to minimize the P-values of masked set overlap,
+while maximizing the P-values of the pairwise overlap of the selected sets.
+Fuzzy selection is possible -- each set is assigned a weight from [0, 1] range.
 """
 immutable CoverProblem
     params::CoverParams
@@ -68,7 +68,7 @@ end
 nsets(problem::CoverProblem) = length(problem.set_scores)
 
 """
-  Constructs JuMP nonlinear model for the given OESC problem.
+Construct JuMP nonlinear model for the given OESC problem.
 """
 function opt_model(problem::CoverProblem)
     m = JuMP.Model()
@@ -90,9 +90,9 @@ function fix_uncov_probs!(uncov_probs::Vector{Float64})
 end
 
 """
-    Score (probability) of the OESC coverage.
+Score (probability) of the OESC coverage.
 
-     * `w` probabilities of the sets being covered
+* `w` probabilities of the sets being covered
 """
 function score(problem::CoverProblem, w::Vector{Float64})
     # FIXME throw an error?
@@ -101,7 +101,7 @@ function score(problem::CoverProblem, w::Vector{Float64})
 end
 
 """
-    Result of `optimize(CoverProblem)`.
+Result of `optimize(CoverProblem)`.
 """
 immutable CoverProblemResult
     weights::Vector{Float64}

@@ -1,5 +1,5 @@
 """
-  Log P-value for the A and B sets intersection.
+Log P-value for the A and B sets intersection.
 """
 function logpvalue(a_size::Integer, b_size::Integer,
                    all_size::Integer, isect_size::Integer;
