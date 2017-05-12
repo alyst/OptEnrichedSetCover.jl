@@ -97,10 +97,10 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes:
     res = Matrix{Float64}(nsets, nsets)
     @inbounds for set1_ix in 1:nsets
         res[set1_ix, set1_ix] = 0.0
-        if set1_ix == nsets break end
-        set1_tiles = slice(tileXset, :, set1_ix)
+        (set1_ix == nsets) && break
+        set1_tiles = view(tileXset, :, set1_ix)
         for set2_ix in (set1_ix+1):nsets
-            set2_tiles = slice(tileXset, :, set2_ix)
+            set2_tiles = view(tileXset, :, set2_ix)
             # one-sided Fisher's P-value
             res[set2_ix, set1_ix] =
                 logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size,
@@ -150,10 +150,10 @@ immutable SetMosaic{T,S}
     """
     Construct `SetMosaic` for a given nameless sets collection.
     """
-    function Base.call{T}(::Type{SetMosaic}, sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
+    function (::Type{SetMosaic}){T}(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
         ix2elm, elm2ix = _encode_elements(all_elms)
         elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
-        tile_sizes = Int[length(slice(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
+        tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in sets]
         new{T, Int}(ix2elm, elm2ix,
                     collect(eachindex(sets)), Dict(Pair{Int,Int}[Pair(i,i) for i in eachindex(sets)]),
@@ -164,10 +164,10 @@ immutable SetMosaic{T,S}
     """
     Constructs `SetMosaic` for a given named sets collection.
     """
-    function Base.call{T, S}(::Type{SetMosaic}, sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
+    function (::Type{SetMosaic}){T,S}(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
         ix2elm, elm2ix = _encode_elements(all_elms)
         elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
-        tile_sizes = Int[length(slice(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
+        tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in values(sets)]
         new{T, S}(ix2elm, elm2ix,
                   collect(keys(sets)), Dict{S, Int}(Pair{S,Int}[Pair(s, i) for (i, s) in enumerate(keys(sets))]),
@@ -180,8 +180,8 @@ nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
 ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)
 nsets(mosaic::SetMosaic) = size(mosaic.tileXset, 2)
 
-tile(mosaic::SetMosaic, tile_ix::Integer) = slice(mosaic.elmXtile, :, tile_ix)
-set(mosaic::SetMosaic, set_ix::Integer) = slice(mosaic.elmXset, :, set_ix)
+tile(mosaic::SetMosaic, tile_ix::Integer) = view(mosaic.elmXtile, :, tile_ix)
+set(mosaic::SetMosaic, set_ix::Integer) = view(mosaic.elmXset, :, set_ix)
 
 """
 `SetMosaic` with an elements mask on top.
@@ -218,23 +218,21 @@ type MaskedSetMosaic{T,S}
             nmasked_perset, nunmasked_perset)
     end
 
-    function Base.call{T,S}(::Type{MaskedSetMosaic}, mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}})
+    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}})
         length(elmask) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
         #println("elmask=", elmask)
         # get the sets that overlap with the elements mask
         setmask = fill(false, nsets(mosaic))
         @inbounds for i in eachindex(elmask)
-            if elmask[i]
-                setmask[slice(mosaic.setXelm, :, i)] = true
-            end
+            elmask[i] && (setmask[view(mosaic.setXelm, :, i)] = true)
         end
         orig_setixs = find(setmask)
         #println("setmask=$setmask")
         # detect and squash tiles that have the same membership pattern wrt the masked sets
         subsetXtile = fill(false, length(orig_setixs), ntiles(mosaic))
         for (new_setix, orig_setix) in enumerate(orig_setixs)
-            subsetXtile[new_setix, slice(mosaic.tileXset, :, orig_setix)] = true
+            subsetXtile[new_setix, view(mosaic.tileXset, :, orig_setix)] = true
         end
         #println("subsetXtile=$subsetXtile")
         membership2tile = Dict{Vector{Int}, Vector{Int}}()
@@ -256,7 +254,7 @@ type MaskedSetMosaic{T,S}
                 push!(set2tile_ixs[set_ix], tile_ix)
             end
             for old_tile_ix in old_tile_ixs
-                oldtile_elms = slice(mosaic.elmXtile, :, old_tile_ix)
+                oldtile_elms = view(mosaic.elmXtile, :, old_tile_ix)
                 n_oldtile_masked = 0
                 for eix in oldtile_elms
                     if elmask[eix]
@@ -271,7 +269,7 @@ type MaskedSetMosaic{T,S}
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
         @inbounds for set_ix in eachindex(nmasked_perset)
-            nmasked_perset[set_ix] = sum(nmasked_pertile[slice(tileXset, :, set_ix)])
+            nmasked_perset[set_ix] = sum(nmasked_pertile[view(tileXset, :, set_ix)])
             nunmasked_perset[set_ix] = mosaic.set_sizes[orig_setixs[set_ix]] - nmasked_perset[set_ix]
         end
         #println("tileXset=$tileXset")

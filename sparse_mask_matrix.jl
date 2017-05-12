@@ -99,4 +99,4 @@ function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::Union{Vector{Boo
     mtx[:, find(colmask)]
 end
 
-Base.slice(mtx::SparseMaskMatrix, ::Colon, col::Integer) = slice(mtx.rowval, _colrange(mtx, col))
+Base.view(mtx::SparseMaskMatrix, ::Colon, col::Integer) = view(mtx.rowval, _colrange(mtx, col))
