@@ -104,7 +104,7 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes:
             # one-sided Fisher's P-value
             res[set2_ix, set1_ix] =
                 logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size,
-                          _isect_size(set1_tiles, set2_tiles, tile_sizes), tail=:left)
+                          _isect_size(set1_tiles, set2_tiles, tile_sizes))
         end
     end
     # symmetrize
