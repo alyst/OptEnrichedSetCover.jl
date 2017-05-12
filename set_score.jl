@@ -8,7 +8,7 @@ function logpvalue(a_size::Integer, b_size::Integer,
     ((a_size <= all_size) && (b_size <= all_size)) || throw(ArgumentError("Sets bigger that total number of elements"))
     # corner cases
     if isect_size >= min(a_size, b_size)
-        return tail == :left ? 0.0 : -Inf
+        return tail == :right ? -Inf : 0.0
     elseif isect_size < min(0, a_size + b_size - all_size)
         return tail == :left ? -Inf : 0.0
     end
