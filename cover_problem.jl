@@ -80,7 +80,7 @@ end
 
 function fix_uncov_probs!(uncov_probs::Vector{Float64})
     pen = 0.0
-    @inbounds for i in 1:length(uncov_probs)
+    @inbounds for i in eachindex(uncov_probs)
         prob = uncov_probs[i]
         prob_new = clamp(prob, 0.0, 1.0)
         pen += (prob_new - prob)^2
@@ -115,9 +115,8 @@ function optimize(problem::CoverProblem;
                   ini_weights::Vector{Float64} = rand(nsets(problem)),
                   #iterations::Int = 100,
                   solver::MathProgBase.SolverInterface.AbstractMathProgSolver = IpoptSolver(print_level=0))
-    if nsets(problem) == 0
-        return CoverProblemResult(Float64[], 0.0)
-    end
+    (nsets(problem) == 0) && return CoverProblemResult(Float64[], 0.0)
+
     # Perform the optimization
     #try
     # using JuMP

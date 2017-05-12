@@ -43,9 +43,8 @@ Construct `SparseMaskMatrix` from the family of sets.
  * `elm2ix` mapping from set element to its index (mask row index)
 """
 function sparse_mask{T}(sets, elm2ix::Dict{T, Int})
-    if isempty(sets)
-        return SparseMaskMatrix(length(elm2ix), 0, fill(0, 1), Vector{Int}())
-    end
+    isempty(sets) && return SparseMaskMatrix(length(elm2ix), 0, fill(0, 1), Vector{Int}())
+
     elm_ixs = Vector{Int}()
     set_ranges = Vector{Int}()
     sizehint!(set_ranges, length(sets))
@@ -63,9 +62,7 @@ function Base.convert(::Type{SparseMaskMatrix}, mtx::Matrix{Bool})
     for j in 1:size(mtx, 2)
         push!(colptr, length(rowval)+1)
         for i in 1:size(mtx, 1)
-            if mtx[i, j]
-                push!(rowval, i)
-            end
+            mtx[i, j] && push!(rowval, i)
         end
     end
     push!(colptr, length(rowval)+1)

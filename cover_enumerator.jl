@@ -89,9 +89,7 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
                              solver=IpoptSolver(print_level=0))
         used_setixs = find(cur_cover.weights .> 0)
-        if isempty(used_setixs)
-            break # no sets selected
-        end
+        isempty(used_setixs) && break # no sets selected
         cover_pos = searchsortedlast(res.variants, cur_cover, by=cover->cover.score)+1
         if cover_pos > 1
             if abs(cur_cover.score - res.variants[cover_pos-1].score) <= 1E-3 &&
@@ -121,9 +119,7 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] = -1 # mark for setting to the cover_pos
             end
         end
-        if !scores_updated
-            break # the cover does not improve any score
-        end
+        scores_updated || break # the cover does not improve any score
         # save the current cover
         insert!(res.variants, cover_pos, cur_cover)
         # update pointers to the best covers for the sets
@@ -135,20 +131,14 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] += 1
             end
         end
-        if max_covers > 0 && length(res) >= max_covers
-            break # collected enough covers
-        end
+        (max_covers > 0 && length(res) >= max_covers) || break # collected enough covers
         # penalize selecting the same cover by penalizing every pair of sets from the cover
-        for set1_ix in used_setixs
-            for set2_ix in used_setixs
-                if set1_ix != set2_ix
-                    cover_problem.setXset_scores[set1_ix, set2_ix] = setXset_penalty;
-                end
+        for set1_ix in used_setixs, set2_ix in used_setixs
+            if set1_ix != set2_ix
+                cover_problem.setXset_scores[set1_ix, set2_ix] = setXset_penalty
             end
         end
-        if all(x::Int -> x > 0, res.set_variantix)
-            break # no unassigned sets left
-        end
+        all(x::Int -> x > 0, res.set_variantix) && break # no unassigned sets left
     end
     return res
 end
