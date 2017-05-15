@@ -63,6 +63,8 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
 end
 
+# size of the sets intersection
+# the sets are represented by the sorted sets of their tiles
 function _isect_size(set1_ixs::StridedVector{Int}, set2_ixs::StridedVector{Int}, tile_sizes::Vector{Int})
     j = 1
     i = 1
@@ -126,8 +128,8 @@ function _union{T}(::Type{T}, sets)
 end
 
 """
-Maintains a collection of (potentially overlapping) sets as
-a mosaic of non-overlapping "tiles".
+A collection of (potentially overlapping) sets as
+a "mosaic" of non-overlapping "tiles".
 
 * `T` type of elements
 * `S` type of set keys
@@ -184,27 +186,23 @@ tile(mosaic::SetMosaic, tile_ix::Integer) = view(mosaic.elmXtile, :, tile_ix)
 set(mosaic::SetMosaic, set_ix::Integer) = view(mosaic.elmXset, :, set_ix)
 
 """
-`SetMosaic` with an elements mask on top.
-Sets that are not overlapping with the mask are excluded from `MaskedSetMosaic`.
+`SetMosaic` with an elements mask (selection) on top.
+Sets that are not overlapping with the mask are excluded(skipped) from `MaskedSetMosaic`.
+
+The tiles of non-overlapped sets are removed, the tiles that have identical membership
+for all the masked sets are squashed into a single tile.
 """
 type MaskedSetMosaic{T,S}
     original::SetMosaic{T,S}    # original mosaic
     elmask::BitVector           # elements mask
     setixs::Vector{Int}         # original indices of the included sets
 
-    """
-      Subset of the original mosaic that excludes sets not overlapping with
-      the mask and their tiles.
-      The remaining tiles that have the same membership within the remaining
-
-      are squashed.
-    """
     tileXset::SparseMaskMatrix
-    total_masked::Int      # total number of masked elements
-    nmasked_pertile::Vector{Int}   # number of masked elements in a tile
-    nunmasked_pertile::Vector{Int} # number of unmasked elements in a tile
-    nmasked_perset::Vector{Int}   # number of masked elements in a set
-    nunmasked_perset::Vector{Int} # number of unmasked elements in a set
+    total_masked::Int               # total number of masked elements
+    nmasked_pertile::Vector{Int}    # number of masked elements in a tile
+    nunmasked_pertile::Vector{Int}  # number of unmasked elements in a tile
+    nmasked_perset::Vector{Int}     # number of masked elements in a set
+    nunmasked_perset::Vector{Int}   # number of unmasked elements in a set
 
     function MaskedSetMosaic(original::SetMosaic{T, S}, elmask::BitVector,
                              setixs::Vector{Int},

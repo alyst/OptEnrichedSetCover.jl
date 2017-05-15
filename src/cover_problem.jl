@@ -1,5 +1,5 @@
 """
-OESC cover problem parameters.
+Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 """
 immutable CoverParams
     a::Float64 # prior probability of covered element to be unmasked
@@ -30,10 +30,13 @@ function independentsetscore(set::Number, masked::Number, total::Number, total_m
 end
 
 """
-OESC cover problem -- choose the sets from the collection to cover
-the masked elements. The sets selection needs to minimize the P-values of masked set overlap,
-while maximizing the P-values of the pairwise overlap of the selected sets.
-Fuzzy selection is possible -- each set is assigned a weight from [0, 1] range.
+Optimal Enriched-Set Cover problem -- choose the sets from the collection to cover
+the masked(selected) elements.
+The optimal sets cover `C` needs to deliver to goals:
+* minimize the P-values of masked elements enrichment for each of `C` sets
+* minimize the P-values of the pairwise non-overlap of `C` sets with each other.
+
+Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` range.
 """
 immutable CoverProblem
     params::CoverParams
@@ -67,10 +70,13 @@ immutable CoverProblem
     end
 end
 
+"""
+Total number of sets in the collection.
+"""
 nsets(problem::CoverProblem) = length(problem.set_scores)
 
 """
-Construct JuMP nonlinear model for the given OESC problem.
+Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
 """
 function opt_model(problem::CoverProblem)
     m = JuMP.Model()
@@ -113,6 +119,9 @@ immutable CoverProblemResult
         new(weights, score)
 end
 
+"""
+Optimize the cover problem.
+"""
 function optimize(problem::CoverProblem;
                   ini_weights::Vector{Float64} = rand(nsets(problem)),
                   #iterations::Int = 100,

@@ -1,5 +1,6 @@
 """
-Enumerates the set collection coverings.
+Enumerates the enriched-set covers of
+the given set collection.
 """
 immutable CoverEnumerator{T,S}
     mosaic::MaskedSetMosaic{T,S}    # the original masked set mosaic
@@ -7,7 +8,7 @@ immutable CoverEnumerator{T,S}
 end
 
 """
-The collection of masked set coverings.
+The collection of masked set covers.
 """
 immutable CoverCollection
     elmask::BitVector                 # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
@@ -57,7 +58,7 @@ Base.length(covers::CoverCollection) = length(covers.variants)
 Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 
 """
-Convert `covers`, a collection of `mosaic` covers, into a `DataFrame`.
+Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 """
 function Base.convert(::Type{DataFrame}, covers::CoverCollection, mosaic::SetMosaic)
     masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
@@ -79,8 +80,13 @@ function Base.convert(::Type{DataFrame}, covers::CoverCollection, mosaic::SetMos
 end
 
 """
-Greedy enumeration of coverings.
-Sets selected at each iteration are removed from the collection.
+Greedy enumeration of enriched-set covers.
+* At each iteration a optimal enriched-set cover problem is being solved.
+* The sets selected at current iteration are removed from further consideration.
+* The process continues with the reduced collection until the result is an empty
+  collection.
+
+Returns `CoverCollection`.
 """
 function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=-100.0, max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0)
     cover_problem = CoverProblem(etor.mosaic, etor.params)

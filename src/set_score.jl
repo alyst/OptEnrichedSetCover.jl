@@ -1,5 +1,14 @@
 """
-Log P-value for the A and B sets intersection.
+Log P-value for the two sets intersection.
+
+`A` has `a_size` elemnts, B has `b_size` elements,
+they have `isect_size` elements in common, and there are
+`all_size` elements in the "universe" in total.
+
+`tail` controls the null hypothesis:
+* `:left`: by chance `A` and `B` would have more elements in common
+* `:right`: by chance `A` and `B` would have less elements in common
+* `:both`: by chance `A` and `B` would have either more or less elements in common
 """
 function logpvalue(a_size::Integer, b_size::Integer,
                    all_size::Integer, isect_size::Integer,
