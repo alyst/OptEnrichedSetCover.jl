@@ -92,7 +92,7 @@ function fix_uncov_probs!(uncov_probs::Vector{Float64})
     @inbounds for i in eachindex(uncov_probs)
         prob = uncov_probs[i]
         prob_new = clamp(prob, 0.0, 1.0)
-        pen += (prob_new - prob)^2
+        pen += abs2(prob_new - prob)
         uncov_probs[i] = prob_new
     end
     return pen
@@ -137,7 +137,11 @@ function optimize(problem::CoverProblem;
     solve(m)
     w = copy(getvalue(getvariable(m, :w)))
     # remove small non-zero probabilities due to optimization method errors
-    w[w .< problem.params.min_weight] = 0.0
+    for i in eachindex(w)
+        @inbounds if w[i] < problem.params.min_weight
+            w[i] = 0.0
+        end
+    end
     return CoverProblemResult(w, getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
