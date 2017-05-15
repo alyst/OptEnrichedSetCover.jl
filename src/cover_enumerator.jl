@@ -88,19 +88,27 @@ Greedy enumeration of enriched-set covers.
 
 Returns `CoverCollection`.
 """
-function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=-100.0, max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0)
+function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=-100.0, max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0, verbose::Bool=false)
     cover_problem = CoverProblem(etor.mosaic, etor.params)
+    verbose && info("Starting covers enumeration...")
     res = CoverCollection(cover_problem, etor.mosaic)
-    while max_covers == 0 || length(res) < max_covers
+    while true
+        verbose && info("Trying to find cover #$(length(res)+1)...")
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
                              solver=IpoptSolver(print_level=0))
-        used_setixs = find(cur_cover.weights .> 0)
-        isempty(used_setixs) && break # no sets selected
+        verbose && info("New cover found (score=$(cur_cover.score)), processing...")
+        used_setixs = find(w -> w > 0.0, cur_cover.weights)
+        if isempty(used_setixs)
+            verbose && info("Cover is empty")
+            break
+        end
         cover_pos = searchsortedlast(res.variants, cur_cover, by=cover->cover.score)+1
         if cover_pos > 1
-            if abs(cur_cover.score - res.variants[cover_pos-1].score) <= 1E-3 &&
-               maxabs(cur_cover.weights - res.variants[cover_pos-1].weights) <= 1E-3
-                break # same solution, stop enumerating
+            variant = res.variants[cover_pos-1]
+            if abs(cur_cover.score - variant.score) <= 1E-3 &&
+               maxabs(cur_cover.weights - variant.weights) <= 1E-3
+                verbose && info("Duplicate solution")
+                break
             end
         end
         delta_score = 0.0
@@ -108,11 +116,13 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
             # not the best cover
             delta_score = cur_cover.score - res.variants[1].score
             if max_cover_score_delta > 0.0 && delta_score > max_cover_score_delta
-                break # bad cover score, stop enumerating
+                verbose && info("Cover score_delta=$(delta_score) above threshold")
+                break
             end
         end
         if isfinite(max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) + delta_score > max_set_score)
-            break # no set with the good score, stop enumerating
+            verbose && info("All set scores below $(max_set_score)")
+            break
         end
         scores_updated = false
         # update the set scores
@@ -125,9 +135,13 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] = -1 # mark for setting to the cover_pos
             end
         end
-        scores_updated || break # the cover does not improve any score
+        if !scores_updated
+            verbose && info("No global set scores improvement")
+            break
+        end
         # save the current cover
         insert!(res.variants, cover_pos, cur_cover)
+        verbose && info("Cover saved")
         # update pointers to the best covers for the sets
         for setix in eachindex(res.set_variantix)
             if res.set_variantix[setix] == -1
@@ -137,14 +151,21 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] += 1
             end
         end
-        (max_covers > 0 && length(res) >= max_covers) && break # collected enough covers
+        if max_covers > 0 && length(res) >= max_covers
+            verbose && info("Maximal number of covers collected")
+            break
+        end
         # penalize selecting the same cover by penalizing every pair of sets from the cover
         for set1_ix in used_setixs, set2_ix in used_setixs
             if set1_ix != set2_ix
                 cover_problem.setXset_scores[set1_ix, set2_ix] = setXset_penalty
             end
         end
-        all(x::Int -> x > 0, res.set_variantix) && break # no unassigned sets left
+        if all(x::Int -> x > 0, res.set_variantix)
+            verbose && info("All sets assigned to covers")
+            break
+        end
     end
+    verbose && info("$(length(res)) cover(s) collected")
     return res
 end
