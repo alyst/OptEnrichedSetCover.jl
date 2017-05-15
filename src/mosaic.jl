@@ -61,30 +61,31 @@ end
 
 # size of the sets intersection
 # the sets are represented by the sorted sets of their tiles
-function _isect_size(set1_ixs::StridedVector{Int}, set2_ixs::StridedVector{Int}, tile_sizes::Vector{Int})
-    j = 1
-    i = 1
+function _isect_size(set1_tiles::StridedVector{Int},
+                     set2_tiles::StridedVector{Int},
+                     tile_sizes::Vector{Int})
+    (length(set1_tiles)==0 || length(set2_tiles)==0) && return 0
     res = 0
-    set1_ix = 0
-    set2_ix = 0
-    @inbounds while i <= length(set1_ixs) && j <= length(set2_ixs)
-        if set1_ix==0
-            set1_ix = set1_ixs[i]
-        end
-        if set2_ix==0
-            set2_ix = set2_ixs[j]
-        end
-        if set1_ix < set2_ix
+    i = 1
+    tile1 = set1_tiles[i] # current tile of the 1st set
+    j = 1
+    tile2 = set2_tiles[j] # current tile of the 2nd set
+    @inbounds while true
+        if tile1 < tile2
             i += 1
-            set1_ix = 0
-        elseif set1_ix > set2_ix
+            (i <= length(set1_tiles)) || break
+            tile1 = set1_tiles[i]
+        elseif tile1 > tile2
             j += 1
-            set2_ix = 0
-        else
-            res += tile_sizes[set1_ix]
+            (j <= length(set2_tiles)) || break
+            tile2 = set2_tiles[j]
+        else # intersecting tile, adjust the overlap
+            res += tile_sizes[tile1]
             i += 1
             j += 1
-            set1_ix = set2_ix = 0
+            (i <= length(set1_tiles) && j <= length(set2_tiles)) || break
+            tile1 = set1_tiles[i]
+            tile2 = set2_tiles[j]
         end
     end
     return res
