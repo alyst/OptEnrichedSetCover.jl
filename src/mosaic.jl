@@ -27,7 +27,7 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     membership2tile = Dict{Vector{Int}, Vector{Int}}()
     sizehint!(membership2tile, length(elm2ix))
     for i in 1:size(setXelm, 2)
-        set_ixs = find(view(setXelm, :, i))
+        @inbounds set_ixs = find(view(setXelm, :, i))
         push!(get!(() -> Vector{Int}(), membership2tile, set_ixs), i)
     end
 
@@ -232,13 +232,9 @@ type MaskedSetMosaic{T,S}
         #println("subsetXtile=$subsetXtile")
         membership2tile = Dict{Vector{Int}, Vector{Int}}()
         sizehint!(membership2tile, size(subsetXtile, 2))
-        @inbounds for i in 1:size(subsetXtile, 2)
-            set_ixs = find(subsetXtile[:, i])
-            if haskey(membership2tile, set_ixs)
-                push!(membership2tile[set_ixs], i)
-            else
-                membership2tile[set_ixs] = Vector{Int}([i])
-            end
+        for i in 1:size(subsetXtile, 2)
+            @inbounds set_ixs = find(view(subsetXtile, :, i))
+            push!(get!(() -> Vector{Int}(), membership2tile, set_ixs), i)
         end
         # build tile-to-set membership matrix
         nmasked_pertile = fill(0, length(membership2tile))
