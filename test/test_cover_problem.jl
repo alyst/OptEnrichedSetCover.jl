@@ -1,5 +1,7 @@
 @testset "CoverProblem" begin
     @testset "CoverParams" begin
+        @test_throws ArgumentError CoverParams(sel_prob=-0.1)
+        @test_throws ArgumentError CoverParams(sel_prob=1.1)
     end
 
     @testset "empty" begin
