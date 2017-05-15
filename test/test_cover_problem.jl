@@ -43,13 +43,13 @@
 
         problem_ab = CoverProblem(sm_ab)
         res_ab = optimize(problem_ab)
-        @test res_ab.weights ≈ [1.0, 0.0] atol=1E-4
+        @test res_ab.weights ≈ [1.0, 0.0]# atol=1E-4
 
         # FIXME when weights would be available
         problem_ab_lowp = CoverProblem(sm_ab, CoverParams(a=0.1, b=0.1))
         @test nsets(problem_ab_lowp) == 2
         res_ab_lowp = optimize(problem_ab_lowp)
-        @test_skip res_ab_lowp.weights ≈ [1.0, 0.0] atol=1E-4
+        @test_skip res_ab_lowp.weights ≈ [1.0, 0.0]# atol=1E-4
     end
 
     @testset "[:a :b] [:b :c] [:a :b :c], mask=[:b]" begin # FIXME take weights into account
@@ -59,7 +59,7 @@
         problem_b_lowp = CoverProblem(sm_b, CoverParams(a=0.1, b=0.1))
         @test nsets(problem_b_lowp) == 3
         res_b_lowp = optimize(problem_b_lowp)
-        @test_skip res_b_lowp.weights ≈ [0.0, 0.0, 0.0] atol=1E-4
+        @test_skip res_b_lowp.weights ≈ [0.0, 0.0, 0.0]# atol=1E-4
 
         problem_b = CoverProblem(sm_b)
         res_b = optimize(problem_b)
@@ -79,12 +79,12 @@
         @test_skip score(problem_ab_lowp, [0.0, 0.0, 1.0]) < score(problem_ab_lowp, [1.0, 1.0, 0.0])
         res_ab_lowp = optimize(problem_ab_lowp)
         #@show problem_ab_lowp
-        @test_skip res_ab_lowp.weights ≈ [0.0, 0.0, 1.0] atol=1E-4
+        @test_skip res_ab_lowp.weights ≈ [0.0, 0.0, 1.0]# atol=1E-4
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
         problem_ab = CoverProblem(sm_ab, CoverParams(a=0.1, b=0.1))
         @test score(problem_ab, [1.0, 1.0, 0.0]) < score(problem_ab, [0.0, 0.0, 1.0])
         res_ab = optimize(problem_ab)
-        @test res_ab.weights ≈ [1.0, 1.0, 0.0] atol=1E-4
+        @test res_ab.weights ≈ [1.0, 1.0, 0.0]# atol=1E-4
     end
 end
