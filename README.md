@@ -1,5 +1,7 @@
 # OptEnrichedSetCover
 
+Optimal Enriched-Set Cover
+
 [![Build Status](https://travis-ci.org/alyst/OptEnrichedSetCover.jl.svg?branch=master)](https://travis-ci.org/alyst/OptEnrichedSetCover.jl)
 
 [![Coverage Status](https://coveralls.io/repos/alyst/OptEnrichedSetCover.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/alyst/OptEnrichedSetCover.jl?branch=master)
