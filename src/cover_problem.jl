@@ -2,19 +2,19 @@
 Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 """
 immutable CoverParams
-    a::Float64 # prior probability of covered element to be unmasked
-    b::Float64 # prior probability of uncovered element to be masked
+    a::Float64 # prior probability of covered element to be unmasked FIXME unused, requires noncentral Hypergeometric
+    b::Float64 # prior probability of uncovered element to be masked FIXME unused, requires noncentral Hypergeometric
     reg::Float64 # regularizing multiplier for w[i]*w[i], penalizes non-zero weights
     min_weight::Float64 # minimal non-zero set probability
 
-    function CoverParams(a::Number, b::Number, reg::Number = 0.01, min_weight::Number = 1E-2)
+    function CoverParams(;a::Number = 0.1, b::Number = 0.5, reg::Number = 0.01, min_weight::Number = 1E-2)
         (0.0 < a < 1.0) || throw(ArgumentError("`a` must be within (0,1) range"))
         (0.0 < b < 1.0) || throw(ArgumentError("`b` must be within (0,1) range"))
         (reg >= 0.0) || throw(ArgumentError("`reg` must be non-negative"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1) range"))
-        (1.0-a > b) || warn("Incoherent parameters: covered element is less likely ($(1-a)) to be observed than uncovered one ($b)")
+        (1.0-a > b) || warn("Incoherent parameters: covered element is less likely ($(1.0-a)) to be masked than uncovered one ($b)")
         #p < 0.5 || warn("Incoherent parameter: set is more likely ($(p)) to be in enabled state")
-        new(a, b, reg,  min_weight)
+        new(a, b, reg, min_weight)
     end
 end
 
@@ -44,7 +44,7 @@ immutable CoverProblem
     setXset_scores::Matrix{Float64}
     set_scores::Vector{Float64}
 
-    function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams)
+    function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
         # preprocess setXset scores matrix for numerical solution
         setXset_scores = mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs]
         min_score = 0.0
