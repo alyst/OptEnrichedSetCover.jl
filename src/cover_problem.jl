@@ -4,17 +4,17 @@ Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 immutable CoverParams
     a::Float64 # prior probability of covered element to be unmasked FIXME unused, requires noncentral Hypergeometric
     b::Float64 # prior probability of uncovered element to be masked FIXME unused, requires noncentral Hypergeometric
-    reg::Float64 # regularizing multiplier for w[i]*w[i], penalizes non-zero weights
+    sel_prob::Float64 # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64 # minimal non-zero set probability
 
-    function CoverParams(;a::Number = 0.1, b::Number = 0.5, reg::Number = 0.01, min_weight::Number = 1E-2)
+    function CoverParams(;a::Number = 0.1, b::Number = 0.5, sel_prob::Number = 0.9, min_weight::Number = 1E-2)
         (0.0 < a < 1.0) || throw(ArgumentError("`a` must be within (0,1) range"))
         (0.0 < b < 1.0) || throw(ArgumentError("`b` must be within (0,1) range"))
-        (reg >= 0.0) || throw(ArgumentError("`reg` must be non-negative"))
+        (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1) range"))
         (1.0-a > b) || warn("Incoherent parameters: covered element is less likely ($(1.0-a)) to be masked than uncovered one ($b)")
         #p < 0.5 || warn("Incoherent parameter: set is more likely ($(p)) to be in enabled state")
-        new(a, b, reg, min_weight)
+        new(a, b, sel_prob, min_weight)
     end
 end
 
@@ -61,8 +61,9 @@ immutable CoverProblem
                 setXset_scores[i] = min_score
             end
         end
+        const log_selp = log(params.sel_prob)
         @inbounds for i in 1:size(setXset_scores, 1)
-            setXset_scores[i, i] = -params.reg
+            setXset_scores[i, i] = log_selp
         end
         new(params, setXset_scores,
             Float64[independentsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
