@@ -16,9 +16,9 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     ((na <= ntotal) && (nb <= ntotal)) || throw(ArgumentError("Sets bigger than total number of elements"))
     # corner cases
     if nisect > min(na, nb)
-        return tail == :right ? -Inf : 0.0
-    elseif nisect < min(0, na + nb - ntotal)
         return tail == :left ? 0.0 : -Inf
+    elseif nisect < min(0, na + nb - ntotal)
+        return tail == :right ? 0.0 : -Inf
     end
     # normal cases
     distr = Distributions.Hypergeometric(na, ntotal - na, nb)
@@ -27,7 +27,7 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     elseif tail == :left
         return logcdf(distr, nisect)
     elseif tail == :both
-        return 2.0 * min(logcdf(distr, nisect), logccdf(distr, nisect-1), 0.5)
+        return log(2.0) + min(logcdf(distr, nisect), logccdf(distr, nisect-1), log(0.5))
     else
         throw(ArgumentError("Unsupported tail specifier ($tail)"))
     end

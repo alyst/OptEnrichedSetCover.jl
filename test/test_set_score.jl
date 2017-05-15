@@ -13,8 +13,11 @@
     @test logpvalue(1, 0, 1, 1) == -Inf
     @test logpvalue(1, 0, 1, 1, :left) == 0.0
     @test logpvalue(1, 1, 1, 1, :left) == 0.0
-    @test logpvalue(1, 0, 1, 1, :both) == 0.0
+    @test logpvalue(1, 0, 1, 1, :both) == -Inf
     @test logpvalue(1, 1, 1, 1, :both) == 0.0
+    @test logpvalue(10, 5, 12, 1, :left) == -Inf
+    @test logpvalue(10, 5, 12, 1, :right) == 0.0
+    @test logpvalue(10, 5, 12, 1, :both) == -Inf
 
     @test logpvalue(1, 2, 3, 1, :right) ≈ log(2/3)
     @test logpvalue(1, 2, 3, 1, :left) == 0.0
@@ -32,9 +35,11 @@
 
     @test logpvalue(10, 10, 20, 5, :left) ≈ log(0.6718591)
     @test logpvalue(10, 10, 20, 5, :right) ≈ log(0.6718591)
+    @test logpvalue(10, 10, 20, 5, :both) ≈ 0.0
 
     @test logpvalue(15, 15, 30, 10, :right) ≈ log(0.071555489)
     @test logpvalue(15, 15, 30, 10, :left) ≈ log(0.9865811354)
+    @test logpvalue(15, 15, 30, 10, :both) ≈ log(2*0.071555489)
 
     @test logpvalue(15, 15, 30, 5, :right) ≈ log(0.9865811354)
     @test logpvalue(15, 15, 30, 5, :left) ≈ log(0.071555489)
