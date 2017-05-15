@@ -50,7 +50,8 @@ immutable CoverProblem
         min_score = 0.0
         @inbounds for i in eachindex(setXset_scores)
             if !isfinite(setXset_scores[i])
-                warn("Infinite setXset score at position $(ind2sub(size(setXset_scores), i))")
+                s1, s2 = ind2sub(size(setXset_scores), i)
+                warn("set[$s1]×set[$s2] score is $(setXset_scores[i])")
             elseif setXset_scores[i] < min_score
                 min_score = setXset_scores[i]
             end
