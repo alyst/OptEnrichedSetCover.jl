@@ -137,7 +137,7 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] += 1
             end
         end
-        (max_covers > 0 && length(res) >= max_covers) || break # collected enough covers
+        (max_covers > 0 && length(res) >= max_covers) && break # collected enough covers
         # penalize selecting the same cover by penalizing every pair of sets from the cover
         for set1_ix in used_setixs, set2_ix in used_setixs
             if set1_ix != set2_ix
