@@ -27,12 +27,8 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     membership2tile = Dict{Vector{Int}, Vector{Int}}()
     sizehint!(membership2tile, length(elm2ix))
     for i in 1:size(setXelm, 2)
-        set_ixs = find(setXelm[:, i])
-        if haskey(membership2tile, set_ixs)
-            push!(membership2tile[set_ixs], i)
-        else
-            membership2tile[set_ixs] = fill(i, 1)
-        end
+        set_ixs = find(view(setXelm, :, i))
+        push!(get!(() -> Vector{Int}(), membership2tile, set_ixs), i)
     end
 
     # build tile-X-set and element-X-tile membership matrices
