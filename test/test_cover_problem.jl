@@ -76,7 +76,7 @@
         @test nsets(problem_ab_lowp) == 3 # c is out
         @test_skip score(problem_ab_lowp, [0.0, 0.0, 1.0]) < score(problem_ab_lowp, [1.0, 1.0, 0.0])
         res_ab_lowp = optimize(problem_ab_lowp)
-        println("problem=$problem_ab_lowp")
+        #@show problem_ab_lowp
         @test_skip res_ab_lowp.weights ≈ [0.0, 0.0, 1.0] atol=1E-4
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
