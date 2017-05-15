@@ -1,5 +1,5 @@
 facts("CoverEnumerator") do # FIXME use weights
-    context("[:a] [:b] [::c] [:a :b :c], mask=[:a :b]") do
+    context("[:a] [:b] [:c] [:a :b :c], mask=[:a :b]") do
         sm = OESC.SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
         sm_ab = OESC.mask(sm, Set([:a, :b]))
 
@@ -16,7 +16,7 @@ facts("CoverEnumerator") do # FIXME use weights
         @pending length(cover_coll2) --> 2
     end
 
-    context("[:a] [:b] [::c] [:a :b :c] :d :e, mask=[:a :b]") do
+    context("[:a] [:b] [:c] [:a :b :c] :d :e, mask=[:a :b]") do
         sm = OESC.SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                             Set([:a, :b, :c, :d, :e]))
         sm_ab = OESC.mask(sm, Set(Symbol[:a, :b]))
