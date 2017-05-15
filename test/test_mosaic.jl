@@ -122,16 +122,24 @@ end
         msm = mask(sm, Set(Symbol[:a, :b]))
 
         @test nelements(msm) == 4
-        @test ntiles(msm) == 2
         @test nmasked(msm) == 2
         @test nunmasked(msm) == 2
-        @test_broken tiles(msm) == Vector{Int}[Int[1, 2], Int[3, 4]]
         @test nsets(msm) == 2
         @test length(nmasked_pertile(msm)) == 2
         @test length(nmasked_perset(msm)) == 2
-        # FIXME set indices not stable
-        @test_broken nmasked_pertile(msm) == Int[2, 0]
-        @test_broken nunmasked_pertile(msm) == Int[0, 2]
+        @test ntiles(msm) == 2
+        # FIXME tile indices not stable
+        if nmasked_pertile(msm) == Int[2, 0]
+            @test_broken tile(msm, 1) == Int[1, 2]
+            @test_broken tile(msm, 2) == Int[3, 4]
+            @test nmasked_pertile(msm) == Int[2, 0]
+            @test nunmasked_pertile(msm) == Int[0, 2]
+        else
+            @test_broken tile(msm, 1) == Int[3, 4]
+            @test_broken tile(msm, 2) == Int[1, 2]
+            @test nmasked_pertile(msm) == Int[0, 2]
+            @test nunmasked_pertile(msm) == Int[2, 0]
+        end
         @test nmasked_perset(msm) == Int[2, 2]
         @test nunmasked_perset(msm) == Int[0, 2]
 
@@ -154,11 +162,20 @@ end
         msm = mask(sm, Set(Symbol[:a, :b]))
 
         @test nelements(msm) == 4
-        @test ntiles(msm) == 2
-        @test_broken tiles(msm) == Vector{Int}[Int[1, 2], Int[3, 4]]
         @test nsets(msm) == 2
-        @test_broken nmasked_pertile(msm) == Int[2, 0]
-        @test_broken nunmasked_pertile(msm) == Int[0, 2]
+        @test ntiles(msm) == 2
+        # FIXME tile indices not stable
+        if nmasked_pertile(msm) == Int[2, 0]
+            @test_broken tile(msm, 1) == Int[1, 2]
+            @test_broken tile(msm, 2) == Int[3, 4]
+            @test nmasked_pertile(msm) == Int[2, 0]
+            @test nunmasked_pertile(msm) == Int[0, 2]
+        else
+            @test_broken tile(msm, 1) == Int[3, 4]
+            @test_broken tile(msm, 2) == Int[1, 2]
+            @test nmasked_pertile(msm) == Int[0, 2]
+            @test nunmasked_pertile(msm) == Int[2, 0]
+        end
     end
 
     @testset "filter!()" begin
