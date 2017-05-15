@@ -1,3 +1,5 @@
+__precompile__(true)
+
 # Optimal Enriched-Set Cover
 module OptEnrichedSetCover
 
