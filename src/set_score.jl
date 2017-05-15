@@ -16,8 +16,10 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     ((na <= ntotal) && (nb <= ntotal)) || throw(ArgumentError("Sets bigger than total number of elements"))
     # corner cases
     if nisect > min(na, nb)
+        (tail ∈ (:left, :right, :both)) || throw(ArgumentError("Unsupported tail specifier ($tail)"))
         return tail == :left ? 0.0 : -Inf
     elseif nisect < min(0, na + nb - ntotal)
+        (tail ∈ (:left, :right, :both)) || throw(ArgumentError("Unsupported tail specifier ($tail)"))
         return tail == :right ? 0.0 : -Inf
     end
     # normal cases

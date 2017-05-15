@@ -18,6 +18,7 @@
     @test logpvalue(10, 5, 12, 1, :left) == -Inf
     @test logpvalue(10, 5, 12, 1, :right) == 0.0
     @test logpvalue(10, 5, 12, 1, :both) == -Inf
+    @test_throws ArgumentError logpvalue(1, 0, 1, 1, :center)
 
     @test logpvalue(1, 2, 3, 1, :right) ≈ log(2/3)
     @test logpvalue(1, 2, 3, 1, :left) == 0.0
