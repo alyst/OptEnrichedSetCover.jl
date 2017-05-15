@@ -103,7 +103,7 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes:
         set1_tiles = view(tileXset, :, set1_ix)
         for set2_ix in (set1_ix+1):nsets
             set2_tiles = view(tileXset, :, set2_ix)
-            # one-sided Fisher's P-value
+            # one-sided Fisher's P-value, right tail
             res[set2_ix, set1_ix] =
                 logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size,
                           _isect_size(set1_tiles, set2_tiles, tile_sizes))
