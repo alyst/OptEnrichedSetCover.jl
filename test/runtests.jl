@@ -8,7 +8,8 @@ my_tests = [
     "test_sparse_mask_matrix.jl",
     "test_mosaic.jl",
     "test_cover_problem.jl",
-    "test_cover_enumerator.jl"
+    "test_cover_enumerator.jl",
+    "test_parallel.jl"
 ]
 
 for t in my_tests
