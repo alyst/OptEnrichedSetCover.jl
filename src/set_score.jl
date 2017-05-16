@@ -1,3 +1,9 @@
+@inline function checktail(tail::Symbol)
+    if tail ∉ (:left, :right, :both)
+        throw(ArgumentError("Unsupported tail specifier ($tail)"))
+    end
+end
+
 """
 Log P-value for the two sets intersection.
 
@@ -16,10 +22,10 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     ((na <= ntotal) && (nb <= ntotal)) || throw(ArgumentError("Sets bigger than total number of elements"))
     # corner cases
     if nisect > min(na, nb)
-        (tail ∈ (:left, :right, :both)) || throw(ArgumentError("Unsupported tail specifier ($tail)"))
+        checktail(tail)
         return tail == :left ? 0.0 : -Inf
     elseif nisect < min(0, na + nb - ntotal)
-        (tail ∈ (:left, :right, :both)) || throw(ArgumentError("Unsupported tail specifier ($tail)"))
+        checktail(tail)
         return tail == :right ? 0.0 : -Inf
     end
     # normal cases
@@ -31,6 +37,6 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     elseif tail == :both
         return log(2.0) + min(logcdf(distr, nisect), logccdf(distr, nisect-1), log(0.5))
     else
-        throw(ArgumentError("Unsupported tail specifier ($tail)"))
+        checktail(tail)
     end
 end
