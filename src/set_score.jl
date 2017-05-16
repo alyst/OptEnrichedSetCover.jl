@@ -27,6 +27,9 @@ function logpvalue(na::Integer, nb::Integer, ntotal::Integer, nisect::Integer,
     elseif nisect < min(0, na + nb - ntotal)
         checktail(tail)
         return tail == :right ? 0.0 : -Inf
+    elseif ntotal==max(na,nb) && nisect==min(na,nb) # FIXME remove this corner case when Rmath-julia (and R upstream would be fixed)
+        checktail(tail)
+        return 0.0
     end
     # normal cases
     distr = Distributions.Hypergeometric(na, ntotal - na, nb)

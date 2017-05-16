@@ -34,6 +34,12 @@
     @test logpvalue(10, 10, 100, 10, :right) ≈ -log(binomial(100, 10))
     @test logpvalue(10, 10, 100, 11, :right) == -Inf
 
+    # https://bugs.r-project.org/bugzilla3/show_bug.cgi?id=17271
+    @test logpvalue(22837, 4, 22837, 4, :left) == 0.0
+    @test logpvalue(22837, 4, 22837, 4, :right) == 0.0
+    @test logpvalue(22837, 22837-4, 22837, 22837-4, :left) == 0.0
+    @test logpvalue(22837, 22837-4, 22837, 22837-4, :right) == 0.0
+
     @test logpvalue(10, 10, 20, 5, :left) ≈ log(0.6718591)
     @test logpvalue(10, 10, 20, 5, :right) ≈ log(0.6718591)
     @test logpvalue(10, 10, 20, 5, :both) ≈ 0.0
