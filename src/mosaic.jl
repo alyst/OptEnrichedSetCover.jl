@@ -13,16 +13,19 @@ end
 function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     if isempty(sets)
         # no sets -- no tiles
-        return SparseMaskMatrix(0, length(elm2ix)), SparseMaskMatrix(length(elm2ix), 0), SparseMaskMatrix(0, 0)
+        return SparseMaskMatrix(0, length(elm2ix)), SparseMaskMatrix(length(elm2ix), 0),
+               SparseMaskMatrix(length(elm2ix), 0), SparseMaskMatrix(0, 0)
     end
 
     # build set-X-element membership matrix
-    setXelm = fill(false, length(sets), length(elm2ix))
+    elmXset = fill(false, length(elm2ix), length(sets))
     for (i, s) in enumerate(sets)
+        set_elms = view(elmXset, :, i)
         for e in s
-            setXelm[i, elm2ix[e]] = true
+            @inbounds set_elms[elm2ix[e]] = true
         end
     end
+    setXelm = elmXset'
     # squash element-X-set matrix (duplicate rows) into membership-mask-to-tile dict
     membership2tile = Dict{Vector{Int}, Vector{Int}}()
     sizehint!(membership2tile, length(elm2ix))
@@ -55,6 +58,7 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     push!(set_tile_ranges, length(tile_ixs)+1)
 
     SparseMaskMatrix(setXelm),
+    SparseMaskMatrix(elmXset),
     SparseMaskMatrix(length(elm2ix), length(tile_elm_ranges)-1, tile_elm_ranges, elm_ixs), # elmXtile
     SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
 end
@@ -140,7 +144,8 @@ immutable SetMosaic{T,S}
 
     set_sizes::Vector{Int}
 
-    setXelm::SparseMaskMatrix  # set-to-element mask
+    setXelm::SparseMaskMatrix  # set×element membership
+    elmXset::SparseMaskMatrix  # element×set membership (transpose of setXelm)
     elmXtile::SparseMaskMatrix  # element-to-tile mask
     tileXset::SparseMaskMatrix  # rows = tiles, cols = sets from collection, true if tile is a subset of a set
 
@@ -151,13 +156,14 @@ immutable SetMosaic{T,S}
     """
     function (::Type{SetMosaic}){T}(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
         ix2elm, elm2ix = _encode_elements(all_elms)
-        elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
+        setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in sets]
         new{T, Int}(ix2elm, elm2ix,
-                    collect(eachindex(sets)), Dict(Pair{Int,Int}[Pair(i,i) for i in eachindex(sets)]),
+                    collect(eachindex(sets)), Dict([Pair(i,i) for i in eachindex(sets)]),
                     set_sizes,
-                    elmXset, elmXtile, tileXset, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
+                    setXelm, elmXset, elmXtile, tileXset,
+                    _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
 
     """
@@ -165,13 +171,14 @@ immutable SetMosaic{T,S}
     """
     function (::Type{SetMosaic}){T,S}(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
         ix2elm, elm2ix = _encode_elements(all_elms)
-        elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
+        setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = Int[length(set) for set in values(sets)]
         new{T, S}(ix2elm, elm2ix,
-                  collect(keys(sets)), Dict{S, Int}(Pair{S,Int}[Pair(s, i) for (i, s) in enumerate(keys(sets))]),
+                  collect(keys(sets)), Dict([Pair(s, i) for (i, s) in enumerate(keys(sets))]),
                   set_sizes,
-                  elmXset, elmXtile, tileXset, _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
+                  setXelm, elmXset, elmXtile, tileXset,
+                  _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
 end
 
