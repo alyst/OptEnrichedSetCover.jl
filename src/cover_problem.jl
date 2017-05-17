@@ -2,29 +2,26 @@
 Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 """
 immutable CoverParams
-    a::Float64 # prior probability of covered element to be unmasked FIXME unused, requires noncentral Hypergeometric
-    b::Float64 # prior probability of uncovered element to be masked FIXME unused, requires noncentral Hypergeometric
-    sel_prob::Float64 # prior probability to select the set, penalizes non-zero weights
-    min_weight::Float64 # minimal non-zero set probability
+    overlap_penalty::Float64    # ≥0, how much set overlaps are penalized
+    sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
+    min_weight::Float64         # minimal non-zero set probability
 
-    function CoverParams(;a::Number = 0.1, b::Number = 0.5, sel_prob::Number = 0.9, min_weight::Number = 1E-2)
-        (0.0 < a < 1.0) || throw(ArgumentError("`a` must be within (0,1) range"))
-        (0.0 < b < 1.0) || throw(ArgumentError("`b` must be within (0,1) range"))
+    function CoverParams(; overlap_penalty::Number = 1.0, sel_prob::Number = 0.9, min_weight::Number = 1E-2)
+        (0.0 <= overlap_penalty) || throw(ArgumentError("`overlap_penalty` must be ≥0"))
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1) range"))
-        (1.0-a > b) || warn("Incoherent parameters: covered element is less likely ($(1.0-a)) to be masked than uncovered one ($b)")
-        #p < 0.5 || warn("Incoherent parameter: set is more likely ($(p)) to be in enabled state")
-        new(a, b, sel_prob, min_weight)
+        new(overlap_penalty, sel_prob, min_weight)
     end
 end
 
 """
-Linear component of a set score.
+Linear component of an individual set score for the `CoverProblem`.
 Doesn't take into account the overlap with the other selected sets.
 """
 function independentsetscore(set::Number, masked::Number, total::Number, total_masked::Number, params::CoverParams)
-    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(set, total_masked, total, masked) -
-    #= P-value for unmasked-vs-set overlap enriched =# logpvalue(set, total - total_masked, total, set - masked)
+    # FIXME is it just tail=:both for one set of parameters
+    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(set, total_masked, total, masked) #-
+    #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set, total - total_masked, total, set - masked)
     @assert !isnan(res) "set=$set masked=$masked total=$total total_masked=$total_masked res NaN"
     return res
 end
@@ -46,7 +43,8 @@ immutable CoverProblem
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
         # preprocess setXset scores matrix for numerical solution
-        setXset_scores = mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs]
+        setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
+                                params.overlap_penalty)
         min_score = 0.0
         @inbounds for i in eachindex(setXset_scores)
             if !isfinite(setXset_scores[i])
