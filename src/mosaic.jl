@@ -27,18 +27,18 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     end
     setXelm = elmXset'
     # squash element-X-set matrix (duplicate rows) into membership-mask-to-tile dict
-    membership2tile = Dict{Vector{Int}, Vector{Int}}()
-    sizehint!(membership2tile, length(elm2ix))
+    sets2elms = Dict{Vector{Int}, Vector{Int}}()
+    sizehint!(sets2elms, length(elm2ix))
     for i in 1:size(setXelm, 2)
         @inbounds set_ixs = find(view(setXelm, :, i))
-        push!(get!(() -> Vector{Int}(), membership2tile, set_ixs), i)
+        push!(get!(() -> Vector{Int}(), sets2elms, set_ixs), i)
     end
 
     # build tile-X-set and element-X-tile membership matrices
     set2tile_ixs = [Vector{Int}() for _ in 1:length(sets)]
     tile_elm_ranges = Vector{Int}()
     elm_ixs = Vector{Int}()
-    for (set_ixs, tile_elm_ixs) in membership2tile
+    for (set_ixs, tile_elm_ixs) in sets2elms
         push!(tile_elm_ranges, length(elm_ixs)+1)
         tile_ix = length(tile_elm_ranges)
         append!(elm_ixs, tile_elm_ixs)
@@ -233,23 +233,23 @@ type MaskedSetMosaic{T,S}
         #println("setmask=$setmask")
         # detect and squash tiles that have the same membership pattern wrt the masked sets
         subsetXtile = fill(false, length(orig_setixs), ntiles(mosaic))
-        for (new_setix, orig_setix) in enumerate(orig_setixs)
+        @inbounds for (new_setix, orig_setix) in enumerate(orig_setixs)
             subsetXtile[new_setix, view(mosaic.tileXset, :, orig_setix)] = true
         end
         #println("subsetXtile=$subsetXtile")
-        membership2tile = Dict{Vector{Int}, Vector{Int}}()
-        sizehint!(membership2tile, size(subsetXtile, 2))
+        subsets2tiles = Dict{Vector{Int}, Vector{Int}}()
+        sizehint!(subsets2tiles, size(subsetXtile, 2))
         for i in 1:size(subsetXtile, 2)
-            @inbounds set_ixs = find(view(subsetXtile, :, i))
-            push!(get!(() -> Vector{Int}(), membership2tile, set_ixs), i)
+            @inbounds subset_ixs = find(view(subsetXtile, :, i))
+            push!(get!(() -> Vector{Int}(), subsets2tiles, subset_ixs), i)
         end
         # build tile-to-set membership matrix
-        nmasked_pertile = fill(0, length(membership2tile))
-        nunmasked_pertile = fill(0, length(membership2tile))
-        set2tile_ixs = [Vector{Int}() for _ in 1:length(orig_setixs)]
-        @inbounds for (tile_ix, (tile_set_ixs, old_tile_ixs)) in enumerate(membership2tile)
-            for set_ix in tile_set_ixs
-                push!(set2tile_ixs[set_ix], tile_ix)
+        nmasked_pertile = zeros(Int, length(subsets2tiles))
+        nunmasked_pertile = zeros(Int, length(subsets2tiles))
+        subset2tile_ixs = [Vector{Int}() for _ in eachindex(orig_setixs)]
+        @inbounds for (tile_ix, (subset_ixs, old_tile_ixs)) in enumerate(subsets2tiles)
+            for subset_ix in subset_ixs
+                push!(subset2tile_ixs[subset_ix], tile_ix)
             end
             for old_tile_ix in old_tile_ixs
                 oldtile_elms = view(mosaic.elmXtile, :, old_tile_ix)
@@ -263,7 +263,7 @@ type MaskedSetMosaic{T,S}
                 nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
             end
         end
-        tileXset = SparseMaskMatrix(length(nmasked_pertile), length(orig_setixs), set2tile_ixs)
+        tileXset = SparseMaskMatrix(length(subsets2tiles), length(orig_setixs), subset2tile_ixs)
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
         @inbounds for set_ix in eachindex(nmasked_perset)
