@@ -17,10 +17,10 @@ immutable CollectCovers{MC,SC}
     end
 end
 
-function (worker::CollectCovers)(mosaic_key, set_key)
+function (worker::CollectCovers)(mosaic_key, set_key; verbose::Bool=false)
     mosaic_masked = mask(worker.mosaics[mosaic_key], worker.sets[set_key])
     covers_enum = CoverEnumerator(mosaic_masked, worker.cover_params)
-    covers_coll = collect(covers_enum; max_set_score=worker.max_set_score)
+    covers_coll = collect(covers_enum; max_set_score=worker.max_set_score, verbose=verbose)
     ((mosaic_key, set_key), !isempty(covers_coll) ? covers_coll : nothing)
 end
 
@@ -47,7 +47,7 @@ function pcollect{MK,SK}(
         keyXcover_vec = map(mosaicXset_keys) do mXs
             m, s = mXs
             verbose && info("Calculating mosaic=$m × set=$s...")
-            collect_covers(m, s)
+            collect_covers(m, s, verbose=verbose)
         end
     else
         throw(ArgumentError("Unknown mode $mode"))
