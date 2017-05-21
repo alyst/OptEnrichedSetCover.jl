@@ -2,38 +2,38 @@ immutable CollectCovers{MC,SC}
     mosaics::MC
     sets::SC
     cover_params::CoverParams
-    max_set_score::Float64
+    enum_params::CoverEnumerationParams
 
     CollectCovers(worker::CollectCovers{MC,SC}) =
         new(worker.mosaics, worker.sets,
-            worker.cover_params, worker.max_set_score)
+            worker.cover_params, worker.enum_params)
 
     function (::Type{CollectCovers}){MC,SC}(
         mosaics::MC, sets::SC,
         cover_params::CoverParams=CoverParams(sel_prob=0.1),
-        max_set_score::Number=log(1E-3)
+        enum_params::CoverEnumerationParams=CoverEnumerationParams()
     )
-        new{MC,SC}(mosaics, sets, cover_params, max_set_score)
+        new{MC,SC}(mosaics, sets, cover_params, enum_params)
     end
 end
 
 function (worker::CollectCovers)(mosaic_key, set_key; verbose::Bool=false)
     mosaic_masked = mask(worker.mosaics[mosaic_key], worker.sets[set_key])
-    covers_enum = CoverEnumerator(mosaic_masked, worker.cover_params)
-    covers_coll = collect(covers_enum; max_set_score=worker.max_set_score, verbose=verbose)
+    covers_coll = collect(mosaic_masked, worker.cover_params, worker.enum_params, verbose=verbose)
     ((mosaic_key, set_key), !isempty(covers_coll) ? covers_coll : nothing)
 end
 
 function pcollect{MK,SK}(
     mosaics::Dict{MK}, sets::Dict{SK};
     cover_params::CoverParams=CoverParams(sel_prob=0.1),
-    max_set_score::Float64=log(1E-3), pids=workers(), mode=:parallel,
+    enum_params::CoverEnumerationParams=CoverEnumerationParams(),
+    pids=workers(), mode=:parallel,
     verbose::Bool=false
 )
     info("Parallel OESC ($(length(mosaics)) mosaic(s) × $(length(sets)) set(s))...")
     # FIXME workaround for pmap() being unable to handle callable objects +
     # unable to efficiently handle large callable objects
-    collect_covers = CollectCovers(mosaics, sets, cover_params, max_set_score)
+    collect_covers = CollectCovers(mosaics, sets, cover_params, enum_params)
     #raw_res = sizehint!(Vector{Tuple{MK,SK,CoverCollection}}(),
     #                    length(tasks))
     mosaicXset_keys = vec([(m, s) for m in keys(mosaics), s in keys(sets)])
@@ -65,8 +65,8 @@ function pcollect{MK,SK}(
 end
 
 function pcollect(sets1_colls, sets2;
-    max_set_score::Float64=log(1E-3),
     cover_params::CoverParams=CoverParams(sel_prob=0.1),
+    enum_params::CoverEnumerationParams=CoverEnumerationParams(),
     mode::Symbol=:sequential, verbose::Bool=false
 )
     verbose && info("Preparing mosaics...")
@@ -77,7 +77,7 @@ function pcollect(sets1_colls, sets2;
         Pair(coll_kv[1], SetMosaic(coll_kv[2]))
     end)
     return pcollect(sets1_mosaics, sets2,
-                    max_set_score=max_set_score,
-                    cover_params=cover_params, mode=mode,
+                    cover_params, enum_params,
+                    mode=mode,
                     verbose=verbose)
 end

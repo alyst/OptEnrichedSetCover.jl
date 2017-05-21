@@ -1,10 +1,18 @@
 """
-Enumerates the enriched-set covers of
-the given set collection.
+Parameters for `collect(mosaic::MaskedSetMosaic)`.
 """
-immutable CoverEnumerator{T,S}
-    mosaic::MaskedSetMosaic{T,S}    # the original masked set mosaic
-    params::CoverParams             # parameters of the `CoverProblem`
+immutable CoverEnumerationParams
+    max_covers::Int
+    max_set_score::Float64
+    max_cover_score_delta::Float64
+    setXset_penalty::Float64
+
+    CoverEnumerationParams(;
+        max_covers::Int = 0,
+        max_set_score::Real = -10.0,
+        max_cover_score_delta::Real = 1.0,
+        setXset_penalty::Float64=-100.0) =
+        new(max_covers, max_set_score, max_cover_score_delta, setXset_penalty)
 end
 
 """
@@ -81,17 +89,21 @@ end
 
 """
 Greedy enumeration of enriched-set covers.
-* At each iteration a optimal enriched-set cover problem is being solved.
+* At each iteration an optimal enriched-set cover problem is being solved.
 * The sets selected at current iteration are removed from further consideration.
 * The process continues with the reduced collection until the result is an empty
-  collection.
+  collection or the last cover is much worse than the first one.
 
 Returns `CoverCollection`.
 """
-function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=-100.0, max_covers::Int = 0, max_set_score::Real = -10.0, max_cover_score_delta::Real = 1.0, verbose::Bool=false)
-    cover_problem = CoverProblem(etor.mosaic, etor.params)
+function Base.collect(mosaic::MaskedSetMosaic,
+                      cover_params::CoverParams=CoverParams(),
+                      params::CoverEnumerationParams=CoverEnumerationParams();
+                      verbose::Bool=false
+)
     verbose && info("Starting covers enumeration...")
-    res = CoverCollection(cover_problem, etor.mosaic)
+    cover_problem = CoverProblem(mosaic, cover_params)
+    res = CoverCollection(cover_problem, mosaic)
     while true
         verbose && info("Trying to find cover #$(length(res)+1)...")
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
@@ -115,12 +127,12 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
         if cover_pos > 1
             # not the best cover
             delta_score = cur_cover.score - res.variants[1].score
-            if max_cover_score_delta > 0.0 && delta_score > max_cover_score_delta
+            if params.max_cover_score_delta > 0.0 && delta_score > params.max_cover_score_delta
                 verbose && info("Cover score_delta=$(delta_score) above threshold")
                 break
             end
         end
-        if isfinite(max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) + delta_score > max_set_score)
+        if isfinite(params.max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) + delta_score > params.max_set_score)
             verbose && info("All set scores below $(max_set_score)")
             break
         end
@@ -151,14 +163,14 @@ function Base.collect{T,S}(etor::CoverEnumerator{T,S}; setXset_penalty::Float64=
                 res.set_variantix[setix] += 1
             end
         end
-        if max_covers > 0 && length(res) >= max_covers
+        if params.max_covers > 0 && length(res) >= params.max_covers
             verbose && info("Maximal number of covers collected")
             break
         end
         # penalize selecting the same cover by penalizing every pair of sets from the cover
         for set1_ix in used_setixs, set2_ix in used_setixs
             if set1_ix != set2_ix
-                cover_problem.setXset_scores[set1_ix, set2_ix] = setXset_penalty
+                cover_problem.setXset_scores[set1_ix, set2_ix] = params.setXset_penalty
             end
         end
         if all(x::Int -> x > 0, res.set_variantix)

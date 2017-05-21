@@ -5,7 +5,8 @@ module OptEnrichedSetCover
 
 using DataFrames, Distributions, MathProgBase, JuMP, Ipopt
 
-export SetMosaic, CoverParams, CoverProblem, CoverEnumerator, CoverCollection,
+export SetMosaic, CoverParams, CoverProblem,
+    CoverEnumerationParams, CoverCollection,
     nelements, ntiles, nsets,
     nmasked, nunmasked, nmasked_pertile, nunmasked_pertile, nmasked_perset, nunmasked_perset,
     tile, tiles, set,
