@@ -52,8 +52,6 @@ function pcollect{MK,SK}(
     else
         throw(ArgumentError("Unknown mode $mode"))
     end
-    verbose && (@show raw_res)
-
     verbose && info("Done covers enumeration, preparing the results...")
     # filter out empty covers
     keyXcover = sizehint!(Dict{Tuple{MK,SK}, CoverCollection}(), length(keyXcover_vec))
