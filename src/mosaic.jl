@@ -204,23 +204,16 @@ type MaskedSetMosaic{T,S}
     elmask::BitVector           # elements mask
     setixs::Vector{Int}         # original indices of the included sets
 
-    tileXset::SparseMaskMatrix
     total_masked::Int               # total number of masked elements
-    nmasked_pertile::Vector{Int}    # number of masked elements in a tile
-    nunmasked_pertile::Vector{Int}  # number of unmasked elements in a tile
     nmasked_perset::Vector{Int}     # number of masked elements in a set
     nunmasked_perset::Vector{Int}   # number of unmasked elements in a set
 
     function MaskedSetMosaic(original::SetMosaic{T, S}, elmask::BitVector,
-                             setixs::Vector{Int},
-                             tileXset::SparseMaskMatrix,
-                             total_masked::Number,
-                             nmasked_pertile::Vector{Int}, nunmasked_pertile::Vector{Int},
+                             setixs::Vector{Int}, total_masked::Number,
                              nmasked_perset::Vector{Int}, nunmasked_perset::Vector{Int}
     )
-        new(original, elmask, setixs, tileXset, total_masked,
-            nmasked_pertile, nunmasked_pertile,
-            nmasked_perset, nunmasked_perset)
+        new(original, elmask, setixs,
+            total_masked, nmasked_perset, nunmasked_perset)
     end
 
     function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
@@ -248,41 +241,10 @@ type MaskedSetMosaic{T,S}
             end
         end
 
-        # detect and squash tiles that have the same membership pattern wrt the masked sets
-        newsetXorgtile = fill(false, length(org_setixs), ntiles(mosaic))
-        @inbounds for (new_setix, org_setix) in enumerate(org_setixs)
-            newsetXorgtile[new_setix, view(mosaic.tileXset, :, org_setix)] = true
-        end
-        newsets2orgtiles = Dict{Vector{Int}, Vector{Int}}()
-        sizehint!(newsets2orgtiles, size(newsetXorgtile, 2))
-        for org_tileix in 1:size(newsetXorgtile, 2)
-            @inbounds new_setixs = find(view(newsetXorgtile, :, org_tileix))
-            isempty(new_setixs) && continue
-            push!(get!(() -> Vector{Int}(), newsets2orgtiles, new_setixs), org_tileix)
-        end
-
-        # build newtile-to-newset membership matrix
-        nmasked_newtiles = zeros(Int, length(newsets2orgtiles))
-        nunmasked_newtiles = zeros(Int, length(newsets2orgtiles))
-        newset2newtiles = [Vector{Int}() for _ in eachindex(org_setixs)]
-        @inbounds for (new_tileix, (new_setixs, org_tileixs)) in enumerate(newsets2orgtiles)
-            for new_setix in new_setixs
-                push!(newset2newtiles[new_setix], new_tileix)
-            end
-            for org_tileix in org_tileixs
-                orgtile_elms = view(mosaic.elmXtile, :, org_tileix)
-                nmasked_orgtile = count(eix -> elmask[eix], orgtile_elms)
-                nmasked_newtiles[new_tileix] += nmasked_orgtile
-                nunmasked_newtiles[new_tileix] += length(orgtile_elms) - nmasked_orgtile
-            end
-        end
-        newtileXnewset = SparseMaskMatrix(length(nmasked_newtiles), newset2newtiles)
-
         # calculate masked/unmasked elements for each set in the masked mosaic
         @inbounds nunmasked_newsets = [mosaic.set_sizes[org_setix] - nmasked_orgsets[org_setix] for org_setix in org_setixs]
-        new{T,S}(mosaic, elmask, org_setixs, newtileXnewset,
-                 sum(elmask), nmasked_newtiles, nunmasked_newtiles,
-                 nmasked_orgsets[org_setixs], nunmasked_newsets)
+        new{T,S}(mosaic, elmask, org_setixs,
+                 sum(elmask), nmasked_orgsets[org_setixs], nunmasked_newsets)
     end
 end
 
@@ -293,21 +255,17 @@ mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}; max_overlap_logpvalue::Real = 0.0
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
-ntiles(mosaic::MaskedSetMosaic) = size(mosaic.tileXset, 1)
-nsets(mosaic::MaskedSetMosaic) = size(mosaic.tileXset, 2)
+nsets(mosaic::MaskedSetMosaic) = length(mosaic.nmasked_perset)
 nmasked(mosaic::MaskedSetMosaic) = mosaic.total_masked
 nunmasked(mosaic::MaskedSetMosaic) = nelements(mosaic) - mosaic.total_masked
-nmasked_pertile(mosaic::MaskedSetMosaic) = mosaic.nmasked_pertile
-nunmasked_pertile(mosaic::MaskedSetMosaic) = mosaic.nunmasked_pertile
 nmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nmasked_perset
 nunmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nunmasked_perset
 
 function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
     # copy everything, except the original mosaic (leave the reference to the same object)
     MaskedSetMosaic{T,S}(mosaic.original, copy(mosaic.elmask), copy(mosaic.setixs),
-                    copy(mosaic.tileXset), mosaic.total_masked,
-                    copy(mosaic.nmasked_pertile), copy(mosaic.nunmasked_pertile),
-                    copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
+                         mosaic.total_masked,
+                         copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
 end
 
 """
@@ -317,15 +275,6 @@ function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVe
     nsets(mosaic) == length(setmask) ||
         throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
     mosaic.setixs = mosaic.setixs[setmask]
-    tileXset = mosaic.tileXset[:, setmask]
-    tile_mask = fill(false, ntiles(mosaic))
-    tile_mask[tileXset.rowval] = true
-    old2new_tileixs = cumsum(tile_mask)
-    old_tileixs = find(tile_mask)
-    mosaic.tileXset = SparseMaskMatrix(length(old_tileixs), tileXset.n,
-                                       tileXset.colptr, old2new_tileixs[tileXset.rowval]) # remove unused tiles
-    mosaic.nmasked_pertile = mosaic.nmasked_pertile[old_tileixs]
-    mosaic.nunmasked_pertile = mosaic.nunmasked_pertile[old_tileixs]
     mosaic.nmasked_perset = mosaic.nmasked_perset[setmask]
     mosaic.nunmasked_perset = mosaic.nunmasked_perset[setmask]
     return mosaic

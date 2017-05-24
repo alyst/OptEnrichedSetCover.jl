@@ -107,10 +107,9 @@ end
         msm = mask(sm, Set{Symbol}())
         @test unmask(msm) == sm
         @test nelements(msm) == 0
-        @test ntiles(msm) == 0
         @test nsets(msm) == 0
-        @test nmasked_pertile(msm) == Int[]
-        @test nunmasked_pertile(msm) == Int[]
+        @test nmasked_perset(msm) == []
+        @test nunmasked_perset(msm) == []
     end
 
     @testset "empty but with elements" begin
@@ -118,12 +117,11 @@ end
         msm = mask(sm, Set([:a]))
         @test unmask(msm) == sm
         @test nelements(msm) == 2
-        @test ntiles(msm) == 0
         @test nsets(msm) == 0
         @test nmasked(msm) == 1
         @test nunmasked(msm) == 1
-        @test nmasked_pertile(msm) == Int[]
-        @test nunmasked_pertile(msm) == Int[]
+        @test nmasked_perset(msm) == []
+        @test nunmasked_perset(msm) == []
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c :d], mask=[:a :b]" begin
@@ -135,45 +133,34 @@ end
         @test nmasked(msm) == 2
         @test nunmasked(msm) == 2
         @test nsets(msm) == 2
-        @test length(nmasked_pertile(msm)) == 2
-        @test length(nmasked_perset(msm)) == 2
-        @test ntiles(msm) == 2
-        # FIXME tile indices not stable
-        if nmasked_pertile(msm) == Int[2, 0]
-            @test_broken tile(msm, 1) == Int[1, 2]
-            @test_broken tile(msm, 2) == Int[3, 4]
-            @test nmasked_pertile(msm) == Int[2, 0]
-            @test nunmasked_pertile(msm) == Int[0, 2]
-        else
-            @test_broken tile(msm, 1) == Int[3, 4]
-            @test_broken tile(msm, 2) == Int[1, 2]
-            @test nmasked_pertile(msm) == Int[0, 2]
-            @test nunmasked_pertile(msm) == Int[2, 0]
-        end
-        @test nmasked_perset(msm) == Int[2, 2]
-        @test nunmasked_perset(msm) == Int[0, 2]
+        @test nmasked_perset(msm) == [2, 2]
+        @test nunmasked_perset(msm) == [0, 2]
 
         msm_copy = copy(msm)
         @test nelements(msm_copy) == nelements(msm)
         @test nmasked(msm_copy) == nmasked(msm)
         @test msm_copy.original == msm.original
         @test nsets(msm_copy) == nsets(msm)
+        @test nmasked_perset(msm_copy) == [2, 2]
+        @test nunmasked_perset(msm_copy) == [0, 2]
 
         # mask with nonexisting element
         msm2 = mask(sm, Set([:a, :b, :g]))
         @test nelements(msm2) == 4
-        @test ntiles(msm2) == 2
         @test nmasked(msm2) == 2
         @test nunmasked(msm2) == 2
         @test nsets(msm2) == 2
+        @test nmasked_perset(msm) == [2, 2]
+        @test nunmasked_perset(msm) == [0, 2]
 
         # mask with max_overlap_logpvalue, [:a :b :c :d] is excluded
         msm3 = mask(sm, Set([:a, :b]), max_overlap_logpvalue=-0.1)
         @test nelements(msm3) == 4
-        @test ntiles(msm3) == 1
         @test nmasked(msm3) == 2
         @test nunmasked(msm3) == 2
         @test nsets(msm3) == 1
+        @test nmasked_perset(msm3) == [2]
+        @test nunmasked_perset(msm3) == [0]
     end
 
     @testset "A=[:a :b] B=[:c :d] C=[:a :b :c :d], mask=[:a :b]" begin
@@ -182,19 +169,8 @@ end
 
         @test nelements(msm) == 4
         @test nsets(msm) == 2
-        @test ntiles(msm) == 2
-        # FIXME tile indices not stable
-        if nmasked_pertile(msm) == Int[2, 0]
-            @test_broken tile(msm, 1) == Int[1, 2]
-            @test_broken tile(msm, 2) == Int[3, 4]
-            @test nmasked_pertile(msm) == Int[2, 0]
-            @test nunmasked_pertile(msm) == Int[0, 2]
-        else
-            @test_broken tile(msm, 1) == Int[3, 4]
-            @test_broken tile(msm, 2) == Int[1, 2]
-            @test nmasked_pertile(msm) == Int[0, 2]
-            @test nunmasked_pertile(msm) == Int[2, 0]
-        end
+        @test nmasked_perset(msm) == [2, 2]
+        @test nunmasked_perset(msm) == [0, 2]
     end
 
     @testset "filter!()" begin
@@ -202,23 +178,20 @@ end
         msm = mask(sm, Set([:b, :c]))
 
         @test nelements(msm) == 4
-        @test ntiles(msm) == 2 # [:a :b] [:c :d]
         @test nsets(msm) == 3
-        @test nmasked_pertile(msm) == Int[1, 1]
-        @test nunmasked_pertile(msm) == Int[1, 1]
+        @test nmasked_perset(msm) == [1, 1, 2]
+        @test nunmasked_perset(msm) == [1, 1, 2]
 
         filter!(msm, Bool[true, true, false])
         @test nelements(msm) == 4
-        @test ntiles(msm) == 2
         @test nsets(msm) == 2
-        @test nmasked_pertile(msm) == Int[1, 1]
-        @test nunmasked_pertile(msm) == Int[1, 1]
+        @test nmasked_perset(msm) == [1, 1]
+        @test nunmasked_perset(msm) == [1, 1]
 
         filter!(msm, Bool[false, true])
         @test nelements(msm) == 4
-        @test ntiles(msm) == 1
         @test nsets(msm) == 1
-        @test nmasked_pertile(msm) == Int[1]
-        @test nunmasked_pertile(msm) == Int[1]
+        @test nmasked_perset(msm) == [1]
+        @test nunmasked_perset(msm) == [1]
     end
 end
