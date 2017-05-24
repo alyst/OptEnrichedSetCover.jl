@@ -70,7 +70,7 @@ Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 """
 function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
     masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
-    nsets = Int[sum(x -> x > 0.0, variant.weights) for variant in covers.variants]
+    nsets = Int[count(x -> x > 0.0, variant.weights) for variant in covers.variants]
     set_ixs = vcat([find(x -> x > 0.0, variant.weights)
                     for variant in covers.variants]...)
     orig_set_ixs = covers.setixs[set_ixs]
@@ -83,7 +83,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
               nmasked = nmasked_perset(masked_mosaic)[set_ixs],
               nunmasked = nunmasked_perset(masked_mosaic)[set_ixs],
               weight = vcat([filter(x -> x > 0.0, variant.weights)
-                              for variant in covers.variants]...),
+                             for variant in covers.variants]...),
               score = [setscore(covers, set_ixs[i], cover_ixs[i]) for i in eachindex(set_ixs)])
 end
 
