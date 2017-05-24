@@ -42,7 +42,7 @@
     end
 
     @testset "SparseMaskMatrix(Vector{Vector{Int}})" begin
-        sm = SparseMaskMatrix(4, 3, Vector{Int}[[1,2], Int[], [3,4]])
+        sm = SparseMaskMatrix(4, Vector{Int}[[1,2], Int[], [3,4]])
         @test size(sm) == (4, 3)
         @test view(sm, :, 1) == [1, 2]
         @test view(sm, :, 2) == Int[]

@@ -25,15 +25,19 @@ Base.copy(mtx::SparseMaskMatrix) = SparseMaskMatrix(mtx.m, mtx.n, copy(mtx.colpt
 """
 Construct `SparseMaskMatrix` given vector of true row indices per each column.
 """
-function SparseMaskMatrix(m::Integer, n::Integer, rowvals_percol::Vector{Vector{Int}})
-    colptr = sizehint!(Vector{Int}(), n+1)
-    rowval = Vector{Int}()
+function SparseMaskMatrix(m::Integer, rowvals_percol::Vector{Vector{Int}})
+    colptr = sizehint!(Vector{Int}(), length(rowvals_percol)+1)
+    nrowvals_cumlenp1 = 1
     for rowvals in rowvals_percol
-        push!(colptr, length(rowval)+1)
-        append!(rowval, rowvals)
+        push!(colptr, nrowvals_cumlenp1)
+        nrowvals_cumlenp1 += length(rowvals)
     end
-    push!(colptr, length(rowval)+1)
-    SparseMaskMatrix(m, n, colptr, rowval)
+    push!(colptr, nrowvals_cumlenp1)
+    allrowvals = sizehint!(Vector{Int}(), nrowvals_cumlenp1-1)
+    for rowvals in rowvals_percol
+        append!(allrowvals, rowvals)
+    end
+    SparseMaskMatrix(m, length(rowvals_percol), colptr, allrowvals)
 end
 
 """

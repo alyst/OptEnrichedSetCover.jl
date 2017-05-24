@@ -278,7 +278,7 @@ type MaskedSetMosaic{T,S}
                 nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
             end
         end
-        tileXset = SparseMaskMatrix(length(subsets2tiles), length(orig_setixs), subset2tile_ixs)
+        tileXset = SparseMaskMatrix(length(subsets2tiles), subset2tile_ixs)
         nmasked_perset = fill(0, size(tileXset, 2))
         nunmasked_perset = Vector{Int}(size(tileXset, 2))
         @inbounds for set_ix in eachindex(nmasked_perset)
