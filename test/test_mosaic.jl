@@ -133,16 +133,20 @@ end
         @test nmasked(msm) == 2
         @test nunmasked(msm) == 2
         @test nsets(msm) == 2
-        @test nmasked_perset(msm) == [2, 2]
-        @test nunmasked_perset(msm) == [0, 2]
+        @test nmasked(msm, 1) == 2
+        @test nmasked(msm, 3) == 2
+        @test nunmasked(msm, 1) == 0
+        @test nunmasked(msm, 3) == 2
 
         msm_copy = copy(msm)
         @test nelements(msm_copy) == nelements(msm)
         @test nmasked(msm_copy) == nmasked(msm)
         @test msm_copy.original == msm.original
         @test nsets(msm_copy) == nsets(msm)
-        @test nmasked_perset(msm_copy) == [2, 2]
-        @test nunmasked_perset(msm_copy) == [0, 2]
+        @test nmasked(msm_copy, 1) == 2
+        @test nmasked(msm_copy, 3) == 2
+        @test nunmasked(msm_copy, 1) == 0
+        @test nunmasked(msm_copy, 3) == 2
 
         # mask with nonexisting element
         msm2 = mask(sm, Set([:a, :b, :g]))
@@ -150,8 +154,10 @@ end
         @test nmasked(msm2) == 2
         @test nunmasked(msm2) == 2
         @test nsets(msm2) == 2
-        @test nmasked_perset(msm) == [2, 2]
-        @test nunmasked_perset(msm) == [0, 2]
+        @test nmasked(msm2, 1) == 2
+        @test nmasked(msm2, 3) == 2
+        @test nunmasked(msm2, 1) == 0
+        @test nunmasked(msm2, 3) == 2
 
         # mask with max_overlap_logpvalue, [:a :b :c :d] is excluded
         msm3 = mask(sm, Set([:a, :b]), max_overlap_logpvalue=-0.1)
@@ -159,6 +165,8 @@ end
         @test nmasked(msm3) == 2
         @test nunmasked(msm3) == 2
         @test nsets(msm3) == 1
+        @test nmasked(msm, 1) == 2
+        @test nunmasked(msm, 1) == 0
         @test nmasked_perset(msm3) == [2]
         @test nunmasked_perset(msm3) == [0]
     end
@@ -169,8 +177,10 @@ end
 
         @test nelements(msm) == 4
         @test nsets(msm) == 2
-        @test nmasked_perset(msm) == [2, 2]
-        @test nunmasked_perset(msm) == [0, 2]
+        @test nmasked(msm, :A) == 2
+        @test nmasked(msm, :C) == 2
+        @test nunmasked(msm, :A) == 0
+        @test nunmasked(msm, :C) == 2
     end
 
     @testset "filter!()" begin

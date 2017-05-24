@@ -248,6 +248,9 @@ type MaskedSetMosaic{T,S}
     end
 end
 
+# FIXME not optimal
+setid2ix{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S) = searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
+
 mask(mosaic::SetMosaic, mask::Union{BitVector,Vector{Bool}}; max_overlap_logpvalue::Real = 0.0) =
     MaskedSetMosaic(mosaic, mask, max_overlap_logpvalue)
 mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}; max_overlap_logpvalue::Real = 0.0) =
@@ -260,6 +263,8 @@ nmasked(mosaic::MaskedSetMosaic) = mosaic.total_masked
 nunmasked(mosaic::MaskedSetMosaic) = nelements(mosaic) - mosaic.total_masked
 nmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nmasked_perset
 nunmasked_perset(mosaic::MaskedSetMosaic) = mosaic.nunmasked_perset
+nmasked{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S) = mosaic.nmasked_perset[setid2ix(mosaic, set)]
+nunmasked{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S) = mosaic.nunmasked_perset[setid2ix(mosaic, set)]
 
 function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
     # copy everything, except the original mosaic (leave the reference to the same object)
