@@ -1,5 +1,5 @@
 @testset "SetMosaic" begin
-    @testset "empty" begin
+    @testset "no sets, no elements" begin
         sm = SetMosaic(Set{Symbol}[])
 
         @test nelements(sm) == 0
@@ -7,14 +7,14 @@
         @test nsets(sm) == 0
     end
 
-    @testset "empty but with :a :b elements" begin
+    @testset "no sets, :a :b" begin
         sm = SetMosaic(Set{Symbol}[], Set([:a, :b]))
         @test nelements(sm) == 2
         @test ntiles(sm) == 0
         @test nsets(sm) == 0
     end
 
-    @testset "[]" begin
+    @testset "[], no elements" begin
         sm = SetMosaic([Set{Symbol}()])
 
         @test nelements(sm) == 0
@@ -117,7 +117,7 @@ end
         @test nunmasked_pertile(msm) == Int[]
     end
 
-    @testset "[:a :b] [:c :d] [:a :b :c :d], :a :b" begin
+    @testset "[:a :b] [:c :d] [:a :b :c :d], mask=[:a :b]" begin
         sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c, :d])])
 
         msm = mask(sm, Set([:a, :b]))
@@ -158,7 +158,7 @@ end
         @test nunmasked(msm2) == 2
     end
 
-    @testset "A=[:a :b] B=[:c :d] C=[:a :b :c :d], :a :b" begin
+    @testset "A=[:a :b] B=[:c :d] C=[:a :b :c :d], mask=[:a :b]" begin
         sm = SetMosaic(Dict(:A=>Set([:a, :b]), :B=>Set([:c, :d]), :C=>Set([:a, :b, :c, :d])))
         msm = mask(sm, Set([:a, :b]))
 
