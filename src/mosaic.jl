@@ -231,63 +231,58 @@ type MaskedSetMosaic{T,S}
         (max_overlap_logpvalue <= 0.0) || throw(ArgumentError("Maximal overlap log(P-value) must be ≤0, found $max_overlap_logpvalue"))
 
         # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
-        noverlaps = zeros(Int, nsets(mosaic))
-        @inbounds for i in eachindex(elmask)
-            elmask[i] || continue
-            for setix in view(mosaic.setXelm, :, i)
-                noverlaps[setix] += 1
+        nmasked_orgsets = zeros(Int, nsets(mosaic))
+        @inbounds for elix in eachindex(elmask)
+            elmask[elix] || continue
+            for org_setix in view(mosaic.setXelm, :, elix)
+                nmasked_orgsets[org_setix] += 1
             end
         end
         ntotal = nelements(mosaic)
         nmasked = sum(elmask)
-        orig_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
-        for (setix, noverlap) in enumerate(noverlaps)
-            @inbounds overlap_pvalue = logpvalue(setsize(mosaic, setix), nmasked, ntotal, noverlap)
-            if (noverlap > 0) && (overlap_pvalue <= max_overlap_logpvalue)
-                push!(orig_setixs, setix)
+        org_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
+        for (org_setix, nmasked_orgset) in enumerate(nmasked_orgsets)
+            @inbounds overlap_pvalue = logpvalue(setsize(mosaic, org_setix), nmasked, ntotal, nmasked_orgset)
+            if (nmasked_orgset > 0) && (overlap_pvalue <= max_overlap_logpvalue)
+                push!(org_setixs, org_setix)
             end
         end
 
         # detect and squash tiles that have the same membership pattern wrt the masked sets
-        subsetXtile = fill(false, length(orig_setixs), ntiles(mosaic))
-        @inbounds for (new_setix, orig_setix) in enumerate(orig_setixs)
-            subsetXtile[new_setix, view(mosaic.tileXset, :, orig_setix)] = true
+        newsetXorgtile = fill(false, length(org_setixs), ntiles(mosaic))
+        @inbounds for (new_setix, org_setix) in enumerate(org_setixs)
+            newsetXorgtile[new_setix, view(mosaic.tileXset, :, org_setix)] = true
         end
-        subsets2tiles = Dict{Vector{Int}, Vector{Int}}()
-        sizehint!(subsets2tiles, size(subsetXtile, 2))
-        for i in 1:size(subsetXtile, 2)
-            @inbounds subset_ixs = find(view(subsetXtile, :, i))
-            push!(get!(() -> Vector{Int}(), subsets2tiles, subset_ixs), i)
+        newsets2orgtiles = Dict{Vector{Int}, Vector{Int}}()
+        sizehint!(newsets2orgtiles, size(newsetXorgtile, 2))
+        for org_tileix in 1:size(newsetXorgtile, 2)
+            @inbounds new_setixs = find(view(newsetXorgtile, :, org_tileix))
+            isempty(new_setixs) && continue
+            push!(get!(() -> Vector{Int}(), newsets2orgtiles, new_setixs), org_tileix)
         end
 
-        # build tile-to-set membership matrix
-        nmasked_pertile = zeros(Int, length(subsets2tiles))
-        nunmasked_pertile = zeros(Int, length(subsets2tiles))
-        subset2tile_ixs = [Vector{Int}() for _ in eachindex(orig_setixs)]
-        @inbounds for (tile_ix, (subset_ixs, old_tile_ixs)) in enumerate(subsets2tiles)
-            for subset_ix in subset_ixs
-                push!(subset2tile_ixs[subset_ix], tile_ix)
+        # build newtile-to-newset membership matrix
+        nmasked_newtiles = zeros(Int, length(newsets2orgtiles))
+        nunmasked_newtiles = zeros(Int, length(newsets2orgtiles))
+        newset2newtiles = [Vector{Int}() for _ in eachindex(org_setixs)]
+        @inbounds for (new_tileix, (new_setixs, org_tileixs)) in enumerate(newsets2orgtiles)
+            for new_setix in new_setixs
+                push!(newset2newtiles[new_setix], new_tileix)
             end
-            for old_tile_ix in old_tile_ixs
-                oldtile_elms = view(mosaic.elmXtile, :, old_tile_ix)
-                n_oldtile_masked = 0
-                for eix in oldtile_elms
-                    elmask[eix] && (n_oldtile_masked += 1)
-                end
-                nmasked_pertile[tile_ix] += n_oldtile_masked
-                nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
+            for org_tileix in org_tileixs
+                orgtile_elms = view(mosaic.elmXtile, :, org_tileix)
+                nmasked_orgtile = count(eix -> elmask[eix], orgtile_elms)
+                nmasked_newtiles[new_tileix] += nmasked_orgtile
+                nunmasked_newtiles[new_tileix] += length(orgtile_elms) - nmasked_orgtile
             end
         end
-        tileXset = SparseMaskMatrix(length(subsets2tiles), subset2tile_ixs)
-        nmasked_perset = fill(0, size(tileXset, 2))
-        nunmasked_perset = Vector{Int}(size(tileXset, 2))
-        @inbounds for set_ix in eachindex(nmasked_perset)
-            nmasked_perset[set_ix] = sum(nmasked_pertile[view(tileXset, :, set_ix)])
-            nunmasked_perset[set_ix] = mosaic.set_sizes[orig_setixs[set_ix]] - nmasked_perset[set_ix]
-        end
-        new{T,S}(mosaic, elmask, orig_setixs, tileXset,
-                 sum(elmask), nmasked_pertile, nunmasked_pertile,
-                 nmasked_perset, nunmasked_perset)
+        newtileXnewset = SparseMaskMatrix(length(nmasked_newtiles), newset2newtiles)
+
+        # calculate masked/unmasked elements for each set in the masked mosaic
+        @inbounds nunmasked_newsets = [mosaic.set_sizes[org_setix] - nmasked_orgsets[org_setix] for org_setix in org_setixs]
+        new{T,S}(mosaic, elmask, org_setixs, newtileXnewset,
+                 sum(elmask), nmasked_newtiles, nunmasked_newtiles,
+                 nmasked_orgsets[org_setixs], nunmasked_newsets)
     end
 end
 
@@ -325,12 +320,12 @@ function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVe
     tileXset = mosaic.tileXset[:, setmask]
     tile_mask = fill(false, ntiles(mosaic))
     tile_mask[tileXset.rowval] = true
-    old2new_tile_ixs = cumsum(tile_mask)
-    old_tile_ixs = find(tile_mask)
-    mosaic.tileXset = SparseMaskMatrix(length(old_tile_ixs), tileXset.n,
-                                       tileXset.colptr, old2new_tile_ixs[tileXset.rowval]) # remove unused tiles
-    mosaic.nmasked_pertile = mosaic.nmasked_pertile[old_tile_ixs]
-    mosaic.nunmasked_pertile = mosaic.nunmasked_pertile[old_tile_ixs]
+    old2new_tileixs = cumsum(tile_mask)
+    old_tileixs = find(tile_mask)
+    mosaic.tileXset = SparseMaskMatrix(length(old_tileixs), tileXset.n,
+                                       tileXset.colptr, old2new_tileixs[tileXset.rowval]) # remove unused tiles
+    mosaic.nmasked_pertile = mosaic.nmasked_pertile[old_tileixs]
+    mosaic.nunmasked_pertile = mosaic.nunmasked_pertile[old_tileixs]
     mosaic.nmasked_perset = mosaic.nmasked_perset[setmask]
     mosaic.nunmasked_perset = mosaic.nunmasked_perset[setmask]
     return mosaic
