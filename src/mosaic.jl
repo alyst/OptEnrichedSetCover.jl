@@ -189,6 +189,8 @@ nsets(mosaic::SetMosaic) = size(mosaic.tileXset, 2)
 tile(mosaic::SetMosaic, tile_ix::Integer) = view(mosaic.elmXtile, :, tile_ix)
 set(mosaic::SetMosaic, set_ix::Integer) = view(mosaic.elmXset, :, set_ix)
 
+setsize(mosaic::SetMosaic, set_ix::Integer) = mosaic.set_sizes[set_ix]
+
 """
 `SetMosaic` with an elements mask (selection) on top.
 Sets that are not overlapping with the mask are excluded(skipped) from `MaskedSetMosaic`.

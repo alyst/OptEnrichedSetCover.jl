@@ -12,6 +12,8 @@
         @test nelements(sm) == 2
         @test ntiles(sm) == 0
         @test nsets(sm) == 0
+        @test_throws BoundsError setsize(sm, 0)
+        @test_throws BoundsError setsize(sm, 1)
     end
 
     @testset "[], no elements" begin
@@ -29,6 +31,7 @@
         @test ntiles(sm) == 1
         @test tile(sm, 1) == [1]
         @test nsets(sm) == 1
+        @test setsize(sm, 1) == 1
     end
 
     @testset "[:a] []" begin
@@ -38,6 +41,8 @@
         @test ntiles(sm) == 1
         @test tile(sm, 1) == [1]
         @test nsets(sm) == 2
+        @test setsize(sm, 1) == 1
+        @test setsize(sm, 2) == 0
     end
 
     @testset "[:a] [:b]" begin
@@ -66,6 +71,10 @@
         @test ntiles(sm) == 2
         @test tile(sm, 1) == [1]
         @test tile(sm, 2) == [2]
+        @test setsize(sm, 1) == 1
+        @test setsize(sm, 2) == 1
+        @test setsize(sm, 3) == 2
+        @test_throws BoundsError setsize(sm, 4)
         @test nsets(sm) == 3
     end
 

@@ -9,7 +9,7 @@ export SetMosaic, CoverParams, CoverProblem,
     CoverEnumerationParams, CoverCollection,
     nelements, ntiles, nsets,
     nmasked, nunmasked, nmasked_pertile, nunmasked_pertile, nmasked_perset, nunmasked_perset,
-    tile, tiles, set,
+    tile, tiles, set, setsize,
     unmask, mask,
     score, # any conflicts
     optimize # conflicts with Optim.jl
