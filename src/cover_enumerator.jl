@@ -71,20 +71,32 @@ Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
     masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
     nsets = Int[count(x -> x > 0.0, variant.weights) for variant in covers.variants]
-    set_ixs = vcat([find(x -> x > 0.0, variant.weights)
-                    for variant in covers.variants]...)
+    nsetsum = sum(nsets)
+    set_ixs = sizehint!(Vector{Int}(), nsetsum)
+    cover_ixs = sizehint!(Vector{Int}(), nsetsum)
+    delta_scores = sizehint!(Vector{Float64}(), nsetsum)
+    weights = sizehint!(Vector{Float64}(), nsetsum)
+    scores = sizehint!(Vector{Float64}(), nsetsum)
+    for (variant_ix, variant) in enumerate(covers.variants)
+        delta_score = variant.score - covers.variants[1].score
+        for (set_ix, weight) in enumerate(variant.weights)
+            (weight > 0.0) || continue
+            push!(set_ixs, set_ix)
+            push!(weights, weight)
+            push!(cover_ixs, variant_ix)
+            push!(delta_scores, delta_score)
+            push!(scores, setscore(covers, set_ix, variant_ix))
+        end
+    end
     orig_set_ixs = covers.setixs[set_ixs]
-    cover_ixs = vcat([fill(cover_ix, nset) for (cover_ix, nset) in enumerate(nsets)]...)
     DataFrame(cover_ix = cover_ixs,
               set_ix = orig_set_ixs,
               set_id = mosaic.ix2set[orig_set_ixs],
-              delta_score = vcat([fill(covers.variants[cover_ix].score - covers.variants[1].score, nset)
-                                 for (cover_ix, nset) in enumerate(nsets)]...),
+              delta_score = delta_scores,
               nmasked = nmasked_perset(masked_mosaic)[set_ixs],
               nunmasked = nunmasked_perset(masked_mosaic)[set_ixs],
-              weight = vcat([filter(x -> x > 0.0, variant.weights)
-                             for variant in covers.variants]...),
-              score = [setscore(covers, set_ixs[i], cover_ixs[i]) for i in eachindex(set_ixs)])
+              weight = weights,
+              score = scores)
 end
 
 """
