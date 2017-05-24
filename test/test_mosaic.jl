@@ -165,6 +165,15 @@ end
         @test ntiles(msm2) == 2
         @test nmasked(msm2) == 2
         @test nunmasked(msm2) == 2
+        @test nsets(msm2) == 2
+
+        # mask with max_overlap_logpvalue, [:a :b :c :d] is excluded
+        msm3 = mask(sm, Set([:a, :b]), max_overlap_logpvalue=-0.1)
+        @test nelements(msm3) == 4
+        @test ntiles(msm3) == 2
+        @test nmasked(msm3) == 2
+        @test nunmasked(msm3) == 2
+        @test nsets(msm3) == 1
     end
 
     @testset "A=[:a :b] B=[:c :d] C=[:a :b :c :d], mask=[:a :b]" begin

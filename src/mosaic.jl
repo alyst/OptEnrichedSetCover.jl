@@ -194,6 +194,7 @@ setsize(mosaic::SetMosaic, set_ix::Integer) = mosaic.set_sizes[set_ix]
 """
 `SetMosaic` with an elements mask (selection) on top.
 Sets that are not overlapping with the mask are excluded(skipped) from `MaskedSetMosaic`.
+Optionally the filtering can include testing for the minimal overlap significance P-value.
 
 The tiles of non-overlapped sets are removed, the tiles that have identical membership
 for all the masked sets are squashed into a single tile.
@@ -222,29 +223,43 @@ type MaskedSetMosaic{T,S}
             nmasked_perset, nunmasked_perset)
     end
 
-    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}})
+    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
+                                            max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+    )
         length(elmask) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
-        #println("elmask=", elmask)
-        # get the sets that overlap with the elements mask
-        setmask = fill(false, nsets(mosaic))
+        (max_overlap_logpvalue <= 0.0) || throw(ArgumentError("Maximal overlap log(P-value) must be ≤0, found $max_overlap_logpvalue"))
+
+        # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
+        noverlaps = zeros(Int, nsets(mosaic))
         @inbounds for i in eachindex(elmask)
-            elmask[i] && (setmask[view(mosaic.setXelm, :, i)] = true)
+            elmask[i] || continue
+            for setix in view(mosaic.setXelm, :, i)
+                noverlaps[setix] += 1
+            end
         end
-        orig_setixs = find(setmask)
-        #println("setmask=$setmask")
+        ntotal = nelements(mosaic)
+        nmasked = sum(elmask)
+        orig_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
+        for (setix, noverlap) in enumerate(noverlaps)
+            @inbounds overlap_pvalue = logpvalue(setsize(mosaic, setix), nmasked, ntotal, noverlap)
+            if (noverlap > 0) && (overlap_pvalue <= max_overlap_logpvalue)
+                push!(orig_setixs, setix)
+            end
+        end
+
         # detect and squash tiles that have the same membership pattern wrt the masked sets
         subsetXtile = fill(false, length(orig_setixs), ntiles(mosaic))
         @inbounds for (new_setix, orig_setix) in enumerate(orig_setixs)
             subsetXtile[new_setix, view(mosaic.tileXset, :, orig_setix)] = true
         end
-        #println("subsetXtile=$subsetXtile")
         subsets2tiles = Dict{Vector{Int}, Vector{Int}}()
         sizehint!(subsets2tiles, size(subsetXtile, 2))
         for i in 1:size(subsetXtile, 2)
             @inbounds subset_ixs = find(view(subsetXtile, :, i))
             push!(get!(() -> Vector{Int}(), subsets2tiles, subset_ixs), i)
         end
+
         # build tile-to-set membership matrix
         nmasked_pertile = zeros(Int, length(subsets2tiles))
         nunmasked_pertile = zeros(Int, length(subsets2tiles))
@@ -257,9 +272,7 @@ type MaskedSetMosaic{T,S}
                 oldtile_elms = view(mosaic.elmXtile, :, old_tile_ix)
                 n_oldtile_masked = 0
                 for eix in oldtile_elms
-                    if elmask[eix]
-                        n_oldtile_masked += 1
-                    end
+                    elmask[eix] && (n_oldtile_masked += 1)
                 end
                 nmasked_pertile[tile_ix] += n_oldtile_masked
                 nunmasked_pertile[tile_ix] += length(oldtile_elms) - n_oldtile_masked
@@ -272,15 +285,16 @@ type MaskedSetMosaic{T,S}
             nmasked_perset[set_ix] = sum(nmasked_pertile[view(tileXset, :, set_ix)])
             nunmasked_perset[set_ix] = mosaic.set_sizes[orig_setixs[set_ix]] - nmasked_perset[set_ix]
         end
-        #println("tileXset=$tileXset")
         new{T,S}(mosaic, elmask, orig_setixs, tileXset,
                  sum(elmask), nmasked_pertile, nunmasked_pertile,
                  nmasked_perset, nunmasked_perset)
     end
 end
 
-mask(mosaic::SetMosaic, mask::Union{BitVector,Vector{Bool}}) = MaskedSetMosaic(mosaic, mask)
-mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}) = mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm])
+mask(mosaic::SetMosaic, mask::Union{BitVector,Vector{Bool}}; max_overlap_logpvalue::Real = 0.0) =
+    MaskedSetMosaic(mosaic, mask, max_overlap_logpvalue)
+mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}; max_overlap_logpvalue::Real = 0.0) =
+    mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm], max_overlap_logpvalue=max_overlap_logpvalue)
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
