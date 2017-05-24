@@ -1,6 +1,6 @@
 @testset "SetMosaic" begin
     @testset "empty" begin
-        sm = SetMosaic(Set{Symbol}[]);
+        sm = SetMosaic(Set{Symbol}[])
 
         @test nelements(sm) == 0
         @test ntiles(sm) == 0
@@ -15,7 +15,7 @@
     end
 
     @testset "[]" begin
-        sm = SetMosaic([Set(Symbol[])]);
+        sm = SetMosaic([Set{Symbol}()])
 
         @test nelements(sm) == 0
         @test ntiles(sm) == 0
@@ -23,7 +23,7 @@
     end
 
     @testset "[:a]" begin
-        sm = SetMosaic([Set(Symbol[:a])]);
+        sm = SetMosaic([Set([:a])])
 
         @test nelements(sm) == 1
         @test ntiles(sm) == 1
@@ -32,7 +32,7 @@
     end
 
     @testset "[:a] []" begin
-        sm = SetMosaic([Set(Symbol[:a]), Set(Symbol[])]);
+        sm = SetMosaic([Set([:a]), Set{Symbol}()])
 
         @test nelements(sm) == 1
         @test ntiles(sm) == 1
@@ -41,7 +41,7 @@
     end
 
     @testset "[:a] [:b]" begin
-        sm = SetMosaic([Set(Symbol[:a]), Set(Symbol[:b])]);
+        sm = SetMosaic([Set([:a]), Set([:b])])
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
@@ -51,7 +51,7 @@
     end
 
     @testset "[:a] [:a]" begin
-        sm = SetMosaic([Set(Symbol[:a]), Set(Symbol[:a])]);
+        sm = SetMosaic([Set([:a]), Set([:a])])
 
         @test nelements(sm) == 1
         @test ntiles(sm) == 1
@@ -60,7 +60,7 @@
     end
 
     @testset "[:a] [:b] [:a :b]" begin
-        sm = SetMosaic([Set(Symbol[:a]), Set(Symbol[:b]), Set(Symbol[:a, :b])]);
+        sm = SetMosaic([Set([:a]), Set([:b]), Set([:a, :b])])
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
@@ -70,7 +70,7 @@
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c]" begin
-        sm = SetMosaic([Set(Symbol[:a, :b]), Set(Symbol[:c, :d]), Set(Symbol[:a, :b, :c])]);
+        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c])])
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 3
@@ -81,7 +81,8 @@
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c :d]" begin
-        sm = SetMosaic([Set(Symbol[:a, :b]), Set(Symbol[:c, :d]), Set(Symbol[:a, :b, :c, :d])]);
+        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]),
+                        Set([:a, :b, :c, :d])])
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 2
@@ -117,9 +118,9 @@ end
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c :d], :a :b" begin
-        sm = SetMosaic([Set(Symbol[:a, :b]), Set(Symbol[:c, :d]), Set(Symbol[:a, :b, :c, :d])]);
+        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c, :d])])
 
-        msm = mask(sm, Set(Symbol[:a, :b]))
+        msm = mask(sm, Set([:a, :b]))
 
         @test nelements(msm) == 4
         @test nmasked(msm) == 2
@@ -150,7 +151,7 @@ end
         @test nsets(msm_copy) == nsets(msm)
 
         # mask with nonexisting element
-        msm2 = mask(sm, Set(Symbol[:a, :b, :g]))
+        msm2 = mask(sm, Set([:a, :b, :g]))
         @test nelements(msm2) == 4
         @test ntiles(msm2) == 2
         @test nmasked(msm2) == 2
@@ -158,8 +159,8 @@ end
     end
 
     @testset "A=[:a :b] B=[:c :d] C=[:a :b :c :d], :a :b" begin
-        sm = SetMosaic(Dict(:A=>Set(Symbol[:a, :b]), :B=>Set(Symbol[:c, :d]), :C=>Set(Symbol[:a, :b, :c, :d])));
-        msm = mask(sm, Set(Symbol[:a, :b]))
+        sm = SetMosaic(Dict(:A=>Set([:a, :b]), :B=>Set([:c, :d]), :C=>Set([:a, :b, :c, :d])))
+        msm = mask(sm, Set([:a, :b]))
 
         @test nelements(msm) == 4
         @test nsets(msm) == 2
@@ -179,8 +180,8 @@ end
     end
 
     @testset "filter!()" begin
-        sm = SetMosaic([Set(Symbol[:a, :b]), Set(Symbol[:c, :d]), Set(Symbol[:a, :b, :c, :d])]);
-        msm = mask(sm, Set(Symbol[:b, :c]))
+        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c, :d])])
+        msm = mask(sm, Set([:b, :c]))
 
         @test nelements(msm) == 4
         @test ntiles(msm) == 2
