@@ -38,13 +38,16 @@ Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` r
 immutable CoverProblem
     params::CoverParams
 
-    setXset_scores::Matrix{Float64}
     set_scores::Vector{Float64}
+    setXset_scores::Matrix{Float64}
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
+		set_scores = Float64[independentsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
+                             nmasked_perset(mosaic)[i], nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)]
         # preprocess setXset scores matrix for numerical solution
         setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
                                 params.overlap_penalty)
+        # replace infinite setXset score with the minimal finite setXset score
         min_score = 0.0
         @inbounds for i in eachindex(setXset_scores)
             if !isfinite(setXset_scores[i])
@@ -63,10 +66,7 @@ immutable CoverProblem
         @inbounds for i in 1:size(setXset_scores, 1)
             setXset_scores[i, i] = log_selp
         end
-        new(params, setXset_scores,
-            Float64[independentsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
-                        nmasked_perset(mosaic)[i],
-                        nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)])
+        new(params, set_scores, setXset_scores)
     end
 end
 
