@@ -133,6 +133,8 @@ end
         @test nmasked(msm) == 2
         @test nunmasked(msm) == 2
         @test nsets(msm) == 2
+        @test setsize(msm, 1) == 2
+        @test setsize(msm, 2) == 4
         @test nmasked(msm, 1) == 2
         @test nmasked(msm, 3) == 2
         @test nunmasked(msm, 1) == 0

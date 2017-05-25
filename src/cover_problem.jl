@@ -42,11 +42,11 @@ immutable CoverProblem
     setXset_scores::Matrix{Float64}
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-		set_scores = Float64[independentsetscore(mosaic.original.set_sizes[mosaic.setixs[i]],
-                             nmasked_perset(mosaic)[i], nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)]
+		@inbounds set_scores = Float64[independentsetscore(setsize(mosaic, i), nmasked_perset(mosaic)[i],
+                                                           nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)]
         # preprocess setXset scores matrix for numerical solution
-        setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
-                                params.overlap_penalty)
+        @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
+                                          params.overlap_penalty)
         # replace infinite setXset score with the minimal finite setXset score
         min_score = 0.0
         @inbounds for i in eachindex(setXset_scores)

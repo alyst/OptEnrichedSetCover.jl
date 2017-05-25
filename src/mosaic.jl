@@ -257,6 +257,11 @@ mask{T,S}(mosaic::SetMosaic{T,S}, sel::Set{T}; max_overlap_logpvalue::Real = 0.0
     mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm], max_overlap_logpvalue=max_overlap_logpvalue)
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
+function setsize(mosaic::MaskedSetMosaic, setix::Integer)
+    @inbounds org_setix = mosaic.setixs[setix]
+    return setsize(mosaic.original, org_setix)
+end
+
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
 nsets(mosaic::MaskedSetMosaic) = length(mosaic.nmasked_perset)
 nmasked(mosaic::MaskedSetMosaic) = mosaic.total_masked
