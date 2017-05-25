@@ -191,6 +191,19 @@ set(mosaic::SetMosaic, set_ix::Integer) = view(mosaic.elmXset, :, set_ix)
 
 setsize(mosaic::SetMosaic, set_ix::Integer) = mosaic.set_sizes[set_ix]
 
+# the number of masked elements in each set of mosaic
+function nmasked_perset(mosaic::SetMosaic, elmask)
+    @assert length(elmask) == nelements(mosaic)
+    res = zeros(Int, nsets(mosaic))
+    @inbounds for elix in eachindex(elmask)
+        elmask[elix] || continue
+        for setix in view(mosaic.setXelm, :, elix)
+            res[setix] += 1
+        end
+    end
+    return res
+end
+
 """
 `SetMosaic` with an elements mask (selection) on top.
 Sets that are not overlapping with the mask are excluded(skipped) from `MaskedSetMosaic`.
@@ -216,6 +229,18 @@ type MaskedSetMosaic{T,S}
             total_masked, nmasked_perset, nunmasked_perset)
     end
 
+    # internal ctor
+    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
+                                            setixs::Vector{Int}, nmasked_perset::Vector{Int})
+        length(elmask) == nelements(mosaic) ||
+            throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
+        @assert nsets(mosaic) == length(nmasked_perset)
+        # FIXME check setixs
+
+        @inbounds nunmasked_newsets = [mosaic.set_sizes[setix] - nmasked_perset[setix] for setix in setixs]
+        new{T,S}(mosaic, elmask, setixs, sum(elmask), nmasked_perset[setixs], nunmasked_newsets)
+    end
+
     function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
                                             max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
     )
@@ -224,13 +249,7 @@ type MaskedSetMosaic{T,S}
         (max_overlap_logpvalue <= 0.0) || throw(ArgumentError("Maximal overlap log(P-value) must be ≤0, found $max_overlap_logpvalue"))
 
         # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
-        nmasked_orgsets = zeros(Int, nsets(mosaic))
-        @inbounds for elix in eachindex(elmask)
-            elmask[elix] || continue
-            for org_setix in view(mosaic.setXelm, :, elix)
-                nmasked_orgsets[org_setix] += 1
-            end
-        end
+        nmasked_orgsets = nmasked_perset(mosaic, elmask)
         ntotal = nelements(mosaic)
         nmasked = sum(elmask)
         org_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
@@ -241,11 +260,13 @@ type MaskedSetMosaic{T,S}
             end
         end
 
-        # calculate masked/unmasked elements for each set in the masked mosaic
-        @inbounds nunmasked_newsets = [mosaic.set_sizes[org_setix] - nmasked_orgsets[org_setix] for org_setix in org_setixs]
-        new{T,S}(mosaic, elmask, org_setixs,
-                 sum(elmask), nmasked_orgsets[org_setixs], nunmasked_newsets)
+        return MaskedSetMosaic(mosaic, elmask, org_setixs, nmasked_orgsets)
     end
+
+    (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S},
+                                   elmask::Union{BitVector, Vector{Bool}},
+                                   setixs::Vector{Int}) =
+        MaskedSetMosaic(mosaic, elmask, setixs, nmasked_perset(mosaic, elmask))
 end
 
 # FIXME not optimal

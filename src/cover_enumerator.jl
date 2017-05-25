@@ -69,7 +69,9 @@ Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 """
 function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
-    masked_mosaic = mask(mosaic, covers.elmask) # FIXME a workaround, because masked_mosaic is very expensive to store in covers
+    # restore masked mosaic
+    # FIXME a workaround, because masked_mosaic is very expensive to store in covers
+    masked_mosaic = MaskedSetMosaic(mosaic, covers.elmask, covers.setixs)
     nsets = Int[count(x -> x > 0.0, variant.weights) for variant in covers.variants]
     nsetsum = sum(nsets)
     set_ixs = sizehint!(Vector{Int}(), nsetsum)
