@@ -165,8 +165,8 @@ end
         @test nmasked(msm3) == 2
         @test nunmasked(msm3) == 2
         @test nsets(msm3) == 1
-        @test nmasked(msm, 1) == 2
-        @test nunmasked(msm, 1) == 0
+        @test nmasked(msm3, 1) == 2
+        @test nunmasked(msm3, 1) == 0
         @test nmasked_perset(msm3) == [2]
         @test nunmasked_perset(msm3) == [0]
     end
