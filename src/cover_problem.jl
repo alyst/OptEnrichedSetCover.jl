@@ -134,7 +134,7 @@ function optimize(problem::CoverProblem;
     m = opt_model(problem)
     setsolver(m, solver)
     solve(m)
-    w = copy(getvalue(getvariable(m, :w)))
+    w = copy(getvalue(getindex(m, :w)))
     # remove small non-zero probabilities due to optimization method errors
     for i in eachindex(w)
         @inbounds if w[i] < problem.params.min_weight
