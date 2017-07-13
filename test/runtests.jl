@@ -1,5 +1,5 @@
 using OptEnrichedSetCover
-using Base.Test, Compat, DataFrames#, DataFramesMeta
+using Base.Test, Compat, DataTables
 
 # write your own tests here
 

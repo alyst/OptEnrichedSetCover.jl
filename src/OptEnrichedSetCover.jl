@@ -1,9 +1,9 @@
-__precompile__(true)
+__precompile__()
 
 # Optimal Enriched-Set Cover
 module OptEnrichedSetCover
 
-using DataFrames, Distributions, MathProgBase, JuMP, Ipopt
+using DataTables, Distributions, MathProgBase, JuMP, Ipopt
 using Compat
 
 export SetMosaic, CoverParams, CoverProblem,

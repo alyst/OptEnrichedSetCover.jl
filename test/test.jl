@@ -69,7 +69,7 @@ sm_ab = OESC.mask(sm, Set(Symbol[:a, :b]))
 
 cover_etor = OESC.CoverEnumerator(sm_ab, OESC.CoverParams(0.5, 0.1, 0.1))
 cover_coll = collect(cover_etor)
-DataFrame(cover_coll)
+DataTable(cover_coll)
 
 cover_etor2 = OESC.CoverEnumerator(sm_ab, OESC.CoverParams(0.1, 0.1, 0.2))
 cover_coll2 = collect(cover_etor2)

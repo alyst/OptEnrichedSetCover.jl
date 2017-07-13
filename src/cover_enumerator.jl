@@ -66,9 +66,9 @@ Base.length(covers::CoverCollection) = length(covers.variants)
 Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 
 """
-Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
+Convert `covers`, a collection of the covers of `mosaic`, into a `DataTable`.
 """
-function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
+function DataTables.DataTable(covers::CoverCollection, mosaic::SetMosaic)
     # restore masked mosaic
     # FIXME a workaround, because masked_mosaic is very expensive to store in covers
     masked_mosaic = MaskedSetMosaic(mosaic, covers.elmask, covers.setixs)
@@ -91,7 +91,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
         end
     end
     orig_set_ixs = covers.setixs[set_ixs]
-    DataFrame(cover_ix = cover_ixs,
+    DataTable(cover_ix = cover_ixs,
               set_ix = orig_set_ixs,
               set_id = mosaic.ix2set[orig_set_ixs],
               delta_score = delta_scores,

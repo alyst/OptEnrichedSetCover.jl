@@ -35,7 +35,7 @@
         @test cover_coll.variants[1].score <= cover_coll.variants[2].score
     end
 
-    @testset "DataFrame(CoverCollection)" begin
+    @testset "DataTable(CoverCollection)" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                             Set([:a, :b, :c, :d, :e]))
         sm_ab = mask(sm, Set(Symbol[:a, :b]))
@@ -44,9 +44,9 @@
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=0.0, max_cover_score_delta=0.0))
 
-        df = DataFrame(cover_coll, sm)
+        df = DataTable(cover_coll, sm)
         @test size(df, 1) == 3
-        # FIXME mess with DataFrames Nullables, should switch to DataTables at some point
+        # FIXME mess with DataTables Nullables, should switch to DataTables at some point
         @test_skip df[:cover_ix] == [1, 1, 2]
         @test_skip df[:set_id] == [1, 2, 4]
     end
