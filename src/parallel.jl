@@ -1,4 +1,4 @@
-immutable CollectCovers{MC,SC}
+@compat struct CollectCovers{MC,SC}
     mosaics::MC
     sets::SC
     cover_params::CoverParams

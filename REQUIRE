@@ -4,3 +4,4 @@ Distributions
 MathProgBase
 JuMP
 Ipopt
+Compat 0.18

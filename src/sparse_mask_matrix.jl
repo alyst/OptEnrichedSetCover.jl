@@ -3,7 +3,7 @@ Sparse representation of `Matrix{Bool}`, when all "falses" are "structural".
 It uses compressed sparse column (CSC) representation, except no
 non-zero values need to be stored.
 """
-immutable SparseMaskMatrix
+@compat struct SparseMaskMatrix
     m::Int
     n::Int
     colptr::Vector{Int}
