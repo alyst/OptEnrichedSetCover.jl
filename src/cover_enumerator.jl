@@ -132,7 +132,8 @@ function Base.collect(mosaic::MaskedSetMosaic,
         if cover_pos > 1
             variant = res.variants[cover_pos-1]
             if abs(cur_cover.score - variant.score) <= 1E-3 &&
-               maxabs(cur_cover.weights - variant.weights) <= 1E-3
+               all(i -> (@inbounds return abs(cur_cover.weights[i] - variant.weights[i]) <= 1E-3),
+                   eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
                 break
             end
@@ -146,7 +147,9 @@ function Base.collect(mosaic::MaskedSetMosaic,
                 break
             end
         end
-        if isfinite(params.max_set_score) && (minimum(cover_problem.set_scores[used_setixs]) + delta_score > params.max_set_score)
+        if isfinite(params.max_set_score) &&
+           all(i -> (@inbounds return cover_problem.set_scores[i] + delta_score > params.max_set_score),
+               used_setixs)
             verbose && info("All set scores below $(max_set_score)")
             break
         end
