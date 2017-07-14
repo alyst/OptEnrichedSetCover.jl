@@ -4,15 +4,15 @@
     cover_params::CoverParams
     enum_params::CoverEnumerationParams
 
-    CollectCovers(worker::CollectCovers{MC,SC}) =
-        new(worker.mosaics, worker.sets,
-            worker.cover_params, worker.enum_params)
+    CollectCovers(worker::CollectCovers{MC,SC}) where {MC,SC} =
+        new{MC,SC}(worker.mosaics, worker.sets,
+                   worker.cover_params, worker.enum_params)
 
-    function (::Type{CollectCovers}){MC,SC}(
+    function CollectCovers(
         mosaics::MC, sets::SC,
         cover_params::CoverParams=CoverParams(sel_prob=0.1),
         enum_params::CoverEnumerationParams=CoverEnumerationParams()
-    )
+    ) where {MC,SC}
         new{MC,SC}(mosaics, sets, cover_params, enum_params)
     end
 end

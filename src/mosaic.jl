@@ -224,14 +224,13 @@ type MaskedSetMosaic{T,S}
     function MaskedSetMosaic(original::SetMosaic{T, S}, elmask::BitVector,
                              setixs::Vector{Int}, total_masked::Number,
                              nmasked_perset::Vector{Int}, nunmasked_perset::Vector{Int}
-    )
-        new(original, elmask, setixs,
-            total_masked, nmasked_perset, nunmasked_perset)
+    ) where {T,S}
+        new{T,S}(original, elmask, setixs,
+                 total_masked, nmasked_perset, nunmasked_perset)
     end
 
-    # internal ctor
-    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
-                                            setixs::Vector{Int}, nmasked_perset::Vector{Int})
+    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmask::Union{BitVector, Vector{Bool}},
+                             setixs::Vector{Int}, nmasked_perset::Vector{Int}) where {T, S}
         length(elmask) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
         @assert nsets(mosaic) == length(nmasked_perset)
@@ -241,9 +240,9 @@ type MaskedSetMosaic{T,S}
         new{T,S}(mosaic, elmask, setixs, sum(elmask), nmasked_perset[setixs], nunmasked_newsets)
     end
 
-    function (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S}, elmask::Union{BitVector, Vector{Bool}},
-                                            max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
-    )
+    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmask::Union{BitVector, Vector{Bool}},
+                             max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+    ) where {T,S}
         length(elmask) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmask))) should match the number of elements ($(nelements(mosaic)))"))
         (max_overlap_logpvalue <= 0.0) || throw(ArgumentError("Maximal overlap log(P-value) must be ≤0, found $max_overlap_logpvalue"))
@@ -263,9 +262,9 @@ type MaskedSetMosaic{T,S}
         return MaskedSetMosaic(mosaic, elmask, org_setixs, nmasked_orgsets)
     end
 
-    (::Type{MaskedSetMosaic}){T,S}(mosaic::SetMosaic{T, S},
-                                   elmask::Union{BitVector, Vector{Bool}},
-                                   setixs::Vector{Int}) =
+    MaskedSetMosaic(mosaic::SetMosaic{T, S},
+                    elmask::Union{BitVector, Vector{Bool}},
+                    setixs::Vector{Int}) where {T,S} =
         MaskedSetMosaic(mosaic, elmask, setixs, nmasked_perset(mosaic, elmask))
 end
 
@@ -294,9 +293,9 @@ nunmasked{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S) = mosaic.nunmasked_perset[s
 
 function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
     # copy everything, except the original mosaic (leave the reference to the same object)
-    MaskedSetMosaic{T,S}(mosaic.original, copy(mosaic.elmask), copy(mosaic.setixs),
-                         mosaic.total_masked,
-                         copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
+    MaskedSetMosaic(mosaic.original, copy(mosaic.elmask), copy(mosaic.setixs),
+                    mosaic.total_masked,
+                    copy(mosaic.nmasked_perset), copy(mosaic.nunmasked_perset))
 end
 
 """
