@@ -118,6 +118,9 @@ function Base.collect(mosaic::MaskedSetMosaic,
     verbose && info("Starting covers enumeration...")
     cover_problem = CoverProblem(mosaic, cover_params)
     res = CoverCollection(cover_problem, mosaic)
+    # thresholds for identifying duplicate covers
+    const score_threshold = 1E-3
+    const weight_threshold = 1E-3
     while true
         verbose && info("Trying to find cover #$(length(res)+1)...")
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
@@ -131,8 +134,8 @@ function Base.collect(mosaic::MaskedSetMosaic,
         cover_pos = searchsortedlast(res.variants, cur_cover, by=cover->cover.score)+1
         if cover_pos > 1
             variant = res.variants[cover_pos-1]
-            if abs(cur_cover.score - variant.score) <= 1E-3 &&
-               all(i -> (@inbounds return abs(cur_cover.weights[i] - variant.weights[i]) <= 1E-3),
+            if abs(cur_cover.score - variant.score) <= score_threshold &&
+               all(i -> (@inbounds return abs(cur_cover.weights[i] - variant.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
                 break
