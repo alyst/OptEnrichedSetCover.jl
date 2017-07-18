@@ -76,7 +76,7 @@
         # low prior probability to select sets, high probability to miss active element, so select abc
         problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(overlap_penalty=10.0, sel_prob=0.1))
         @show problem_ignore_overlap.setXset_scores problem_ignore_overlap.set_scores
-        @test nsets(problem_ignore_overlap) == 5 # c is out
+        @test nsets(problem_ignore_overlap) == 5 # d is out
         @test score(problem_ignore_overlap, [0.0, 0.0, 0.0, 1.0, 0.0]) < score(problem_ignore_overlap, [1.0, 1.0, 0.0, 0.0, 0.0])
         res_ignore_overlap = optimize(problem_ignore_overlap)
         #@show problem_ab_lowp
