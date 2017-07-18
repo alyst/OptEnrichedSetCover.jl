@@ -253,8 +253,9 @@ type MaskedSetMosaic{T,S}
         nmasked = sum(elmask)
         org_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
         for (org_setix, nmasked_orgset) in enumerate(nmasked_orgsets)
+            (nmasked_orgset == 0) && continue
             @inbounds overlap_pvalue = logpvalue(setsize(mosaic, org_setix), nmasked, ntotal, nmasked_orgset)
-            if (nmasked_orgset > 0) && (overlap_pvalue <= max_overlap_logpvalue)
+            if overlap_pvalue <= max_overlap_logpvalue
                 push!(org_setixs, org_setix)
             end
         end
