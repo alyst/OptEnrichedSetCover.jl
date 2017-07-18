@@ -1,7 +1,7 @@
 @testset "CoverEnumerator" begin # FIXME use weights
     @testset "[:a] [:b] [:c] [:a :b :c], mask=[:a :b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
-        sm_ab = mask(sm, Set([:a, :b]))
+        sm_ab = mask(sm, [Set([:a, :b])])
 
         # low penality to select sets, high probability to miss active element, so select abc
         cover_params1 = CoverParams(sel_prob=1.0)
@@ -29,7 +29,7 @@
                             Set([:a, :b, :c, :d, :e]))
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
-        cover_coll = collect(mask(sm, Set(Symbol[:a, :b])), CoverParams(sel_prob=1.0),
+        cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])]), CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=0.0, max_cover_score_delta=0.0))
         @test length(cover_coll) == 2
         @test cover_coll.variants[1].score <= cover_coll.variants[2].score
@@ -38,7 +38,7 @@
     @testset "DataTable(CoverCollection)" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                             Set([:a, :b, :c, :d, :e]))
-        sm_ab = mask(sm, Set(Symbol[:a, :b]))
+        sm_ab = mask(sm, [Set(Symbol[:a, :b])])
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),

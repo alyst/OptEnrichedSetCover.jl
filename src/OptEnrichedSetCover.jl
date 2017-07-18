@@ -8,7 +8,7 @@ using Compat
 
 export SetMosaic, CoverParams, CoverProblem,
     CoverEnumerationParams, CoverCollection,
-    nelements, ntiles, nsets,
+    nelements, ntiles, nsets, nmasks,
     nmasked, nunmasked, nmasked_pertile, nunmasked_pertile, nmasked_perset, nunmasked_perset,
     tile, tiles, set, setsize,
     unmask, mask,

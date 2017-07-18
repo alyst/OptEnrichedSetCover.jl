@@ -38,12 +38,12 @@ Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` r
 @compat struct CoverProblem
     params::CoverParams
 
-    set_scores::Vector{Float64}
+    set_scores::Matrix{Float64}
     setXset_scores::Matrix{Float64}
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-		@inbounds set_scores = Float64[independentsetscore(setsize(mosaic, i), nmasked_perset(mosaic)[i],
-                                                           nelements(mosaic), nmasked(mosaic), params) for i in 1:nsets(mosaic)]
+		@inbounds set_scores = Float64[independentsetscore(setsize(mosaic, i), mosaic.nmasked_perset[i, j],
+                                                           nelements(mosaic), nmasked(mosaic, j), params) for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
         # preprocess setXset scores matrix for numerical solution
         @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
                                           params.overlap_penalty)
@@ -62,31 +62,45 @@ Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` r
                 setXset_scores[i] = min_score
             end
         end
-        const log_selp = log(params.sel_prob)
+        # activating the same set in another mask doesn't introduce the penalty
         @inbounds for i in 1:size(setXset_scores, 1)
-            setXset_scores[i, i] = log_selp
+            setXset_scores[i, i] = 0
         end
-        new(params, set_scores, setXset_scores)
+        # activating the set in a given mask introduces the penalty
+        # (too constrain the number of activated sets)
+        const log_selp = log(params.sel_prob)
+        multi_setXset_scores = repeat(setXset_scores, outer=[nmasks(mosaic), nmasks(mosaic)])
+        @inbounds for i in 1:size(multi_setXset_scores, 1)
+            multi_setXset_scores[i, i] = log_selp
+        end
+        new(params, set_scores, multi_setXset_scores)
     end
 end
 
 """
 Total number of sets in the collection.
 """
-nsets(problem::CoverProblem) = length(problem.set_scores)
+nsets(problem::CoverProblem) = size(problem.set_scores, 1)
+
+"""
+Total number of masks in the collection.
+"""
+nmasks(problem::CoverProblem) = size(problem.set_scores, 2)
+
+nweights(problem::CoverProblem) = length(problem.set_scores)
 
 """
 Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
 """
 function opt_model(problem::CoverProblem)
     m = JuMP.Model()
-    ns = nsets(problem)
-    @variable(m, 0.0 <= w[1:ns] <= 1.0)
-    @objective(m, :Min, dot(problem.set_scores, w) - dot(w, problem.setXset_scores * w))
+    nw = nweights(problem)
+    @variable(m, 0.0 <= w[1:nw] <= 1.0)
+    @objective(m, :Min, dot(vec(problem.set_scores), w) - dot(w, problem.setXset_scores * w))
     return m
 end
 
-function fix_uncov_probs!(uncov_probs::Vector{Float64})
+function fix_uncov_probs!(uncov_probs::Matrix{Float64})
     pen = 0.0
     @inbounds for i in eachindex(uncov_probs)
         prob = uncov_probs[i]
@@ -112,10 +126,10 @@ end
 Result of `optimize(CoverProblem)`.
 """
 @compat struct CoverProblemResult
-    weights::Vector{Float64}
+    weights::Matrix{Float64}
     score::Float64
 
-    CoverProblemResult(weights::Vector{Float64}, score::Float64) =
+    CoverProblemResult(weights::Matrix{Float64}, score::Float64) =
         new(weights, score)
 end
 
@@ -123,10 +137,10 @@ end
 Optimize the cover problem.
 """
 function optimize(problem::CoverProblem;
-                  ini_weights::Vector{Float64} = rand(nsets(problem)),
+                  ini_weights::Vector{Float64} = rand(nweights(problem)),
                   #iterations::Int = 100,
                   solver::MathProgBase.SolverInterface.AbstractMathProgSolver = IpoptSolver(print_level=0))
-    (nsets(problem) == 0) && return CoverProblemResult(Float64[], 0.0)
+    (nweights(problem) == 0) && return CoverProblemResult(Matrix{Float64}(0,0), 0.0)
 
     # Perform the optimization
     #try
@@ -141,7 +155,7 @@ function optimize(problem::CoverProblem;
             w[i] = 0.0
         end
     end
-    return CoverProblemResult(w, getobjectivevalue(m))
+    return CoverProblemResult(reshape(w, (nsets(problem), nmasks(problem))), getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing

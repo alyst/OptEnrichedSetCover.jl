@@ -19,10 +19,10 @@ end
 The collection of masked set covers.
 """
 @compat struct CoverCollection
-    elmask::BitVector                 # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
+    elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # vector of the set indices in the original mosaic
-    base_setscores::Vector{Float64}   # base set scores
-    set_variantix::Vector{Int}        # best-scoring cover for the given set
+    base_setscores::Matrix{Float64}   # base set scores
+    set_variantix::Matrix{Int}        # best-scoring cover for the given set
     variants::Vector{CoverProblemResult}
 
     CoverCollection(empty::Void = nothing) =
@@ -31,37 +31,40 @@ The collection of masked set covers.
 
     function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic)
         nsets(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
+        nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
         # FIXME check the problem is compatible with the mosaic
-        new(mosaic.elmask, mosaic.setixs,
+        new(mosaic.elmasks, mosaic.setixs,
             problem.set_scores,
-            zeros(Int, nsets(problem)),
+            zeros(Int, nsets(problem), nmasks(problem)),
             Vector{CoverProblemResult}())
     end
 end
 
-function setscore(covers::CoverCollection, setix::Int, cover::CoverProblemResult, delta_score::Float64)
-    if cover.weights[setix] > 0.0
+function setscore(covers::CoverCollection, setix::Int, maskix::Int, cover::CoverProblemResult, delta_score::Float64)
+    if cover.weights[setix, maskix] > 0.0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return covers.base_setscores[setix] + delta_score - log(cover.weights[setix])
+        return covers.base_setscores[setix, maskix] + delta_score - log(cover.weights[setix, maskix])
     else
         # the set is not selectd
         return Inf
     end
 end
 
-setscore(covers::CoverCollection, setix::Int, variantix::Int) = setscore(covers, setix, covers.variants[variantix],
-                                                                         covers.variants[variantix].score - covers.variants[1].score)
+setscore(covers::CoverCollection, setix::Int, maskix::Int, variantix::Int) =
+    setscore(covers, setix, maskix, covers.variants[variantix],
+             covers.variants[variantix].score - covers.variants[1].score)
 
-function setscore(covers::CoverCollection, setix::Int)
-    if covers.set_variantix[setix] > 0
+function setscore(covers::CoverCollection, setix::Int, maskix::Int)
+    if covers.set_variantix[setix, maskix] > 0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return setscore(covers, setix, covers.set_variantix[setix])
+        return setscore(covers, setix, maskix, covers.set_variantix[setix])
     else
         # the set not selectd
         return Inf
     end
 end
 
+nmasks(covers::CoverCollection) = size(covers.elmasks, 2)
 Base.length(covers::CoverCollection) = length(covers.variants)
 Base.isempty(covers::CoverCollection) = isempty(covers.variants)
 
@@ -71,32 +74,40 @@ Convert `covers`, a collection of the covers of `mosaic`, into a `DataTable`.
 function DataTables.DataTable(covers::CoverCollection, mosaic::SetMosaic)
     # restore masked mosaic
     # FIXME a workaround, because masked_mosaic is very expensive to store in covers
-    masked_mosaic = MaskedSetMosaic(mosaic, covers.elmask, covers.setixs)
-    nsets = Int[count(x -> x > 0.0, variant.weights) for variant in covers.variants]
+    masked_mosaic = MaskedSetMosaic(mosaic, covers.elmasks, covers.setixs)
+    nsets = Int[count(x -> x > 0.0, view(variant.weights, :, maskix)) for maskix in 1:nmasks(covers), variant in covers.variants]
     nsetsum = sum(nsets)
     set_ixs = sizehint!(Vector{Int}(), nsetsum)
+    mask_ixs = sizehint!(Vector{Int}(), nsetsum)
     cover_ixs = sizehint!(Vector{Int}(), nsetsum)
     delta_scores = sizehint!(Vector{Float64}(), nsetsum)
     weights = sizehint!(Vector{Float64}(), nsetsum)
     scores = sizehint!(Vector{Float64}(), nsetsum)
+    nmasked_v = sizehint!(Vector{Int}(), nsetsum)
+    nunmasked_v = sizehint!(Vector{Int}(), nsetsum)
     for (variant_ix, variant) in enumerate(covers.variants)
         delta_score = variant.score - covers.variants[1].score
-        for (set_ix, weight) in enumerate(variant.weights)
+        @inbounds for set_ix in 1:size(variant.weights, 1), mask_ix in 1:size(variant.weights, 2)
+            weight = variant.weights[set_ix, mask_ix]
             (weight > 0.0) || continue
             push!(set_ixs, set_ix)
             push!(weights, weight)
+            push!(mask_ixs, mask_ix)
             push!(cover_ixs, variant_ix)
             push!(delta_scores, delta_score)
-            push!(scores, setscore(covers, set_ix, variant_ix))
+            push!(scores, setscore(covers, set_ix, mask_ix, variant_ix))
+            push!(nmasked_v, masked_mosaic.nmasked_perset[set_ix, mask_ix])
+            push!(nunmasked_v, masked_mosaic.nunmasked_perset[set_ix, mask_ix])
         end
     end
     orig_set_ixs = covers.setixs[set_ixs]
     DataTable(cover_ix = cover_ixs,
               set_ix = orig_set_ixs,
               set_id = mosaic.ix2set[orig_set_ixs],
+              mask_ix = mask_ixs,
               delta_score = delta_scores,
-              nmasked = nmasked_perset(masked_mosaic)[set_ixs],
-              nunmasked = nunmasked_perset(masked_mosaic)[set_ixs],
+              nmasked = nmasked_v,
+              nunmasked = nunmasked_v,
               weight = weights,
               score = scores)
 end
@@ -126,7 +137,8 @@ function Base.collect(mosaic::MaskedSetMosaic,
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
                              solver=IpoptSolver(print_level=0))
         verbose && info("New cover found (score=$(cur_cover.score)), processing...")
-        used_setixs = find(w -> w > 0.0, cur_cover.weights)
+        used_setixs = filter(setix -> any(w -> w > 0.0, view(cur_cover.weights, setix, :)),
+                             1:size(cur_cover.weights, 1))
         if isempty(used_setixs)
             verbose && info("Cover is empty")
             break
@@ -151,20 +163,20 @@ function Base.collect(mosaic::MaskedSetMosaic,
             end
         end
         if isfinite(params.max_set_score) &&
-           all(i -> (@inbounds return cover_problem.set_scores[i] + delta_score > params.max_set_score),
+           all(i -> (@inbounds return all(x -> x + delta_score > params.max_set_score, view(cover_problem.set_scores, i, :))),
                used_setixs)
             verbose && info("All set scores below $(max_set_score)")
             break
         end
         scores_updated = false
         # update the set scores
-        @inbounds for setix in used_setixs
+        @inbounds for setix in used_setixs, maskix in 1:nmasks(cover_problem)
             # adjust the set scores by delta
-            new_score = setscore(res, setix, cur_cover, delta_score)
-            cur_score = setscore(res, setix)
+            new_score = setscore(res, setix, maskix, cur_cover, delta_score)
+            cur_score = setscore(res, setix, maskix)
             if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
                 scores_updated = true
-                res.set_variantix[setix] = -1 # mark for setting to the cover_pos
+                res.set_variantix[setix, maskix] = -1 # mark for setting to the cover_pos
             end
         end
         if !scores_updated
@@ -175,12 +187,12 @@ function Base.collect(mosaic::MaskedSetMosaic,
         insert!(res.variants, cover_pos, cur_cover)
         verbose && info("Cover saved")
         # update pointers to the best covers for the sets
-        for setix in eachindex(res.set_variantix)
-            if res.set_variantix[setix] == -1
-                res.set_variantix[setix] = cover_pos
-            elseif res.set_variantix[setix] >= cover_pos
+        for sXmix in eachindex(res.set_variantix)
+            if res.set_variantix[sXmix] == -1
+                res.set_variantix[sXmix] = cover_pos
+            elseif res.set_variantix[sXmix] >= cover_pos
                 # the variant has moved down
-                res.set_variantix[setix] += 1
+                res.set_variantix[sXmix] += 1
             end
         end
         if params.max_covers > 0 && length(res) >= params.max_covers
