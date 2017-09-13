@@ -1,4 +1,4 @@
-@compat struct CollectCovers{MC,SC}
+struct CollectCovers{MC,SC}
     mosaics::MC
     sets::SC
     cover_params::CoverParams
@@ -23,13 +23,13 @@ function (worker::CollectCovers)(mosaic_key, set_key; verbose::Bool=false)
     ((mosaic_key, set_key), !isempty(covers_coll) ? covers_coll : nothing)
 end
 
-function pcollect{MK,SK}(
+function pcollect(
     mosaics::Dict{MK}, sets::Dict{SK};
     cover_params::CoverParams=CoverParams(sel_prob=0.1),
     enum_params::CoverEnumerationParams=CoverEnumerationParams(),
     pids=workers(), mode=:parallel,
     verbose::Bool=false
-)
+) where {MK, SK}
     info("Parallel OESC ($(length(mosaics)) mosaic(s) × $(length(sets)) set(s))...")
     # FIXME workaround for pmap() being unable to handle callable objects +
     # unable to efficiently handle large callable objects

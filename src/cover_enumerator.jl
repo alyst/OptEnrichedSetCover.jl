@@ -1,7 +1,7 @@
 """
 Parameters for `collect(mosaic::MaskedSetMosaic)`.
 """
-@compat struct CoverEnumerationParams
+struct CoverEnumerationParams
     max_covers::Int
     max_set_score::Float64
     max_cover_score_delta::Float64
@@ -18,7 +18,7 @@ end
 """
 The collection of masked set covers.
 """
-@compat struct CoverCollection
+struct CoverCollection
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # vector of the set indices in the original mosaic
     base_setscores::Matrix{Float64}   # base set scores
