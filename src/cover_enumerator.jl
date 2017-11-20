@@ -137,7 +137,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         cur_cover = optimize(cover_problem; ini_weights=rand(nsets(cover_problem)),
                              solver=IpoptSolver(print_level=0))
         verbose && info("New cover found (score=$(cur_cover.score)), processing...")
-        used_setixs = filter(setix -> any(w -> w > 0.0, view(cur_cover.weights, setix, :)),
+        used_setixs = filter(setix -> any(w -> w > 0.0, view(cur_cover.weights, setix, :))::Bool,
                              1:size(cur_cover.weights, 1))
         if isempty(used_setixs)
             verbose && info("Cover is empty")
