@@ -14,13 +14,11 @@ export SetMosaic, CoverParams, CoverProblem,
     score, # any conflicts
     optimize # conflicts with Optim.jl
 
-for script_file in ["set_score.jl",
-                    "sparse_mask_matrix.jl",
-                    "mosaic.jl",
-                    "cover_problem.jl",
-                    "cover_enumerator.jl",
-                    "parallel.jl"]
-    include(script_file)
-end
+include("set_score.jl")
+include("sparse_mask_matrix.jl")
+include("mosaic.jl")
+include("cover_problem.jl")
+include("cover_enumerator.jl")
+include("parallel.jl")
 
 end # module
