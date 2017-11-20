@@ -135,7 +135,7 @@ a "mosaic" of non-overlapping "tiles".
 * `T` type of elements
 * `S` type of set keys
 """
-@compat struct SetMosaic{T,S}
+struct SetMosaic{T,S}
     ix2elm::Vector{T}       # element index to element
     elm2ix::Dict{T, Int}    # element to its index
 

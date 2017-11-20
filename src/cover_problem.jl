@@ -1,7 +1,7 @@
 """
 Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 """
-@compat struct CoverParams
+struct CoverParams
     overlap_penalty::Float64    # ≥0, how much set overlaps are penalized
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
@@ -35,7 +35,7 @@ The optimal sets cover `C` needs to deliver to goals:
 
 Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` range.
 """
-@compat struct CoverProblem
+struct CoverProblem
     params::CoverParams
 
     set_scores::Matrix{Float64}
@@ -125,7 +125,7 @@ end
 """
 Result of `optimize(CoverProblem)`.
 """
-@compat struct CoverProblemResult
+struct CoverProblemResult
     weights::Matrix{Float64}
     score::Float64
 

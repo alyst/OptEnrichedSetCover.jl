@@ -4,7 +4,6 @@ __precompile__()
 module OptEnrichedSetCover
 
 using DataFrames, Distributions, MathProgBase, JuMP, Ipopt
-using Compat
 
 export SetMosaic, CoverParams, CoverProblem,
     CoverEnumerationParams, CoverCollection,
