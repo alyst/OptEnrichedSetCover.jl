@@ -154,7 +154,7 @@ struct SetMosaic{T,S}
     """
     Construct `SetMosaic` for a given nameless sets collection.
     """
-    function (::Type{SetMosaic}){T}(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets))
+    function SetMosaic(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets)) where T
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
@@ -169,7 +169,7 @@ struct SetMosaic{T,S}
     """
     Constructs `SetMosaic` for a given named sets collection.
     """
-    function (::Type{SetMosaic}){T,S}(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)))
+    function SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets))) where {T, S}
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
@@ -292,11 +292,12 @@ type MaskedSetMosaic{T,S}
 end
 
 # FIXME not optimal
-setid2ix{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S) = searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
+setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
+    searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
 mask(mosaic::SetMosaic, mask::Union{BitMatrix,Matrix{Bool}}; max_overlap_logpvalue::Real = 0.0) =
     MaskedSetMosaic(mosaic, mask, max_overlap_logpvalue)
-mask{T,S}(mosaic::SetMosaic{T,S}, sels::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) =
+mask(mosaic::SetMosaic{T,S}, sels::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) where {T,S} =
     mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm, sel in sels],
          max_overlap_logpvalue=max_overlap_logpvalue)
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
@@ -313,10 +314,12 @@ nmasked(mosaic::MaskedSetMosaic, maskix::Int) = mosaic.total_masked[maskix]
 nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.total_masked[maskix]
 nmasked_perset(mosaic::MaskedSetMosaic, maskix::Int) = view(mosaic.nmasked_perset, :, maskix)
 nunmasked_perset(mosaic::MaskedSetMosaic, maskix::Int) = view(mosaic.nunmasked_perset, :, maskix)
-nmasked{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) = (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nmasked_perset[setix, maskix] : 0)
-nunmasked{T,S}(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) = (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nunmasked_perset[setix, maskix] : setsize(mosaic.original, mosaic.original.set2ix[set]))
+nmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
+    (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nmasked_perset[setix, maskix] : 0)
+nunmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
+    (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nunmasked_perset[setix, maskix] : setsize(mosaic.original, mosaic.original.set2ix[set]))
 
-function Base.copy{T,S}(mosaic::MaskedSetMosaic{T,S})
+function Base.copy(mosaic::MaskedSetMosaic)
     # copy everything, except the original mosaic (leave the reference to the same object)
     MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.setixs),
                     mosaic.total_masked,

@@ -46,7 +46,7 @@ Construct `SparseMaskMatrix` from the family of sets.
  * `sets` family of sets, one set per result column
  * `elm2ix` mapping from set element to its index (mask row index)
 """
-function SparseMaskMatrix{T}(sets, elm2ix::Dict{T, Int})
+function SparseMaskMatrix(sets, elm2ix::Dict{T, Int}) where T
     isempty(sets) && return SparseMaskMatrix(length(elm2ix), 0, fill(0, 1), Vector{Int}())
 
     elm_ixs = Vector{Int}()
