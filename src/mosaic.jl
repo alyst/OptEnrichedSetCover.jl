@@ -22,7 +22,10 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     for (i, s) in enumerate(sets)
         set_elms = view(elmXset, :, i)
         for e in s
-            @inbounds set_elms[elm2ix[e]] = true
+            ix = get(elm2ix, e, 0)
+            if ix > 0
+                @inbounds set_elms[ix] = true
+            end
         end
     end
     setXelm = elmXset'
@@ -128,6 +131,16 @@ function _union{T}(::Type{T}, sets)
     return res
 end
 
+function _set_sizes(tileXset::SparseMaskMatrix, tile_sizes::Vector{Int})
+    set_sizes = zeros(Int, size(tileXset, 2))
+    for six in eachindex(set_sizes)
+        tile_ixs = view(tileXset, :, six)
+        isempty(tile_ixs) && continue
+        @inbounds set_sizes[six] = sum(tix -> tile_sizes[tix], view(tileXset, :, six))
+    end
+    return set_sizes
+end
+
 """
 A collection of (potentially overlapping) sets as
 a "mosaic" of non-overlapping "tiles".
@@ -158,7 +171,7 @@ struct SetMosaic{T,S}
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
-        set_sizes = Int[length(set) for set in sets]
+        set_sizes = _set_sizes(tileXset, tile_sizes)
         new{T, Int}(ix2elm, elm2ix,
                     collect(eachindex(sets)), Dict([Pair(i,i) for i in eachindex(sets)]),
                     set_sizes,
@@ -173,7 +186,7 @@ struct SetMosaic{T,S}
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(values(sets), elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
-        set_sizes = Int[length(set) for set in values(sets)]
+        set_sizes = _set_sizes(tileXset, tile_sizes)
         new{T, S}(ix2elm, elm2ix,
                   collect(keys(sets)), Dict([Pair(s, i) for (i, s) in enumerate(keys(sets))]),
                   set_sizes,
