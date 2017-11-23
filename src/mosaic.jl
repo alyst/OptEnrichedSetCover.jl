@@ -227,7 +227,7 @@ Optionally the filtering can include testing for the minimal overlap significanc
 The tiles of non-overlapped sets are removed, the tiles that have identical membership
 for all the masked sets are squashed into a single tile.
 """
-type MaskedSetMosaic{T,S}
+mutable struct MaskedSetMosaic{T,S}
     original::SetMosaic{T,S}    # original mosaic
     elmasks::BitMatrix          # elements masks
     setixs::Vector{Int}         # original indices of the included sets
