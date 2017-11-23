@@ -173,7 +173,7 @@ struct SetMosaic{T,S}
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = _set_sizes(tileXset, tile_sizes)
         new{T, Int}(ix2elm, elm2ix,
-                    collect(eachindex(sets)), Dict([Pair(i,i) for i in eachindex(sets)]),
+                    collect(eachindex(sets)), Dict(Pair(i,i) for i in eachindex(sets)),
                     set_sizes,
                     setXelm, elmXset, elmXtile, tileXset,
                     _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
@@ -188,7 +188,7 @@ struct SetMosaic{T,S}
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = _set_sizes(tileXset, tile_sizes)
         new{T, S}(ix2elm, elm2ix,
-                  collect(keys(sets)), Dict([Pair(s, i) for (i, s) in enumerate(keys(sets))]),
+                  collect(keys(sets)), Dict(Pair(s, i) for (i, s) in enumerate(keys(sets))),
                   set_sizes,
                   setXelm, elmXset, elmXtile, tileXset,
                   _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
