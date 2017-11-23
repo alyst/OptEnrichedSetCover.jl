@@ -19,6 +19,7 @@ end
 The collection of masked set covers.
 """
 struct CoverCollection
+    total_masked::Vector{Int}         # total masked elements in the mosaic
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # vector of the set indices in the original mosaic
     base_setscores::Matrix{Float64}   # base set scores
@@ -26,14 +27,14 @@ struct CoverCollection
     variants::Vector{CoverProblemResult}
 
     CoverCollection(empty::Void = nothing) =
-        new(BitVector(), Vector{Int}(), Vector{Float64}(),
+        new(Vector{Int}(), BitVector(), Vector{Int}(), Vector{Float64}(),
             Vector{Int}(), Vector{CoverProblemResult}())
 
     function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic)
         nsets(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
         # FIXME check the problem is compatible with the mosaic
-        new(mosaic.elmasks, mosaic.setixs,
+        new(copy(mosaic.total_masked), mosaic.elmasks, mosaic.setixs,
             problem.set_scores,
             zeros(Int, nsets(problem), nmasks(problem)),
             Vector{CoverProblemResult}())
