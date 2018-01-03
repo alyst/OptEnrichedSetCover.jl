@@ -64,33 +64,6 @@ mutable struct MaskedSetMosaic{T,S}
                  nmasked_perset[setixs, :], nunmasked_newsets)
     end
 
-    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmasks::AbstractMatrix{Bool},
-                             max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
-    ) where {T,S}
-        size(elmasks, 1) == nelements(mosaic) ||
-            throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
-
-        # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
-        nmasked_orgsets = nmasked_perset(mosaic, elmasks)
-        ntotal = nelements(mosaic)
-        nmasked = squeeze(sum(elmasks, 1), 1)
-        org_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
-        for org_setix in 1:size(nmasked_orgsets, 1)
-            for maskix in 1:size(nmasked_orgsets, 2)
-                @inbounds nmasked_orgset = nmasked_orgsets[org_setix, maskix]
-                (nmasked_orgset == 0) && continue
-                @inbounds overlap_pvalue = logpvalue(nmasked_orgset, setsize(mosaic, org_setix), nmasked[maskix], ntotal)
-                if overlap_pvalue <= max_overlap_logpvalue
-                    # add the set, stop the loop
-                    push!(org_setixs, org_setix)
-                    break
-                end
-            end
-        end
-
-        return MaskedSetMosaic(mosaic, elmasks, org_setixs, nmasked_orgsets)
-    end
-
     MaskedSetMosaic(mosaic::SetMosaic{T, S},
                     elmasks::AbstractMatrix{Bool},
                     setixs::Vector{Int}) where {T,S} =
@@ -101,8 +74,33 @@ end
 setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
     searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
-mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool}; max_overlap_logpvalue::Real = 0.0) =
-    MaskedSetMosaic(mosaic, elmasks, max_overlap_logpvalue)
+function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
+              max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+)
+    size(elmasks, 1) == nelements(mosaic) ||
+        throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
+
+    # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
+    nmasked_orgsets = nmasked_perset(mosaic, elmasks)
+    ntotal = nelements(mosaic)
+    nmasked = squeeze(sum(elmasks, 1), 1)
+    org_setixs = sizehint!(Vector{Int}(), nsets(mosaic))
+    for org_setix in 1:size(nmasked_orgsets, 1)
+        for maskix in 1:size(nmasked_orgsets, 2)
+            @inbounds nmasked_orgset = nmasked_orgsets[org_setix, maskix]
+            (nmasked_orgset == 0) && continue
+            @inbounds overlap_pvalue = logpvalue(nmasked_orgset, setsize(mosaic, org_setix), nmasked[maskix], ntotal)
+            if overlap_pvalue <= max_overlap_logpvalue
+                # add the set, stop the loop
+                push!(org_setixs, org_setix)
+                break
+            end
+        end
+    end
+
+    return MaskedSetMosaic(mosaic, elmasks, org_setixs, nmasked_orgsets)
+end
+
 mask(mosaic::SetMosaic{T,S}, elmasks::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) where {T,S} =
     mask(mosaic, Bool[in(e, elmask) for e in mosaic.ix2elm, elmask in elmasks],
          max_overlap_logpvalue=max_overlap_logpvalue)
