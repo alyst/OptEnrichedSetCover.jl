@@ -46,7 +46,7 @@
         res_def = optimize(problem_def)
         @test res_def.weights == reshape([1.0, 0.0], (2, 1))
 
-        problem_no_penalty = CoverProblem(sm_ab, CoverParams(overlap_penalty=0.0, sel_prob=1.0))
+        problem_no_penalty = CoverProblem(sm_ab, CoverParams(setXset_factor=0.0, sel_prob=1.0))
         @test nsets(problem_no_penalty) == 2
         res_no_penalty = optimize(problem_no_penalty)
         @test res_no_penalty.weights == reshape([1.0, 1.0], (2, 1))
@@ -56,7 +56,7 @@
         sm = SetMosaic([Set([:a, :b]), Set([:b, :c]), Set([:a, :b, :c])])
         sm_b = mask(sm, [Set([:b])])
 
-        problem_ignore_overlap = CoverProblem(sm_b, CoverParams(overlap_penalty=10.0, sel_prob=1E-25))
+        problem_ignore_overlap = CoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_prob=1E-25))
         @test nsets(problem_ignore_overlap) == 3
         res_ignore_overlap = optimize(problem_ignore_overlap)
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0;]# atol=1E-4
@@ -75,7 +75,7 @@
         sm_abc = mask(sm, [Set([:a, :b, :c])])
 
         # low prior probability to select sets, high probability to miss active element, so select abc
-        problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(overlap_penalty=10.0, sel_prob=0.1))
+        problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_prob=0.1))
         @show problem_ignore_overlap.setXset_scores problem_ignore_overlap.set_scores
         @test nsets(problem_ignore_overlap) == 5 # d is out
         @test score(problem_ignore_overlap, [0.0, 0.0, 0.0, 1.0, 0.0]) < score(problem_ignore_overlap, [1.0, 1.0, 0.0, 0.0, 0.0])
@@ -84,7 +84,7 @@
         @test_broken res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0;]# atol=1E-4
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
-        problem_low_penalty = CoverProblem(sm_abc, CoverParams(overlap_penalty=1.0, sel_prob=0.5))
+        problem_low_penalty = CoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.5))
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [1.0, 1.0, 0.0, 0.0, 0.0])
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [0.0, 0.0, 0.0, 1.0, 0.0])
         res_low_penalty = optimize(problem_low_penalty)
@@ -98,7 +98,7 @@
         sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])])
 
         # low prior probability to select sets, high probability to miss active element, so select abc
-        problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(overlap_penalty=10.0, sel_prob=0.1))
+        problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_prob=0.1))
         @test nmasks(problem_ignore_overlap) == 2
         @show problem_ignore_overlap.setXset_scores problem_ignore_overlap.set_scores
         @test nsets(problem_ignore_overlap) == 5 # d is out
@@ -107,7 +107,7 @@
         @test_broken res_ignore_overlap.weights ≈ [0.0 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 0.0 0.0]'# atol=1E-4
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
-        problem_low_penalty = CoverProblem(sm_abc, CoverParams(overlap_penalty=1.0, sel_prob=0.5))
+        problem_low_penalty = CoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.5))
         res_low_penalty = optimize(problem_low_penalty)
         #@show res_low_penalty.weights
         @test find(res_low_penalty.weights) == [1, 3, 6]

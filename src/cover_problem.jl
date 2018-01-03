@@ -2,15 +2,16 @@
 Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 """
 struct CoverParams
-    overlap_penalty::Float64    # ≥0, how much set overlaps are penalized
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
+    setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
 
-    function CoverParams(; overlap_penalty::Number = 1.0, sel_prob::Number = 0.9, min_weight::Number = 1E-2)
-        (0.0 <= overlap_penalty) || throw(ArgumentError("`overlap_penalty` must be ≥0"))
+    function CoverParams(; sel_prob::Number=0.9, min_weight::Number = 1E-2,
+                         setXset_factor::Number=1.0)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
-        (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1) range"))
-        new(overlap_penalty, sel_prob, min_weight)
+        (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
+        (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
+        new(sel_prob, min_weight, setXset_factor)
     end
 end
 
@@ -46,7 +47,7 @@ struct CoverProblem
                                                           nmasked(mosaic, j), nelements(mosaic), params) for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
         # preprocess setXset scores matrix for numerical solution
         @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
-                                          params.overlap_penalty)
+                                          params.setXset_factor)
         # replace infinite setXset score with the minimal finite setXset score
         min_score = 0.0
         @inbounds for i in eachindex(setXset_scores)
