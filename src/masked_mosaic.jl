@@ -51,7 +51,7 @@ mutable struct MaskedSetMosaic{T,S}
                  total_masked, nmasked_perset, nunmasked_perset)
     end
 
-    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmasks::Union{BitMatrix, Matrix{Bool}},
+    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmasks::AbstractMatrix{Bool},
                              setixs::Vector{Int}, nmasked_perset::Matrix{Int}) where {T, S}
         size(elmasks, 1) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask length ($(length(elmasks))) should match the number of elements ($(nelements(mosaic)))"))
@@ -64,7 +64,7 @@ mutable struct MaskedSetMosaic{T,S}
                  nmasked_perset[setixs, :], nunmasked_newsets)
     end
 
-    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmasks::Union{BitMatrix, Matrix{Bool}},
+    function MaskedSetMosaic(mosaic::SetMosaic{T,S}, elmasks::AbstractMatrix{Bool},
                              max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
     ) where {T,S}
         size(elmasks, 1) == nelements(mosaic) ||
@@ -92,7 +92,7 @@ mutable struct MaskedSetMosaic{T,S}
     end
 
     MaskedSetMosaic(mosaic::SetMosaic{T, S},
-                    elmasks::Union{BitMatrix, Matrix{Bool}},
+                    elmasks::AbstractMatrix{Bool},
                     setixs::Vector{Int}) where {T,S} =
         MaskedSetMosaic(mosaic, elmasks, setixs, nmasked_perset(mosaic, elmasks))
 end
@@ -101,10 +101,10 @@ end
 setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
     searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
-mask(mosaic::SetMosaic, mask::Union{BitMatrix,Matrix{Bool}}; max_overlap_logpvalue::Real = 0.0) =
-    MaskedSetMosaic(mosaic, mask, max_overlap_logpvalue)
-mask(mosaic::SetMosaic{T,S}, sels::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) where {T,S} =
-    mask(mosaic, Bool[in(e, sel) for e in mosaic.ix2elm, sel in sels],
+mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool}; max_overlap_logpvalue::Real = 0.0) =
+    MaskedSetMosaic(mosaic, elmasks, max_overlap_logpvalue)
+mask(mosaic::SetMosaic{T,S}, elmasks::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) where {T,S} =
+    mask(mosaic, Bool[in(e, elmask) for e in mosaic.ix2elm, elmask in elmasks],
          max_overlap_logpvalue=max_overlap_logpvalue)
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
