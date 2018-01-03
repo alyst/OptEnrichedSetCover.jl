@@ -17,6 +17,7 @@ export SetMosaic, CoverParams, CoverProblem,
 include("set_score.jl")
 include("sparse_mask_matrix.jl")
 include("mosaic.jl")
+include("masked_mosaic.jl")
 include("cover_problem.jl")
 include("cover_enumerator.jl")
 include("parallel.jl")
