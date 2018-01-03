@@ -18,7 +18,7 @@ end
 Linear component of an individual set score for the `CoverProblem`.
 Doesn't take into account the overlap with the other selected sets.
 """
-function independentsetscore(masked::Number, set::Number, total_masked::Number, total::Number, params::CoverParams)
+function standalonesetscore(masked::Number, set::Number, total_masked::Number, total::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
     #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
@@ -42,8 +42,8 @@ struct CoverProblem
     setXset_scores::Matrix{Float64}
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-		@inbounds set_scores = Float64[independentsetscore(mosaic.nmasked_perset[i, j], setsize(mosaic, i),
-                                                           nmasked(mosaic, j), nelements(mosaic), params) for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
+		@inbounds set_scores = Float64[standalonesetscore(mosaic.nmasked_perset[i, j], setsize(mosaic, i),
+                                                          nmasked(mosaic, j), nelements(mosaic), params) for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
         # preprocess setXset scores matrix for numerical solution
         @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
                                           params.overlap_penalty)
