@@ -109,8 +109,8 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes:
             set2_tiles = view(tileXset, :, set2_ix)
             # one-sided Fisher's P-value, right tail
             res[set2_ix, set1_ix] =
-                logpvalue(set_sizes[set1_ix], set_sizes[set2_ix], total_size,
-                          _isect_size(set1_tiles, set2_tiles, tile_sizes))
+                logpvalue(_isect_size(set1_tiles, set2_tiles, tile_sizes),
+                          set_sizes[set1_ix], set_sizes[set2_ix], total_size)
         end
     end
     # symmetrize
@@ -286,7 +286,7 @@ mutable struct MaskedSetMosaic{T,S}
             for maskix in 1:size(nmasked_orgsets, 2)
                 @inbounds nmasked_orgset = nmasked_orgsets[org_setix, maskix]
                 (nmasked_orgset == 0) && continue
-                @inbounds overlap_pvalue = logpvalue(setsize(mosaic, org_setix), nmasked[maskix], ntotal, nmasked_orgset)
+                @inbounds overlap_pvalue = logpvalue(nmasked_orgset, setsize(mosaic, org_setix), nmasked[maskix], ntotal)
                 if overlap_pvalue <= max_overlap_logpvalue
                     # add the set, stop the loop
                     push!(org_setixs, org_setix)
