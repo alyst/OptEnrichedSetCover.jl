@@ -43,8 +43,11 @@ struct CoverProblem
     setXset_scores::Matrix{Float64}
 
     function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-		@inbounds set_scores = Float64[standalonesetscore(mosaic.nmasked_perset[i, j], setsize(mosaic, i),
-                                                          nmasked(mosaic, j), nelements(mosaic), params) for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
+        # activating the set in a given mask introduces the penalty
+        # (too constrain the number of activated sets)
+        const log_selp = log(params.sel_prob)
+	    @inbounds set_scores = Float64[standalonesetscore(mosaic.nmasked_perset[i, j], setsize(mosaic, i),
+                                                          nmasked(mosaic, j), nelements(mosaic), params) - log_selp for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
         # preprocess setXset scores matrix for numerical solution
         @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
                                           params.setXset_factor)
@@ -67,13 +70,7 @@ struct CoverProblem
         @inbounds for i in 1:size(setXset_scores, 1)
             setXset_scores[i, i] = 0
         end
-        # activating the set in a given mask introduces the penalty
-        # (too constrain the number of activated sets)
-        const log_selp = log(params.sel_prob)
         multi_setXset_scores = repeat(setXset_scores, outer=[nmasks(mosaic), nmasks(mosaic)])
-        @inbounds for i in 1:size(multi_setXset_scores, 1)
-            multi_setXset_scores[i, i] = log_selp
-        end
         new(params, set_scores, multi_setXset_scores)
     end
 end

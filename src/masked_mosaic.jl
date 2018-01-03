@@ -69,7 +69,6 @@ mutable struct MaskedSetMosaic{T,S}
     ) where {T,S}
         size(elmasks, 1) == nelements(mosaic) ||
             throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
-        (max_overlap_logpvalue <= 0.0) || throw(ArgumentError("Maximal overlap log(P-value) must be ≤0, found $max_overlap_logpvalue"))
 
         # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
         nmasked_orgsets = nmasked_perset(mosaic, elmasks)

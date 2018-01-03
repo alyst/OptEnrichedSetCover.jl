@@ -18,7 +18,8 @@ struct CollectCovers{MC,SC}
 end
 
 function (worker::CollectCovers)(mosaic_key, set_key; verbose::Bool=false)
-    mosaic_masked = mask(worker.mosaics[mosaic_key], [worker.sets[set_key]], max_overlap_logpvalue=worker.enum_params.max_set_score)
+    mosaic_masked = mask(worker.mosaics[mosaic_key], [worker.sets[set_key]],
+                         max_overlap_logpvalue=worker.enum_params.max_set_score+log(worker.cover_params.sel_prob))
     covers_coll = collect(mosaic_masked, worker.cover_params, worker.enum_params, verbose=verbose)
     ((mosaic_key, set_key), !isempty(covers_coll) ? covers_coll : nothing)
 end
