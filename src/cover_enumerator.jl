@@ -23,8 +23,8 @@ struct CoverCollection
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # vector of the set indices in the original mosaic
     base_setscores::Matrix{Float64}   # base set scores
-    set_variantix::Matrix{Int}        # best-scoring cover for the given set
-    variants::Vector{CoverProblemResult}
+    var2cover::Matrix{Int}          # best-scoring cover for the given set
+    results::Vector{CoverProblemResult}
 
     CoverCollection(empty::Void = nothing) =
         new(Vector{Int}(), BitVector(), Vector{Int}(), Vector{Float64}(),
@@ -43,7 +43,7 @@ end
 
 function setscore(covers::CoverCollection, setix::Int, maskix::Int, cover::CoverProblemResult, delta_score::Float64)
     if cover.weights[setix, maskix] > 0.0
-        # problem set score + delta score for the best variant, where it was covered - log(set weight)
+        # problem set score + delta score for the best cover, where it was covered - log(set weight)
         return covers.base_setscores[setix, maskix] + delta_score - log(cover.weights[setix, maskix])
     else
         # the set is not selectd
@@ -51,14 +51,14 @@ function setscore(covers::CoverCollection, setix::Int, maskix::Int, cover::Cover
     end
 end
 
-setscore(covers::CoverCollection, setix::Int, maskix::Int, variantix::Int) =
-    setscore(covers, setix, maskix, covers.variants[variantix],
-             covers.variants[variantix].score - covers.variants[1].score)
+setscore(covers::CoverCollection, setix::Int, maskix::Int, coverix::Int) =
+    setscore(covers, setix, maskix, covers.results[coverix],
+             covers.results[coverix].score - covers.results[1].score)
 
 function setscore(covers::CoverCollection, setix::Int, maskix::Int)
-    if covers.set_variantix[setix, maskix] > 0
-        # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return setscore(covers, setix, maskix, covers.set_variantix[setix])
+    if covers.var2cover[setix, maskix] > 0
+        # problem set score + delta score for the best cover, where it was covered - log(set weight)
+        return setscore(covers, setix, maskix, covers.var2cover[setix])
     else
         # the set not selectd
         return Inf
@@ -66,8 +66,8 @@ function setscore(covers::CoverCollection, setix::Int, maskix::Int)
 end
 
 nmasks(covers::CoverCollection) = size(covers.elmasks, 2)
-Base.length(covers::CoverCollection) = length(covers.variants)
-Base.isempty(covers::CoverCollection) = isempty(covers.variants)
+Base.length(covers::CoverCollection) = length(covers.results)
+Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
 """
 Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
@@ -76,7 +76,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
     # restore masked mosaic
     # FIXME a workaround, because masked_mosaic is very expensive to store in covers
     masked_mosaic = MaskedSetMosaic(mosaic, covers.elmasks, covers.setixs)
-    nsets = Int[count(x -> x > 0.0, view(variant.weights, :, maskix)) for maskix in 1:nmasks(covers), variant in covers.variants]
+    nsets = Int[count(x -> x > 0.0, view(cover.weights, :, maskix)) for maskix in 1:nmasks(covers), cover in covers.results]
     nsetsum = sum(nsets)
     set_ixs = sizehint!(Vector{Int}(), nsetsum)
     mask_ixs = sizehint!(Vector{Int}(), nsetsum)
@@ -86,17 +86,17 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
     scores = sizehint!(Vector{Float64}(), nsetsum)
     nmasked_v = sizehint!(Vector{Int}(), nsetsum)
     nunmasked_v = sizehint!(Vector{Int}(), nsetsum)
-    for (variant_ix, variant) in enumerate(covers.variants)
-        delta_score = variant.score - covers.variants[1].score
-        @inbounds for set_ix in 1:size(variant.weights, 1), mask_ix in 1:size(variant.weights, 2)
-            weight = variant.weights[set_ix, mask_ix]
+    for (cover_ix, cover) in enumerate(covers.results)
+        delta_score = cover.score - covers.results[1].score
+        @inbounds for set_ix in 1:size(cover.weights, 1), mask_ix in 1:size(cover.weights, 2)
+            weight = cover.weights[set_ix, mask_ix]
             (weight > 0.0) || continue
             push!(set_ixs, set_ix)
             push!(weights, weight)
             push!(mask_ixs, mask_ix)
-            push!(cover_ixs, variant_ix)
+            push!(cover_ixs, cover_ix)
             push!(delta_scores, delta_score)
-            push!(scores, setscore(covers, set_ix, mask_ix, variant_ix))
+            push!(scores, setscore(covers, set_ix, mask_ix, cover_ix))
             push!(nmasked_v, masked_mosaic.nmasked_perset[set_ix, mask_ix])
             push!(nunmasked_v, masked_mosaic.nunmasked_perset[set_ix, mask_ix])
         end
@@ -144,11 +144,11 @@ function Base.collect(mosaic::MaskedSetMosaic,
             verbose && info("Cover is empty")
             break
         end
-        cover_pos = searchsortedlast(res.variants, cur_cover, by=cover->cover.score)+1
+        cover_pos = searchsortedlast(res.results, cur_cover, by=cover->cover.score)+1
         if cover_pos > 1
-            variant = res.variants[cover_pos-1]
-            if abs(cur_cover.score - variant.score) <= score_threshold &&
-               all(i -> (@inbounds return abs(cur_cover.weights[i] - variant.weights[i]) <= weight_threshold),
+            cover = res.results[cover_pos-1]
+            if abs(cur_cover.score - cover.score) <= score_threshold &&
+               all(i -> (@inbounds return abs(cur_cover.weights[i] - cover.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
                 break
@@ -157,7 +157,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         delta_score = 0.0
         if cover_pos > 1
             # not the best cover
-            delta_score = cur_cover.score - res.variants[1].score
+            delta_score = cur_cover.score - res.results[1].score
             if params.max_cover_score_delta > 0.0 && delta_score > params.max_cover_score_delta
                 verbose && info("Cover score_delta=$(delta_score) above threshold")
                 break
@@ -177,7 +177,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
             cur_score = setscore(res, setix, maskix)
             if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
                 scores_updated = true
-                res.set_variantix[setix, maskix] = -1 # mark for setting to the cover_pos
+                res.var2cover[setix, maskix] = -1 # mark for setting to the cover_pos
             end
         end
         if !scores_updated
@@ -185,15 +185,15 @@ function Base.collect(mosaic::MaskedSetMosaic,
             break
         end
         # save the current cover
-        insert!(res.variants, cover_pos, cur_cover)
+        insert!(res.results, cover_pos, cur_cover)
         verbose && info("Cover saved")
         # update pointers to the best covers for the sets
-        for sXmix in eachindex(res.set_variantix)
-            if res.set_variantix[sXmix] == -1
-                res.set_variantix[sXmix] = cover_pos
-            elseif res.set_variantix[sXmix] >= cover_pos
-                # the variant has moved down
-                res.set_variantix[sXmix] += 1
+        for sXmix in eachindex(res.var2cover)
+            if res.var2cover[sXmix] == -1
+                res.var2cover[sXmix] = cover_pos
+            elseif res.var2cover[sXmix] >= cover_pos
+                # the cover has moved down
+                res.var2cover[sXmix] += 1
             end
         end
         if params.max_covers > 0 && length(res) >= params.max_covers
@@ -206,7 +206,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
                 cover_problem.setXset_scores[set1_ix, set2_ix] = params.setXset_penalty
             end
         end
-        if all(x::Int -> x > 0, res.set_variantix)
+        if all(x::Int -> x > 0, res.var2cover)
             verbose && info("All sets assigned to covers")
             break
         end
