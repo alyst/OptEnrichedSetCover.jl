@@ -67,46 +67,6 @@ Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
 """
-Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
-"""
-function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
-    nselsets = sum(count(x -> x > 0.0, variant.weights) for variant in covers.results)
-    set_ixs = sizehint!(Vector{Int}(), nselsets)
-    mask_ixs = sizehint!(Vector{Int}(), nselsets)
-    cover_ixs = sizehint!(Vector{Int}(), nselsets)
-    delta_scores = sizehint!(Vector{Float64}(), nselsets)
-    weights = sizehint!(Vector{Float64}(), nselsets)
-    scores = sizehint!(Vector{Float64}(), nselsets)
-    nmasked_v = sizehint!(Vector{Int}(), nselsets)
-    nunmasked_v = sizehint!(Vector{Int}(), nselsets)
-    for (cover_ix, cover) in enumerate(covers.results)
-        delta_score = cover.total_score - covers.results[1].total_score
-        @inbounds for var_ix in eachindex(cover.weights)
-            weight = cover.weights[var_ix]
-            maskedset = covers.maskedsets[var_ix]
-            (weight > 0.0) || continue
-            push!(set_ixs, maskedset.set)
-            push!(weights, weight)
-            push!(mask_ixs, maskedset.mask)
-            push!(cover_ixs, cover_ix)
-            push!(delta_scores, delta_score)
-            push!(scores, setscore(covers, var_ix, cover_ix))
-            push!(nmasked_v, maskedset.nmasked)
-            push!(nunmasked_v, maskedset.nunmasked)
-        end
-    end
-    DataFrame(cover_ix = cover_ixs,
-              set_ix = set_ixs,
-              set_id = mosaic.ix2set[set_ixs],
-              mask_ix = mask_ixs,
-              delta_score = delta_scores,
-              nmasked = nmasked_v,
-              nunmasked = nunmasked_v,
-              weight = weights,
-              score = scores)
-end
-
-"""
 Greedy enumeration of enriched-set covers.
 * At each iteration an optimal enriched-set cover problem is being solved.
 * The sets selected at current iteration are removed from further consideration.
@@ -201,4 +161,57 @@ function Base.collect(mosaic::MaskedSetMosaic,
     end
     verbose && info("$(length(cover_coll)) cover(s) collected")
     return cover_coll
+end
+
+"""
+Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
+"""
+function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic; report::Symbol=:covered)
+    if report == :covered
+        return report_covered(covers, mosaic)
+    else
+        throw(ArgumentError("Unknown report mode '$report'"))
+    end
+end
+
+# DataFrame report for the covered sets (weight > 0)
+function report_covered(covers::CoverCollection, mosaic::SetMosaic)
+    nselsets = sum(count(x -> x > 0.0, variant.weights) for variant in covers.results)
+    set_ixs = sizehint!(Vector{Int}(), nselsets)
+    mask_ixs = sizehint!(Vector{Int}(), nselsets)
+    cover_ixs = sizehint!(Vector{Int}(), nselsets)
+    delta_scores = sizehint!(Vector{Float64}(), nselsets)
+    weights = sizehint!(Vector{Float64}(), nselsets)
+    cv_scores = sizehint!(Vector{Float64}(), nselsets)
+    sa_scores = sizehint!(Vector{Float64}(), nselsets)
+    nmasked_v = sizehint!(Vector{Int}(), nselsets)
+    nunmasked_v = sizehint!(Vector{Int}(), nselsets)
+    for (cover_ix, cover) in enumerate(covers.results)
+        delta_score = cover.total_score - covers.results[1].total_score
+        @inbounds for var_ix in eachindex(cover.weights)
+            weight = cover.weights[var_ix]
+            maskedset = covers.maskedsets[var_ix]
+            (weight > 0.0) || continue
+            push!(set_ixs, maskedset.set)
+            push!(weights, weight)
+            push!(mask_ixs, maskedset.mask)
+            push!(cover_ixs, cover_ix)
+            push!(delta_scores, delta_score)
+            push!(cv_scores, setscore(covers, var_ix, cover, delta_score))
+            push!(sa_scores, standalonesetscore(maskedset.nmasked, setsize(maskedset),
+                                                covers.total_masked[maskedset.mask], nelements(mosaic), covers.cover_params))
+            push!(nmasked_v, maskedset.nmasked)
+            push!(nunmasked_v, maskedset.nunmasked)
+        end
+    end
+    DataFrame(cover_ix = cover_ixs,
+              set_ix = set_ixs,
+              set_id = mosaic.ix2set[set_ixs],
+              mask_ix = mask_ixs,
+              cover_delta_score = delta_scores,
+              nmasked = nmasked_v,
+              nunmasked = nunmasked_v,
+              weight = weights,
+              covered_score = cv_scores,
+              stdalone_score = sa_scores)
 end

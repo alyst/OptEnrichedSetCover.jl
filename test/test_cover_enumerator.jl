@@ -48,5 +48,8 @@
         @test size(df, 1) == 3
         @test df[:cover_ix] == [1, 1, 2]
         @test df[:set_id] == [1, 2, 4]
+        @test df == DataFrame(cover_coll, sm, report=:covered)
+
+        @test_throws ArgumentError DataFrame(cover_coll, sm, report=:unknown)
     end
 end
