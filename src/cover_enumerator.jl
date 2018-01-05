@@ -17,6 +17,8 @@ end
 The collection of masked set covers.
 """
 struct CoverCollection
+    cover_params::CoverParams
+    enum_params::CoverEnumerationParams
     total_masked::Vector{Int}         # total masked elements in the mosaic
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     maskedsets::Vector{MaskedSet}     # sets of the MaskedSetMosaic
@@ -24,15 +26,12 @@ struct CoverCollection
     var2cover::Vector{Int}            # best-scoring cover for the given masked set
     results::Vector{CoverProblemResult}
 
-    CoverCollection(empty::Void = nothing) =
-        new(Vector{Int}(), BitVector(), Vector{Int}(), Vector{Float64}(),
-            Vector{Int}(), Vector{CoverProblemResult}())
-
-    function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic)
+    function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic,
+                             params::CoverEnumerationParams)
         # check the problem is compatible with the mosaic
         nvars(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new(mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
+        new(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
             copy(problem.set_scores),
             zeros(Int, nvars(problem)),
             Vector{CoverProblemResult}())
@@ -123,7 +122,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
 )
     verbose && info("Starting covers enumeration...")
     cover_problem = CoverProblem(mosaic, cover_params)
-    cover_coll = CoverCollection(cover_problem, mosaic)
+    cover_coll = CoverCollection(cover_problem, mosaic, params)
     # thresholds for identifying duplicate covers
     const score_threshold = 1E-3
     const weight_threshold = 1E-3
