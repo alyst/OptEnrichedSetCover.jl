@@ -1,14 +1,20 @@
 # the number of masked elements in each set of mosaic
+function nmasked_perset_mask!(nmasked::AbstractVector{Int}, mosaic::SetMosaic, elmask::AbstractVector{Bool})
+    @inbounds for elix in eachindex(elmask)
+        elmask[elix] || continue
+        for setix in view(mosaic.setXelm, :, elix)
+            nmasked[setix] += 1
+        end
+    end
+    return nmasked
+end
+
+# the number of masked elements in each set of mosaic
 function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractVector)
     res = zeros(Int, nsets(mosaic), length(elmasks))
     @inbounds for (maskix, elmask) in enumerate(elmasks)
         @assert length(elmask) == nelements(mosaic)
-        @inbounds for elix in eachindex(elmask)
-            elmask[elix] || continue
-            for setix in view(mosaic.setXelm, :, elix)
-                res[setix, maskix] += 1
-            end
-        end
+        nmasked_perset_mask!(view(res, :, maskix), mosaic, elmask)
     end
     return res
 end
@@ -17,11 +23,8 @@ end
 function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool})
     @assert size(elmasks, 1) == nelements(mosaic)
     res = zeros(Int, nsets(mosaic), size(elmasks, 2))
-    @inbounds for elix in 1:size(elmasks,1), maskix in 1:size(elmasks, 2)
-        elmasks[elix, maskix] || continue
-        for setix in view(mosaic.setXelm, :, elix)
-            res[setix, maskix] += 1
-        end
+    @inbounds for maskix in 1:size(elmasks, 2)
+        nmasked_perset_mask!(view(res, :, maskix), mosaic, view(elmasks, :, maskix))
     end
     return res
 end
