@@ -1,30 +1,40 @@
 # the number of masked elements in each set of mosaic
-function nmasked_perset_mask!(nmasked::AbstractVector{Int}, mosaic::SetMosaic, elmask::AbstractVector{Bool})
+function nmasked_perset_mask!(nmasked::AbstractVector{Int}, mosaic::SetMosaic, elmask::AbstractVector{Bool},
+                              set2index::Union{Void,Dict{Int,Int}} = nothing)
     @inbounds for elix in eachindex(elmask)
         elmask[elix] || continue
         for setix in view(mosaic.setXelm, :, elix)
-            nmasked[setix] += 1
+            if set2index === nothing
+                nmasked[setix] += 1
+            else
+                ix = get(set2index, setix, 0)
+                if ix > 0
+                    nmasked[ix] += 1
+                end
+            end
         end
     end
     return nmasked
 end
 
 # the number of masked elements in each set of mosaic
-function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractVector)
-    res = zeros(Int, nsets(mosaic), length(elmasks))
+function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractVector,
+                        set2index::Union{Void,Dict{Int,Int}} = nothing)
+    res = zeros(Int, set2index === nothing ? nsets(mosaic) : length(set2index), length(elmasks))
     @inbounds for (maskix, elmask) in enumerate(elmasks)
         @assert length(elmask) == nelements(mosaic)
-        nmasked_perset_mask!(view(res, :, maskix), mosaic, elmask)
+        nmasked_perset_mask!(view(res, :, maskix), mosaic, elmask, set2index)
     end
     return res
 end
 
 # the number of masked elements in each set of mosaic
-function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool})
+function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool},
+                        set2index::Union{Void,Dict{Int,Int}} = nothing)
     @assert size(elmasks, 1) == nelements(mosaic)
-    res = zeros(Int, nsets(mosaic), size(elmasks, 2))
+    res = zeros(Int, set2index === nothing ? nsets(mosaic) : length(set2index), size(elmasks, 2))
     @inbounds for maskix in 1:size(elmasks, 2)
-        nmasked_perset_mask!(view(res, :, maskix), mosaic, view(elmasks, :, maskix))
+        nmasked_perset_mask!(view(res, :, maskix), mosaic, view(elmasks, :, maskix), set2index)
     end
     return res
 end
