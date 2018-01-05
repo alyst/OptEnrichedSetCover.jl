@@ -33,7 +33,7 @@ struct CoverCollection
         nvars(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
         new(mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
-            problem.set_scores,
+            copy(problem.set_scores),
             zeros(Int, nvars(problem)),
             Vector{CoverProblemResult}())
     end
