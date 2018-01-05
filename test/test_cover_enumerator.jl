@@ -50,6 +50,11 @@
         @test df[:set_id] == [1, 2, 4]
         @test df == DataFrame(cover_coll, sm, report=:covered)
 
+        df2 = DataFrame(cover_coll, sm, report=:matrix)
+        @test size(df2, 1) == 3
+        @test df2[:cover_ix] == [1, 1, 2]
+        @test df2[:set_id] == [1, 2, 4]
+
         @test_throws ArgumentError DataFrame(cover_coll, sm, report=:unknown)
     end
 
@@ -68,5 +73,11 @@
         @test df[:cover_ix] == [1, 1, 1, 1, 1]
         @test df[:mask_ix] == [1, 1, 1, 1, 2]
         @test df[:set_id] == [1, 2, 3, 5, 5]
+
+        df2 = DataFrame(cover_coll, sm, report=:matrix)
+        @test size(df2, 1) == 8
+        @test df2[:cover_ix] == [1, 1, 1, 1, 0, 0, 0, 1]
+        @test df2[:mask_ix] == [1, 1, 1, 1, 2, 2, 2, 2]
+        @test df2[:set_id] == [1, 2, 3, 5, 1, 2, 3, 5]
     end
 end

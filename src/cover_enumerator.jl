@@ -169,6 +169,8 @@ Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic; report::Symbol=:covered)
     if report == :covered
         return report_covered(covers, mosaic)
+    elseif report == :matrix
+        return report_matrix(covers, mosaic)
     else
         throw(ArgumentError("Unknown report mode '$report'"))
     end
@@ -214,4 +216,54 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               weight = weights,
               covered_score = cv_scores,
               stdalone_score = sa_scores)
+end
+
+# DataFrame report for each mask X each set,
+# where all set that are covered in at least one mask are considered
+# only the best covers used
+function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
+    # collect all sets that are covered in at least one mask
+    selsets = Set{Int}()
+    for (varix, coverix) in enumerate(covers.var2cover)
+        if coverix > 0
+            push!(selsets, covers.maskedsets[varix].set)
+        end
+    end
+    nmasks = size(covers.elmasks, 2)
+    sets_v = sort!(collect(selsets))
+    setsizes_v = setsize.(mosaic, sets_v)
+    set2index = Dict(zip(sets_v, 1:length(sets_v)))
+    nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2index)
+    coverix_mtx = zeros(Int, size(nmasked_mtx))
+    weights_mtx = zeros(Float64, size(nmasked_mtx))
+    delta_scores_mtx = zeros(Float64, size(nmasked_mtx))
+    cv_scores_mtx = fill(NaN, size(nmasked_mtx))
+    @inbounds for (varix, coverix) in enumerate(covers.var2cover)
+        coverix > 0 || continue
+        mset = covers.maskedsets[varix]
+        setix = set2index[mset.set]
+        i = sub2ind(size(coverix_mtx), setix, mset.mask)
+        coverix_mtx[i] = coverix
+        weights_mtx[i] = covers.results[coverix].weights[varix]
+        delta_scores_mtx[i] = covers.results[coverix].total_score - covers.results[1].total_score
+        cv_scores_mtx[i] = setscore(covers, varix, coverix)
+    end
+    sa_scores_mtx = zeros(Float64, size(nmasked_mtx))
+    @inbounds for j in 1:nmasks
+        for i in eachindex(sets_v)
+            setix = sets_v[i]
+            sa_scores_mtx[i, j] = standalonesetscore(nmasked_mtx[i, j], setsizes_v[i],
+                                                     covers.total_masked[j], nelements(mosaic), covers.cover_params)
+        end
+    end
+    DataFrame(cover_ix = vec(coverix_mtx),
+              set_ix = repeat(sets_v, outer=[nmasks]),
+              set_id = repeat(mosaic.ix2set[sets_v], outer=[nmasks]),
+              mask_ix = repeat(collect(1:nmasks), inner=[length(sets_v)]),
+              cover_delta_score = vec(delta_scores_mtx),
+              nmasked = vec(nmasked_mtx),
+              nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
+              weight = vec(weights_mtx),
+              covered_score = vec(cv_scores_mtx),
+              stdalone_score = vec(sa_scores_mtx))
 end
