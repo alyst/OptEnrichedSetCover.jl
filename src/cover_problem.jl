@@ -138,6 +138,7 @@ Result of `optimize(CoverProblem)`.
 """
 struct CoverProblemResult
     weights::Vector{Float64}
+    var_scores::Vector{Float64}
     total_score::Float64
 end
 
@@ -148,7 +149,7 @@ function optimize(problem::CoverProblem;
                   ini_weights::Vector{Float64} = rand(nvars(problem)),
                   #iterations::Int = 100,
                   solver::MathProgBase.SolverInterface.AbstractMathProgSolver = IpoptSolver(print_level=0))
-    (nvars(problem) == 0) && return CoverProblemResult(Vector{Float64}(), 0.0)
+    (nvars(problem) == 0) && return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), 0.0)
 
     # Perform the optimization
     #try
@@ -163,7 +164,7 @@ function optimize(problem::CoverProblem;
             w[i] = 0.0
         end
     end
-    return CoverProblemResult(w, getobjectivevalue(m))
+    return CoverProblemResult(w, problem.set_scores .* w, getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
