@@ -52,4 +52,21 @@
 
         @test_throws ArgumentError DataFrame(cover_coll, sm, report=:unknown)
     end
+
+    @testset "multimask: [a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[[a b c] [b e]]" begin # FIXME take weights into account
+        sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
+                        Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
+                        Set([:a, :b, :c, :d, :e, :f]))
+        sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])])
+
+        # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
+        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, sel_prob=0.9),
+                             CoverEnumerationParams(max_set_score=0.0, max_cover_score_delta=0.0))
+
+        df = DataFrame(cover_coll, sm, report=:covered)
+        @test size(df, 1) == 5
+        @test df[:cover_ix] == [1, 1, 1, 1, 1]
+        @test df[:mask_ix] == [1, 1, 1, 1, 2]
+        @test df[:set_id] == [1, 2, 3, 5, 5]
+    end
 end
