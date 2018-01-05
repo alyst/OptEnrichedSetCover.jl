@@ -14,7 +14,7 @@
 
         res = optimize(problem)
         @test res.weights == Vector{Float64}()
-        @test res.score == 0.0
+        @test res.total_score == 0.0
     end
 
     @testset "[a]" begin # FIXME take element detection probability into account
@@ -23,7 +23,7 @@
         @test nvars(empty_problem) == 0
         empty_res = optimize(empty_problem)
         @test empty_res.weights == Vector{Float64}(0)
-        @test empty_res.score == 0.0
+        @test empty_res.total_score == 0.0
 
         # disabled because :a is all elements
         dis_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a])), [Set{Symbol}([:a])]))

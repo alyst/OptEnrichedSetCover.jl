@@ -138,10 +138,7 @@ Result of `optimize(CoverProblem)`.
 """
 struct CoverProblemResult
     weights::Vector{Float64}
-    score::Float64
-
-    CoverProblemResult(weights::Vector{Float64}, score::Float64) =
-        new(weights, score)
+    total_score::Float64
 end
 
 """

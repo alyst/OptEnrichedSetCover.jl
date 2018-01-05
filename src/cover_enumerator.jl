@@ -51,7 +51,7 @@ end
 
 setscore(covers::CoverCollection, varix::Int, coverix::Int) =
     setscore(covers, varix, covers.results[coverix],
-             covers.results[coverix].score - covers.results[1].score)
+             covers.results[coverix].total_score - covers.results[1].total_score)
 
 function setscore(covers::CoverCollection, varix::Int)
     if covers.var2cover[varix] > 0
@@ -81,7 +81,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic)
     nmasked_v = sizehint!(Vector{Int}(), nselsets)
     nunmasked_v = sizehint!(Vector{Int}(), nselsets)
     for (cover_ix, cover) in enumerate(covers.results)
-        delta_score = cover.score - covers.results[1].score
+        delta_score = cover.total_score - covers.results[1].total_score
         @inbounds for var_ix in eachindex(cover.weights)
             weight = cover.weights[var_ix]
             maskedset = covers.maskedsets[var_ix]
@@ -131,16 +131,16 @@ function Base.collect(mosaic::MaskedSetMosaic,
         verbose && info("Trying to find cover #$(length(cover_coll)+1)...")
         cur_cover = optimize(cover_problem; ini_weights=rand(nvars(cover_problem)),
                              solver=default_solver())
-        verbose && info("New cover found (score=$(cur_cover.score)), processing...")
+        verbose && info("New cover found (score=$(cur_cover.total_score)), processing...")
         used_varixs = find(w -> w > 0.0, cur_cover.weights)
         if isempty(used_varixs)
             verbose && info("Cover is empty")
             break
         end
-        cover_pos = searchsortedlast(cover_coll.results, cur_cover, by=cover->cover.score)+1
+        cover_pos = searchsortedlast(cover_coll.results, cur_cover, by=cover->cover.total_score)+1
         if cover_pos > 1
             cover = cover_coll.results[cover_pos-1]
-            if abs(cur_cover.score - cover.score) <= score_threshold &&
+            if abs(cur_cover.total_score - cover.total_score) <= score_threshold &&
                all(i -> (@inbounds return abs(cur_cover.weights[i] - cover.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
@@ -150,7 +150,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         delta_score = 0.0
         if cover_pos > 1
             # not the best cover
-            delta_score = cur_cover.score - cover_coll.results[1].score
+            delta_score = cur_cover.total_score - cover_coll.results[1].total_score
             if params.max_cover_score_delta > 0.0 && delta_score > params.max_cover_score_delta
                 verbose && info("Cover score_delta=$(delta_score) above threshold")
                 break
