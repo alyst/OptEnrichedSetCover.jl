@@ -56,8 +56,8 @@ function setscore(covers::CoverCollection, varix::Int)
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
         return setscore(covers, varix, covers.var2cover[varix])
     else
-        # the set not selectd
-        return Inf
+        # the set is not covered
+        return NaN
     end
 end
 
