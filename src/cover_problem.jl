@@ -88,7 +88,7 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
             s1, s2 = ind2sub(size(setXset_scores), i)
             warn("set[$s1]×set[$s2] score is $(setXset_scores[i])")
             if setXset_scores[i] < 0.0
-                setXset_scores[i] = min_score
+                setXset_scores[i] = 1.25 * min_score
             end
         end
     end
