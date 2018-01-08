@@ -3,13 +3,13 @@ Parameters for `collect(mosaic::MaskedSetMosaic)`.
 """
 struct CoverEnumerationParams
     max_covers::Int
-    max_set_score::Float64
-    max_cover_score_delta::Float64
+    max_set_score::Union{Float64, Void}
+    max_cover_score_delta::Union{Float64, Void}
 
     CoverEnumerationParams(;
         max_covers::Int = 0,
-        max_set_score::Real = -10.0,
-        max_cover_score_delta::Real = 1.0) =
+        max_set_score::Union{Real, Void} = -10.0,
+        max_cover_score_delta::Union{Real, Void} = nothing) =
         new(max_covers, max_set_score, max_cover_score_delta)
 end
 
@@ -105,19 +105,21 @@ function Base.collect(mosaic::MaskedSetMosaic,
                 break
             end
         end
-        if cover_pos > 1
+        if cover_pos > 1 && isa(params.max_cover_score_delta, Float64)
             # not the best cover
-            delta_score = cur_cover.total_score - cover_coll.results[1].total_score
-            if params.max_cover_score_delta > 0.0 && delta_score > params.max_cover_score_delta
-                verbose && info("Cover score_delta=$(delta_score) above threshold")
+            cover_score_delta = cur_cover.total_score - cover_coll.results[1].total_score
+            if cover_score_delta > params.max_cover_score_delta
+                verbose && info("Cover score_delta=$(cover_score_delta) above threshold")
                 break
             end
         end
-        if isfinite(params.max_set_score) &&
-           all(i -> (@inbounds return all(x -> x + delta_score > params.max_set_score, view(cover_problem.set_scores, i, :))),
-               used_varixs)
-            verbose && info("All set scores below $(max_set_score)")
-            break
+        if isa(params.max_set_score, Float64)
+            max_set_score = params.max_set_score::Float64
+            if all(i -> (@inbounds return all(x -> x > max_set_score, view(cover_problem.set_scores, i, :))),
+                    used_varixs)
+                verbose && info("All set scores below $(max_set_score)")
+                break
+            end
         end
         scores_updated = false
         # update the best set scores

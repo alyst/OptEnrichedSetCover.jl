@@ -19,7 +19,7 @@
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_params3 = CoverParams(sel_prob=1.0)
-        cover_coll3 = collect(sm_ab, cover_params3, CoverEnumerationParams(max_set_score=10.0, max_cover_score_delta=0.0))
+        cover_coll3 = collect(sm_ab, cover_params3, CoverEnumerationParams(max_set_score=10.0))
         #@show cover_coll2
         @test_broken length(cover_coll3) == 2 # FIXME use a and b weights
     end
@@ -30,7 +30,7 @@
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])]), CoverParams(sel_prob=1.0),
-                             CoverEnumerationParams(max_set_score=10.0, max_cover_score_delta=0.0))
+                             CoverEnumerationParams(max_set_score=10.0))
         @test length(cover_coll) == 2
         @test cover_coll.results[1].total_score <= cover_coll.results[2].total_score
     end
@@ -42,7 +42,7 @@
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),
-                             CoverEnumerationParams(max_set_score=10.0, max_cover_score_delta=0.0))
+                             CoverEnumerationParams(max_set_score=10.0))
 
         df = DataFrame(cover_coll, sm)
         @test size(df, 1) == 3
@@ -66,7 +66,7 @@
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, sel_prob=0.9),
-                             CoverEnumerationParams(max_set_score=0.0, max_cover_score_delta=0.0))
+                             CoverEnumerationParams(max_set_score=0.0))
 
         df = DataFrame(cover_coll, sm, report=:covered)
         @test size(df, 1) == 5
