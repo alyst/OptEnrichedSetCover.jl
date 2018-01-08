@@ -7,8 +7,8 @@ using DataFrames, Distributions, MathProgBase, JuMP, Ipopt
 
 export SetMosaic, CoverParams, CoverProblem,
     CoverEnumerationParams, CoverCollection,
-    nelements, ntiles, nsets, nmasks,
-    nmasked, nunmasked, nmasked_pertile, nunmasked_pertile, nmasked_perset, nunmasked_perset,
+    nelements, ntiles, nsets, nmasks, nvars,
+    nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
     unmask, mask,
     score, # any conflicts

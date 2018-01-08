@@ -5,13 +5,15 @@ struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
+    maskXmask_factor::Float64   # how much activating overlapping sets in different masks is penalized
 
     function CoverParams(; sel_prob::Number=0.9, min_weight::Number = 1E-2,
-                         setXset_factor::Number=1.0)
+                         setXset_factor::Number=1.0, maskXmask_factor::Number=1.0)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
-        new(sel_prob, min_weight, setXset_factor)
+        (0.0 <= maskXmask_factor <= 1.0) || throw(ArgumentError("`maskXmask_factor` must be within [0,1] range"))
+        new(sel_prob, min_weight, setXset_factor, maskXmask_factor)
     end
 end
 
@@ -39,60 +41,71 @@ Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` r
 struct CoverProblem
     params::CoverParams
 
-    set_scores::Matrix{Float64}
+    set_scores::Vector{Float64}
     setXset_scores::Matrix{Float64}
 
-    function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-        # activating the set in a given mask introduces the penalty
-        # (too constrain the number of activated sets)
-        const log_selp = log(params.sel_prob)
-	    @inbounds set_scores = Float64[standalonesetscore(mosaic.nmasked_perset[i, j], setsize(mosaic, i),
-                                                          nmasked(mosaic, j), nelements(mosaic), params) - log_selp for i in 1:nsets(mosaic), j in 1:nmasks(mosaic)]
-        # preprocess setXset scores matrix for numerical solution
-        @inbounds setXset_scores = scale!(mosaic.original.setXset_scores[mosaic.setixs, mosaic.setixs],
-                                          params.setXset_factor)
-        # replace infinite setXset score with the minimal finite setXset score
-        min_score = 0.0
-        @inbounds for i in eachindex(setXset_scores)
-            if !isfinite(setXset_scores[i])
-                s1, s2 = ind2sub(size(setXset_scores), i)
-                warn("set[$s1]×set[$s2] score is $(setXset_scores[i])")
-            elseif setXset_scores[i] < min_score
-                min_score = setXset_scores[i]
-            end
-        end
-        @inbounds for i in eachindex(setXset_scores)
-            if isinf(setXset_scores[i]) && setXset_scores[i] < 0.0
-                setXset_scores[i] = min_score
-            end
-        end
-        # activating the same set in another mask doesn't introduce the penalty
-        @inbounds for i in 1:size(setXset_scores, 1)
-            setXset_scores[i, i] = 0
-        end
-        multi_setXset_scores = repeat(setXset_scores, outer=[nmasks(mosaic), nmasks(mosaic)])
-        new(params, set_scores, multi_setXset_scores)
+    function CoverProblem(params::CoverParams,
+                          set_scores::Vector{Float64},
+                          setXset_scores::Matrix{Float64})
+        length(set_scores) == size(setXset_scores, 1) == size(setXset_scores, 2) ||
+            throw(ArgumentError("set_scores and setXset_scores sizes do not match"))
+        new(params, set_scores, setXset_scores)
     end
 end
 
-"""
-Total number of sets in the collection.
-"""
-nsets(problem::CoverProblem) = size(problem.set_scores, 1)
+function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
+    # activating the set in a given mask introduces the penalty
+    # (to constrain the number of activated sets)
+    const log_selp = log(params.sel_prob)
+	@inbounds set_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
+                                                      nmasked(mosaic, s.mask), nelements(mosaic), params) - log_selp for s in mosaic.maskedsets]
+    # prepare setXset scores
+    setXset_scores = zeros(eltype(mosaic.original.setXset_scores), length(set_scores), length(set_scores))
+    min_score = Inf # minimum finite setXset_scores element
+    @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
+        for (j, jset) in enumerate(mosaic.maskedsets)
+            sc = params.setXset_factor * mosaic.original.setXset_scores[iset.set, jset.set]
+            if iset.mask != jset.mask
+                if iset.set != jset.set
+                    # scale the original setXset score by maskXmask_factor if
+                    # the sets are from different masks,
+                    sc *= params.maskXmask_factor
+                else
+                    # unless (i, j) point to the same set
+                    # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
+                    sc = zero(eltype(setXset_scores))
+                end
+            end
+            setXset_scores[i, j] = sc
+            if isfinite(sc) && sc < min_score
+                min_score = sc
+            end
+        end
+    end
+    # replace infinite setXset score with the minimal finite setXset score
+    @inbounds for i in eachindex(setXset_scores)
+        if !isfinite(setXset_scores[i])
+            s1, s2 = ind2sub(size(setXset_scores), i)
+            warn("set[$s1]×set[$s2] score is $(setXset_scores[i])")
+            if setXset_scores[i] < 0.0
+                setXset_scores[i] = min_score
+            end
+        end
+    end
+    CoverProblem(params, set_scores, setXset_scores)
+end
 
 """
-Total number of masks in the collection.
+Total number of problem variables.
 """
-nmasks(problem::CoverProblem) = size(problem.set_scores, 2)
-
-nweights(problem::CoverProblem) = length(problem.set_scores)
+nvars(problem::CoverProblem) = length(problem.set_scores)
 
 """
 Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
 """
 function opt_model(problem::CoverProblem)
     m = JuMP.Model()
-    nw = nweights(problem)
+    nw = nvars(problem)
     @variable(m, 0.0 <= w[1:nw] <= 1.0)
     @objective(m, :Min, dot(vec(problem.set_scores), w) - dot(w, problem.setXset_scores * w))
     return m
@@ -124,10 +137,10 @@ end
 Result of `optimize(CoverProblem)`.
 """
 struct CoverProblemResult
-    weights::Matrix{Float64}
+    weights::Vector{Float64}
     score::Float64
 
-    CoverProblemResult(weights::Matrix{Float64}, score::Float64) =
+    CoverProblemResult(weights::Vector{Float64}, score::Float64) =
         new(weights, score)
 end
 
@@ -135,10 +148,10 @@ end
 Optimize the cover problem.
 """
 function optimize(problem::CoverProblem;
-                  ini_weights::Vector{Float64} = rand(nweights(problem)),
+                  ini_weights::Vector{Float64} = rand(nvars(problem)),
                   #iterations::Int = 100,
                   solver::MathProgBase.SolverInterface.AbstractMathProgSolver = IpoptSolver(print_level=0))
-    (nweights(problem) == 0) && return CoverProblemResult(Matrix{Float64}(0,0), 0.0)
+    (nvars(problem) == 0) && return CoverProblemResult(Vector{Float64}(), 0.0)
 
     # Perform the optimization
     #try
@@ -153,7 +166,7 @@ function optimize(problem::CoverProblem;
             w[i] = 0.0
         end
     end
-    return CoverProblemResult(reshape(w, (nsets(problem), nmasks(problem))), getobjectivevalue(m))
+    return CoverProblemResult(w, getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
