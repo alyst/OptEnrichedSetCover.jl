@@ -38,10 +38,10 @@ struct CoverCollection
     end
 end
 
-function setscore(covers::CoverCollection, varix::Int, cover::CoverProblemResult, delta_score::Float64)
+function setscore(covers::CoverCollection, varix::Int, cover::CoverProblemResult)
     if cover.weights[varix] > 0.0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return covers.base_setscores[varix] + delta_score - log(cover.weights[varix])
+        return covers.base_setscores[varix] - log(cover.weights[varix])
     else
         # the set is not selected
         return Inf
@@ -49,8 +49,7 @@ function setscore(covers::CoverCollection, varix::Int, cover::CoverProblemResult
 end
 
 setscore(covers::CoverCollection, varix::Int, coverix::Int) =
-    setscore(covers, varix, covers.results[coverix],
-             covers.results[coverix].total_score - covers.results[1].total_score)
+    setscore(covers, varix, covers.results[coverix])
 
 function setscore(covers::CoverCollection, varix::Int)
     if covers.var2cover[varix] > 0
@@ -106,7 +105,6 @@ function Base.collect(mosaic::MaskedSetMosaic,
                 break
             end
         end
-        delta_score = 0.0
         if cover_pos > 1
             # not the best cover
             delta_score = cur_cover.total_score - cover_coll.results[1].total_score
@@ -125,7 +123,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         # update the best set scores
         @inbounds for varix in used_varixs
             # adjust the set scores by delta
-            new_score = setscore(cover_coll, varix, cur_cover, delta_score)
+            new_score = setscore(cover_coll, varix, cur_cover)
             cur_score = setscore(cover_coll, varix)
             if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
                 scores_updated = true
@@ -182,14 +180,13 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
     set_ixs = sizehint!(Vector{Int}(), nselsets)
     mask_ixs = sizehint!(Vector{Int}(), nselsets)
     cover_ixs = sizehint!(Vector{Int}(), nselsets)
-    delta_scores = sizehint!(Vector{Float64}(), nselsets)
+    cover_scores = sizehint!(Vector{Float64}(), nselsets)
     weights = sizehint!(Vector{Float64}(), nselsets)
     cv_scores = sizehint!(Vector{Float64}(), nselsets)
     sa_scores = sizehint!(Vector{Float64}(), nselsets)
     nmasked_v = sizehint!(Vector{Int}(), nselsets)
     nunmasked_v = sizehint!(Vector{Int}(), nselsets)
     for (cover_ix, cover) in enumerate(covers.results)
-        delta_score = cover.total_score - covers.results[1].total_score
         @inbounds for var_ix in eachindex(cover.weights)
             weight = cover.weights[var_ix]
             maskedset = covers.maskedsets[var_ix]
@@ -198,8 +195,8 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
             push!(weights, weight)
             push!(mask_ixs, maskedset.mask)
             push!(cover_ixs, cover_ix)
-            push!(delta_scores, delta_score)
-            push!(cv_scores, setscore(covers, var_ix, cover, delta_score))
+            push!(cover_scores, cover.total_score)
+            push!(cv_scores, setscore(covers, var_ix, cover))
             push!(sa_scores, standalonesetscore(maskedset.nmasked, setsize(maskedset),
                                                 covers.total_masked[maskedset.mask], nelements(mosaic), covers.cover_params))
             push!(nmasked_v, maskedset.nmasked)
@@ -210,7 +207,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               set_ix = set_ixs,
               set_id = mosaic.ix2set[set_ixs],
               mask_ix = mask_ixs,
-              cover_delta_score = delta_scores,
+              cover_score = cover_scores,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
               weight = weights,
@@ -236,7 +233,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
     nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2index)
     coverix_mtx = zeros(Int, size(nmasked_mtx))
     weights_mtx = zeros(Float64, size(nmasked_mtx))
-    delta_scores_mtx = zeros(Float64, size(nmasked_mtx))
+    cover_scores_mtx = zeros(Float64, size(nmasked_mtx))
     cv_scores_mtx = fill(NaN, size(nmasked_mtx))
     @inbounds for (varix, coverix) in enumerate(covers.var2cover)
         coverix > 0 || continue
@@ -245,7 +242,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
         i = sub2ind(size(coverix_mtx), setix, mset.mask)
         coverix_mtx[i] = coverix
         weights_mtx[i] = covers.results[coverix].weights[varix]
-        delta_scores_mtx[i] = covers.results[coverix].total_score - covers.results[1].total_score
+        cover_scores_mtx[i] = covers.results[coverix].total_score
         cv_scores_mtx[i] = setscore(covers, varix, coverix)
     end
     sa_scores_mtx = zeros(Float64, size(nmasked_mtx))
@@ -260,7 +257,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
               set_ix = repeat(sets_v, outer=[nmasks]),
               set_id = repeat(mosaic.ix2set[sets_v], outer=[nmasks]),
               mask_ix = repeat(collect(1:nmasks), inner=[length(sets_v)]),
-              cover_delta_score = vec(delta_scores_mtx),
+              cover_score = vec(cover_scores_mtx),
               nmasked = vec(nmasked_mtx),
               nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
               weight = vec(weights_mtx),
