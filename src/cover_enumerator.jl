@@ -138,14 +138,14 @@ function Base.collect(mosaic::MaskedSetMosaic,
         end
         # save the current cover
         insert!(cover_coll.results, cover_pos, cur_cover)
-        verbose && info("Cover saved")
+        verbose && info("Cover collected")
         # update pointers to the best covers for the sets
-        for sXmix in eachindex(cover_coll.var2cover)
-            if cover_coll.var2cover[sXmix] == -1
-                cover_coll.var2cover[sXmix] = cover_pos
-            elseif cover_coll.var2cover[sXmix] >= cover_pos
+        for i in eachindex(cover_coll.var2cover)
+            if cover_coll.var2cover[i] == -1
+                cover_coll.var2cover[i] = cover_pos
+            elseif cover_coll.var2cover[i] >= cover_pos
                 # the variant has moved down
-                cover_coll.var2cover[sXmix] += 1
+                cover_coll.var2cover[i] += 1
             end
         end
         if params.max_covers > 0 && length(cover_coll) >= params.max_covers
