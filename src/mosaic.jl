@@ -102,10 +102,9 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int, set_sizes:
     nsets = size(tileXset, 2)
     res = Matrix{Float64}(nsets, nsets)
     @inbounds for set1_ix in 1:nsets
-        res[set1_ix, set1_ix] = 0.0
         (set1_ix == nsets) && break
         set1_tiles = view(tileXset, :, set1_ix)
-        for set2_ix in (set1_ix+1):nsets
+        for set2_ix in set1_ix:nsets
             set2_tiles = view(tileXset, :, set2_ix)
             # one-sided Fisher's P-value, right tail
             res[set2_ix, set1_ix] =
