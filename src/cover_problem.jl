@@ -61,34 +61,44 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
                                                       nmasked(mosaic, s.mask), nelements(mosaic), params) - log_selp for s in mosaic.maskedsets]
     # prepare setXset scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
-    min_vXv = Inf # minimum finite varXvar_scores element
+    min_sXs = Inf # minimum finite varXvar_scores element
+    k_sXs = params.setXset_factor
+    k_mXm = params.maskXmask_factor * params.setXset_factor
     @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
         for (j, jset) in enumerate(mosaic.maskedsets)
-            vXv = params.setXset_factor * mosaic.original.setXset_scores[iset.set, jset.set]
-            if iset.mask != jset.mask
-                if iset.set != jset.set
+            sXs = mosaic.original.setXset_scores[iset.set, jset.set]
+            if iset.set == jset.set
+                # no penalty for the overlap with itself, even in different masks
+                # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
+                vXv = zero(eltype(varXvar_scores))
+            elseif !isfinite(sXs)
+                vXv = Inf # fix later with min_score
+            else
+                if sXs < min_sXs
+                    min_sXs = sXs
+                end
+                if iset.mask == jset.mask
+                    vXv = sXs*k_sXs
+                else
                     # scale the original setXset score by maskXmask_factor if
                     # the sets are from different masks,
-                    vXv *= params.maskXmask_factor
-                else
-                    # unless (i, j) point to the same set
-                    # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
-                    sc = zero(eltype(setXset_scores))
+                    vXv = sXs*k_mXm
                 end
             end
             varXvar_scores[i, j] = vXv
-            if isfinite(sc) && vXv < min_vXv
-                min_vXv= vXv
-            end
         end
     end
-    # replace infinite varXvar score with the minimal finite varXvar score
+    # replace infinite varXvar score with the minimal finite setXset score
+    sXs_min = (1.25*min_sXs)*k_sXs
+    mXm_min = (1.25*min_sXs)*k_mXm
     @inbounds for i in eachindex(varXvar_scores)
         if !isfinite(varXvar_scores[i])
             v1, v2 = ind2sub(size(varXvar_scores), i)
             warn("var[$v1]×var[$v2] score is $(varXvar_scores[i])")
             if varXvar_scores[i] < 0.0
-                varXvar_scores[i] = 1.25 * min_vXv
+                set1 = mosaic.maskedsets[v1]
+                set2 = mosaic.maskedsets[v2]
+                varXvar_scores[i] = set1.mask == set2.mask ? sXs_min : mXm_min
             end
         end
     end
