@@ -32,7 +32,7 @@ struct CoverCollection
         nvars(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
         new(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
-            copy(problem.set_scores),
+            copy(problem.var_scores),
             zeros(Int, nvars(problem)),
             Vector{CoverProblemResult}())
     end
@@ -115,7 +115,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         end
         if isa(params.max_set_score, Float64)
             max_set_score = params.max_set_score::Float64
-            if all(i -> (@inbounds return all(x -> x > max_set_score, view(cover_problem.set_scores, i, :))),
+            if all(i -> (@inbounds return all(x -> x > max_set_score, view(cover_problem.var_scores, i, :))),
                     used_varixs)
                 verbose && info("All set scores below $(max_set_score)")
                 break
@@ -165,11 +165,11 @@ function Base.collect(mosaic::MaskedSetMosaic,
         penalty_weights = zeros(cur_cover.weights)
         penalty_score = -log(cover_params.sel_prob) + 1000.0
         @inbounds for varix in penalized_varixs
-            cover_problem.set_scores[varix] = penalty_score
+            cover_problem.var_scores[varix] = penalty_score
             penalty_weights[varix] = 1.0
         end
         # overlapping sets are penalized
-        cover_problem.set_scores .-= cover_problem.setXset_scores * penalty_weights
+        cover_problem.var_scores .-= cover_problem.varXvar_scores * penalty_weights
     end
     verbose && info("$(length(cover_coll)) cover(s) collected")
     return cover_coll

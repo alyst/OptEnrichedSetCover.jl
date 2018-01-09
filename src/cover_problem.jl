@@ -41,15 +41,15 @@ Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` r
 struct CoverProblem
     params::CoverParams
 
-    set_scores::Vector{Float64}
-    setXset_scores::Matrix{Float64}
+    var_scores::Vector{Float64}
+    varXvar_scores::Matrix{Float64}
 
     function CoverProblem(params::CoverParams,
-                          set_scores::Vector{Float64},
-                          setXset_scores::Matrix{Float64})
-        length(set_scores) == size(setXset_scores, 1) == size(setXset_scores, 2) ||
-            throw(ArgumentError("set_scores and setXset_scores sizes do not match"))
-        new(params, set_scores, setXset_scores)
+                          var_scores::Vector{Float64},
+                          varXvar_scores::Matrix{Float64})
+        length(var_scores) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
+            throw(ArgumentError("var_scores and varXvar_scores sizes do not match"))
+        new(params, var_scores, varXvar_scores)
     end
 end
 
@@ -57,48 +57,48 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
     # activating the set in a given mask introduces the penalty
     # (to constrain the number of activated sets)
     const log_selp = log(params.sel_prob)
-	@inbounds set_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
+	@inbounds var_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
                                                       nmasked(mosaic, s.mask), nelements(mosaic), params) - log_selp for s in mosaic.maskedsets]
     # prepare setXset scores
-    setXset_scores = zeros(eltype(mosaic.original.setXset_scores), length(set_scores), length(set_scores))
-    min_score = Inf # minimum finite setXset_scores element
+    varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
+    min_vXv = Inf # minimum finite varXvar_scores element
     @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
         for (j, jset) in enumerate(mosaic.maskedsets)
-            sc = params.setXset_factor * mosaic.original.setXset_scores[iset.set, jset.set]
+            vXv = params.setXset_factor * mosaic.original.setXset_scores[iset.set, jset.set]
             if iset.mask != jset.mask
                 if iset.set != jset.set
                     # scale the original setXset score by maskXmask_factor if
                     # the sets are from different masks,
-                    sc *= params.maskXmask_factor
+                    vXv *= params.maskXmask_factor
                 else
                     # unless (i, j) point to the same set
                     # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
                     sc = zero(eltype(setXset_scores))
                 end
             end
-            setXset_scores[i, j] = sc
-            if isfinite(sc) && sc < min_score
-                min_score = sc
+            varXvar_scores[i, j] = vXv
+            if isfinite(sc) && vXv < min_vXv
+                min_vXv= vXv
             end
         end
     end
-    # replace infinite setXset score with the minimal finite setXset score
-    @inbounds for i in eachindex(setXset_scores)
-        if !isfinite(setXset_scores[i])
-            s1, s2 = ind2sub(size(setXset_scores), i)
-            warn("set[$s1]×set[$s2] score is $(setXset_scores[i])")
-            if setXset_scores[i] < 0.0
-                setXset_scores[i] = 1.25 * min_score
+    # replace infinite varXvar score with the minimal finite varXvar score
+    @inbounds for i in eachindex(varXvar_scores)
+        if !isfinite(varXvar_scores[i])
+            v1, v2 = ind2sub(size(varXvar_scores), i)
+            warn("var[$v1]×var[$v2] score is $(varXvar_scores[i])")
+            if varXvar_scores[i] < 0.0
+                varXvar_scores[i] = 1.25 * min_vXv
             end
         end
     end
-    CoverProblem(params, set_scores, setXset_scores)
+    CoverProblem(params, var_scores, varXvar_scores)
 end
 
 """
 Total number of problem variables.
 """
-nvars(problem::CoverProblem) = length(problem.set_scores)
+nvars(problem::CoverProblem) = length(problem.var_scores)
 
 """
 Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
@@ -107,7 +107,7 @@ function opt_model(problem::CoverProblem)
     m = JuMP.Model()
     nw = nvars(problem)
     @variable(m, 0.0 <= w[1:nw] <= 1.0)
-    @objective(m, :Min, dot(vec(problem.set_scores), w) - dot(w, problem.setXset_scores * w))
+    @objective(m, :Min, dot(vec(problem.var_scores), w) - dot(w, problem.varXvar_scores * w))
     return m
 end
 
@@ -130,7 +130,7 @@ Score (probability) of the OESC coverage.
 function score(problem::CoverProblem, w::Vector{Float64})
     # FIXME throw an error?
     #pen = fix_uncov_probs!(uncov_probs)
-    dot(problem.set_scores - problem.setXset_scores * w, w)
+    dot(problem.var_scores - problem.varXvar_scores * w, w)
 end
 
 """
@@ -164,7 +164,7 @@ function optimize(problem::CoverProblem;
             w[i] = 0.0
         end
     end
-    return CoverProblemResult(w, problem.set_scores .* w, getobjectivevalue(m))
+    return CoverProblemResult(w, problem.var_scores .* w, getobjectivevalue(m))
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
