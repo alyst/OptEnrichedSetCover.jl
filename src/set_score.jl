@@ -80,16 +80,19 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
                          set_sizes::AbstractVector{Int},
                          tile_sizes::AbstractVector{Int})
     nsets = size(tileXset, 2)
-    res = Matrix{Float64}(nsets, nsets)
+    res = zeros(Float64, nsets, nsets)
     @inbounds for set1_ix in 1:nsets
         set1_size = set_sizes[set1_ix]
+        set1_size == 0 && continue # skip empty sets
         set1_tiles = view(tileXset, :, set1_ix)
         for set2_ix in set1_ix:nsets
+            set2_size = set_sizes[set2_ix]
+            set2_size == 0 && continue # skip empty sets
             set2_tiles = view(tileXset, :, set2_ix)
             # one-sided Fisher's P-value, right tail
             res[set2_ix, set1_ix] =
                 logpvalue(_isect_size(set1_tiles, set2_tiles, tile_sizes),
-                          set1_size, set_sizes[set2_ix], total_size)
+                          set1_size, set2_size, total_size)
         end
     end
     # symmetrize
