@@ -43,3 +43,60 @@ function logpvalue(nisect::Integer, na::Integer, nb::Integer, ntotal::Integer,
         checktail(tail)
     end
 end
+
+# size of the sets intersection
+# the sets are represented by the sorted sets of their tiles
+function _isect_size(set1_tiles::AbstractVector{Int},
+                     set2_tiles::AbstractVector{Int},
+                     tile_sizes::Vector{Int})
+    (length(set1_tiles)==0 || length(set2_tiles)==0) && return 0
+    res = 0
+    i = 1
+    tile1 = set1_tiles[i] # current tile of the 1st set
+    j = 1
+    tile2 = set2_tiles[j] # current tile of the 2nd set
+    @inbounds while true
+        if tile1 < tile2
+            i += 1
+            (i <= length(set1_tiles)) || break
+            tile1 = set1_tiles[i]
+        elseif tile1 > tile2
+            j += 1
+            (j <= length(set2_tiles)) || break
+            tile2 = set2_tiles[j]
+        else # intersecting tile, adjust the overlap
+            res += tile_sizes[tile1]
+            i += 1
+            j += 1
+            (i <= length(set1_tiles) && j <= length(set2_tiles)) || break
+            tile1 = set1_tiles[i]
+            tile2 = set2_tiles[j]
+        end
+    end
+    return res
+end
+
+function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
+                         set_sizes::AbstractVector{Int},
+                         tile_sizes::AbstractVector{Int})
+    nsets = size(tileXset, 2)
+    res = Matrix{Float64}(nsets, nsets)
+    @inbounds for set1_ix in 1:nsets
+        set1_size = set_sizes[set1_ix]
+        set1_tiles = view(tileXset, :, set1_ix)
+        for set2_ix in set1_ix:nsets
+            set2_tiles = view(tileXset, :, set2_ix)
+            # one-sided Fisher's P-value, right tail
+            res[set2_ix, set1_ix] =
+                logpvalue(_isect_size(set1_tiles, set2_tiles, tile_sizes),
+                          set1_size, set_sizes[set2_ix], total_size)
+        end
+    end
+    # symmetrize
+    @inbounds for set2_ix in 1:nsets
+        for set1_ix in (set2_ix+1):nsets
+            res[set2_ix, set1_ix] = res[set1_ix, set2_ix]
+        end
+    end
+    return res
+end

@@ -17,8 +17,8 @@ export SetMosaic, CoverParams, CoverProblem,
 using Ipopt
 default_solver() = IpoptSolver(print_level=0)
 
-include("set_score.jl")
 include("sparse_mask_matrix.jl")
+include("set_score.jl")
 include("mosaic.jl")
 include("masked_mosaic.jl")
 include("cover_problem.jl")
