@@ -224,7 +224,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               cover_score = cover_scores,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
-              weight = weights,
+              cover_weight = weights,
               covered_score = cv_scores,
               stdalone_score = sa_scores)
 end
@@ -274,7 +274,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
               cover_score = vec(cover_scores_mtx),
               nmasked = vec(nmasked_mtx),
               nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
-              weight = vec(weights_mtx),
+              cover_weight = vec(weights_mtx),
               covered_score = vec(cv_scores_mtx),
               stdalone_score = vec(sa_scores_mtx))
 end
