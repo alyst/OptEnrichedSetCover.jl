@@ -66,7 +66,7 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
     const log_selp = log(params.sel_prob)
 	@inbounds var_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
                                                       nmasked(mosaic, s.mask), nelements(mosaic), params) - log_selp for s in mosaic.maskedsets]
-    # prepare setXset scores
+    # prepare varXvar scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
     min_sXs = Inf # minimum finite varXvar_scores element
     k_sXs = params.setXset_factor

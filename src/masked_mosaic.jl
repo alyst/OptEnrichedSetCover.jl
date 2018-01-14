@@ -62,7 +62,7 @@ mutable struct MaskedSetMosaic{T,S}
     elmasks::BitMatrix              # elements masks
     total_masked::Vector{Int}       # total number of masked elements for each mask
     maskedsets::Vector{MaskedSet}   # per set mask info (only the sets intersecting with each mask included)
-    orig2masked::Dict{Int, Set{Int}}
+    orig2masked::Dict{Int, Set{Int}}# map from the original index to the indices of masked sets
 end
 
 function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
