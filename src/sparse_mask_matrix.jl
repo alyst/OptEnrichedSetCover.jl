@@ -4,10 +4,10 @@ It uses compressed sparse column (CSC) representation, except no
 non-zero values need to be stored.
 """
 struct SparseMaskMatrix
-    m::Int
-    n::Int
-    colptr::Vector{Int}
-    rowval::Vector{Int}
+    m::Int              # rows number
+    n::Int              # cols number
+    colptr::Vector{Int} # indices of column starts in rowval vector
+    rowval::Vector{Int} # indices of rows of true matrix elements
 
     function SparseMaskMatrix(m::Integer, n::Integer, colptr::Vector{Int}, rowval::Vector{Int})
         length(colptr) == n+1 || throw(ArgumentError("col pointers ($(length(colptr))) does not match columns count ($n)"))
