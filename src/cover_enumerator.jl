@@ -196,6 +196,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
     cover_ixs = sizehint!(Vector{Int}(), nselsets)
     cover_scores = sizehint!(Vector{Float64}(), nselsets)
     weights = sizehint!(Vector{Float64}(), nselsets)
+    relevances = sizehint!(Vector{Float64}(), nselsets)
     cv_scores = sizehint!(Vector{Float64}(), nselsets)
     sa_scores = sizehint!(Vector{Float64}(), nselsets)
     nmasked_v = sizehint!(Vector{Int}(), nselsets)
@@ -207,12 +208,14 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
             (weight > 0.0) || continue
             push!(set_ixs, maskedset.set)
             push!(weights, weight)
+            push!(relevances, mosaic.set_relevances[maskedset.set])
             push!(mask_ixs, maskedset.mask)
             push!(cover_ixs, cover_ix)
             push!(cover_scores, cover.total_score)
             push!(cv_scores, setscore(covers, var_ix, cover))
             push!(sa_scores, standalonesetscore(maskedset.nmasked, setsize(maskedset),
-                                                covers.total_masked[maskedset.mask], nelements(mosaic), covers.cover_params))
+                                                covers.total_masked[maskedset.mask], nelements(mosaic),
+                                                1.0 #= ignore relevance =#, covers.cover_params))
             push!(nmasked_v, maskedset.nmasked)
             push!(nunmasked_v, maskedset.nunmasked)
         end
@@ -224,6 +227,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               cover_score = cover_scores,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
+              relevance = relevances,
               cover_weight = weights,
               covered_score = cv_scores,
               stdalone_score = sa_scores)
@@ -264,7 +268,8 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
         for i in eachindex(sets_v)
             setix = sets_v[i]
             sa_scores_mtx[i, j] = standalonesetscore(nmasked_mtx[i, j], setsizes_v[i],
-                                                     covers.total_masked[j], nelements(mosaic), covers.cover_params)
+                                                     covers.total_masked[j], nelements(mosaic),
+                                                     1.0 #= ignore relevance =#, covers.cover_params)
         end
     end
     DataFrame(cover_ix = vec(coverix_mtx),
@@ -274,6 +279,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
               cover_score = vec(cover_scores_mtx),
               nmasked = vec(nmasked_mtx),
               nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
+              relevance = repeat(mosaic.set_relevances[sets_v], outer=[nmasks]),
               cover_weight = vec(weights_mtx),
               covered_score = vec(cv_scores_mtx),
               stdalone_score = vec(sa_scores_mtx))

@@ -100,6 +100,7 @@ struct SetMosaic{T,S}
     set2ix::Dict{S, Int}    # set ID to index
 
     set_sizes::Vector{Int}
+    set_relevances::Vector{Float64}  # 0..1 set relevance score
 
     setXelm::SparseMaskMatrix  # set×element membership
     elmXset::SparseMaskMatrix  # element×set membership (transpose of setXelm)
@@ -108,19 +109,24 @@ struct SetMosaic{T,S}
 
     setXset_scores::Matrix{Float64}
 
-    function SetMosaic(set2ix::Dict{S, Int}, sets, all_elms::Set{T}) where {T, S}
+    function SetMosaic(set2ix::Dict{S, Int}, sets, all_elms::Set{T},
+                       set_relevances) where {T, S}
         length(set2ix) == length(sets) ||
             throw(ArgumentError("Number of set IDs does not match the number of sets"))
+        length(set_relevances) == length(sets) ||
+            throw(ArgumentError("Number of set relevance scores does not match the number of sets"))
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
         set_sizes = _set_sizes(tileXset, tile_sizes)
         ix2set = Vector{S}(length(set2ix))
+        set_relev = Vector{Float64}(length(set_relevances))
         for (id, ix) in set2ix
             ix2set[ix] = id
+            set_relev[ix] = set_relevances[id]
         end
         new{T, S}(ix2elm, elm2ix, ix2set, set2ix,
-                  set_sizes,
+                  set_sizes, set_relev,
                   setXelm, elmXset, elmXtile, tileXset,
                   _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
@@ -129,14 +135,17 @@ end
 """
 Construct `SetMosaic` for a given nameless sets collection.
 """
-SetMosaic(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets)) where {T} =
-    SetMosaic(Dict(Pair(i,i) for i in eachindex(sets)), sets, all_elms)
+SetMosaic(sets::Vector{Set{T}}, all_elms::Set{T} = _union(T, sets),
+          set_relevance = fill(1.0, length(sets))) where {T} =
+    SetMosaic(Dict(Pair(i,i) for i in eachindex(sets)), sets, all_elms, set_relevance)
 
 """
 Constructs `SetMosaic` for a given named sets collection.
 """
-SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets))) where {S, T} =
-    SetMosaic(Dict(Pair(s, i) for (i, s) in enumerate(keys(sets))), values(sets), all_elms)
+SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)),
+          set_relevances::Dict{S, Float64} = Dict(k => 1.0 for k in keys(sets))) where {S, T} =
+    SetMosaic(Dict(Pair(s, i) for (i, s) in enumerate(keys(sets))), values(sets), all_elms,
+              set_relevances)
 
 nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
 ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)

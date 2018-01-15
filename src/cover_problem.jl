@@ -4,21 +4,24 @@ Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
 struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
+    set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
     setXset_shape::Float64      # how much set-set overlaps are penalized (setXset_score shape), 0 = no penalty
     maskXmask_factor::Float64   # how much activating overlapping sets in different masks is penalized
     maskXmask_shape::Float64    # how much activating overlapping sets in different masks is penalized
 
     function CoverParams(; sel_prob::Number=0.9, min_weight::Number = 1E-2,
+                         set_relevance_shape::Number=1.0,
                          setXset_factor::Number=1.0, setXset_shape::Number=1.0,
                          maskXmask_factor::Number=1.0, maskXmask_shape::Number=1.0)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
+        (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= setXset_shape) || throw(ArgumentError("`setXset_shape` must be ≥0"))
         (0.0 <= maskXmask_factor) || throw(ArgumentError("`maskXmask_factor` must be ≥0"))
         (0.0 <= maskXmask_shape) || throw(ArgumentError("`maskXmask_shape` must be ≥0"))
-        new(sel_prob, min_weight,
+        new(sel_prob, min_weight, set_relevance_shape,
             setXset_factor, setXset_shape,
             maskXmask_factor, maskXmask_shape)
     end
@@ -28,11 +31,11 @@ end
 Linear component of an individual set score for the `CoverProblem`.
 Doesn't take into account the overlap with the other selected sets.
 """
-function standalonesetscore(masked::Number, set::Number, total_masked::Number, total::Number, params::CoverParams)
+function standalonesetscore(masked::Number, set::Number, total_masked::Number, total::Number, relevance::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
-    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total) #-
+    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*(relevance^params.set_relevance_shape) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
-    @assert !isnan(res) "masked=$masked set=$set total_masked=$total_masked total=$total res=NaN"
+    @assert !isnan(res) "masked=$masked set=$set total_masked=$total_masked total=$total relevance=$relevance res=NaN"
     return res
 end
 
@@ -65,7 +68,9 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
     # (to constrain the number of activated sets)
     const log_selp = log(params.sel_prob)
 	@inbounds var_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
-                                                      nmasked(mosaic, s.mask), nelements(mosaic), params) - log_selp for s in mosaic.maskedsets]
+                                                      nmasked(mosaic, s.mask), nelements(mosaic),
+                                                      mosaic.original.set_relevances[s.set],
+                                                      params) - log_selp for s in mosaic.maskedsets]
     # prepare varXvar scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
     min_sXs = Inf # minimum finite varXvar_scores element
