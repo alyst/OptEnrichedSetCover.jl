@@ -148,7 +148,7 @@ Optimize the cover problem.
 function optimize(problem::CoverProblem;
                   ini_weights::Vector{Float64} = rand(nvars(problem)),
                   #iterations::Int = 100,
-                  solver::MathProgBase.SolverInterface.AbstractMathProgSolver = IpoptSolver(print_level=0))
+                  solver::MathProgBase.SolverInterface.AbstractMathProgSolver = default_solver())
     (nvars(problem) == 0) && return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), 0.0)
 
     # Perform the optimization

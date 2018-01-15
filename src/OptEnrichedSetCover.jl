@@ -3,7 +3,7 @@ __precompile__()
 # Optimal Enriched-Set Cover
 module OptEnrichedSetCover
 
-using DataFrames, Distributions, MathProgBase, JuMP, Ipopt
+using DataFrames, Distributions, MathProgBase, JuMP
 
 export SetMosaic, CoverParams, CoverProblem,
     CoverEnumerationParams, CoverCollection,
@@ -13,6 +13,9 @@ export SetMosaic, CoverParams, CoverProblem,
     unmask, mask,
     score, # any conflicts
     optimize # conflicts with Optim.jl
+
+using Ipopt
+default_solver() = IpoptSolver(print_level=0)
 
 include("set_score.jl")
 include("sparse_mask_matrix.jl")
