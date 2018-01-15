@@ -5,15 +5,22 @@ struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
+    setXset_shape::Float64      # how much set-set overlaps are penalized (setXset_score shape), 0 = no penalty
     maskXmask_factor::Float64   # how much activating overlapping sets in different masks is penalized
+    maskXmask_shape::Float64    # how much activating overlapping sets in different masks is penalized
 
     function CoverParams(; sel_prob::Number=0.9, min_weight::Number = 1E-2,
-                         setXset_factor::Number=1.0, maskXmask_factor::Number=1.0)
+                         setXset_factor::Number=1.0, setXset_shape::Number=1.0,
+                         maskXmask_factor::Number=1.0, maskXmask_shape::Number=1.0)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
-        (0.0 <= maskXmask_factor <= 1.0) || throw(ArgumentError("`maskXmask_factor` must be within [0,1] range"))
-        new(sel_prob, min_weight, setXset_factor, maskXmask_factor)
+        (0.0 <= setXset_shape) || throw(ArgumentError("`setXset_shape` must be ≥0"))
+        (0.0 <= maskXmask_factor) || throw(ArgumentError("`maskXmask_factor` must be ≥0"))
+        (0.0 <= maskXmask_shape) || throw(ArgumentError("`maskXmask_shape` must be ≥0"))
+        new(sel_prob, min_weight,
+            setXset_factor, setXset_shape,
+            maskXmask_factor, maskXmask_shape)
     end
 end
 
@@ -64,6 +71,8 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
     min_sXs = Inf # minimum finite varXvar_scores element
     k_sXs = params.setXset_factor
     k_mXm = params.maskXmask_factor * params.setXset_factor
+    α_sXs = params.setXset_shape
+    α_mXm = params.maskXmask_shape * params.setXset_shape
     @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
         for (j, jset) in enumerate(mosaic.maskedsets)
             sXs = mosaic.original.setXset_scores[iset.set, jset.set]
@@ -72,25 +81,25 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
                 # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
                 vXv = zero(eltype(varXvar_scores))
             elseif !isfinite(sXs)
-                vXv = Inf # fix later with min_score
+                vXv = -Inf # fix later with min_score
             else
                 if sXs < min_sXs
                     min_sXs = sXs
                 end
                 if iset.mask == jset.mask
-                    vXv = sXs*k_sXs
+                    vXv = -((1.0-sXs)^α_sXs-1.0)*k_sXs
                 else
                     # scale the original setXset score by maskXmask_factor if
                     # the sets are from different masks,
-                    vXv = sXs*k_mXm
+                    vXv = -((1.0-sXs)^α_mXm-1.0)*k_mXm
                 end
             end
             varXvar_scores[i, j] = vXv
         end
     end
     # replace infinite varXvar score with the minimal finite setXset score
-    sXs_min = (1.25*min_sXs)*k_sXs
-    mXm_min = (1.25*min_sXs)*k_mXm
+    sXs_min = -((1.0 - 1.25*min_sXs)^α_sXs-1.0)*k_sXs
+    mXm_min = -((1.0 - 1.25*min_sXs)^α_mXm-1.0)*k_mXm
     @inbounds for i in eachindex(varXvar_scores)
         if !isfinite(varXvar_scores[i])
             v1, v2 = ind2sub(size(varXvar_scores), i)
