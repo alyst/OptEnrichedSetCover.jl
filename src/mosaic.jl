@@ -96,7 +96,7 @@ struct SetMosaic{T,S}
     ix2elm::Vector{T}       # element index to element
     elm2ix::Dict{T, Int}    # element to its index
 
-    ix2set::Vector{S}       # set index to ID
+    ix2set::Vector{S}       # set index to the ID of the most relevant set (if there are duplicates)
     set2ix::Dict{S, Int}    # set ID to index
 
     set_sizes::Vector{Int}
@@ -119,12 +119,51 @@ struct SetMosaic{T,S}
             throw(ArgumentError("Number of set relevance scores does not match the number of sets"))
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
+
+        # elementwise sets comparison
+        function setels_compare(iset, jset)
+            lendiff = length(iset) - length(jset) # prioritize length since we need sorting just to find duplicated
+            (lendiff != 0) && return lendiff > 0 ? 1 : -1
+            (length(iset) == 0) && return 0 # both empty
+            for i in eachindex(iset)
+                @inbounds eldiff = iset[i] - jset[i]
+                (eldiff != 0) && return eldiff > 0 ? 1 : -1
+            end
+            return 0
+        end
+        # sort sets by their tiles and relevance, so that duplicate sets are adjacent
+        function sets_isless(i, j)
+            els_diff = setels_compare(view(tileXset, :, i), view(tileXset, :, j))
+            (els_diff != 0) && return els_diff < 0
+            rel_diff = set_relevances[i] - set_relevances[j]
+            (rel_diff != 0.0) && return rel_diff > 0.0 # descending relevance
+            return setids[i] < setids[j]
+        end
+        @inbounds set_sort = sortperm(1:size(tileXset, 2), lt=sets_isless)
+        ix2new = fill(0, length(setids))
+        new2ix = Vector{Int}()
+        if !isempty(set_sort) # remove duplicate sets keeping the ones with higher relevance and id
+            lastset_tiles = view(tileXset, :, 1)
+            for setix in set_sort
+                curset_tiles = view(tileXset, :, setix)
+                if isempty(new2ix) || curset_tiles != lastset_tiles
+                    lastset_tiles = curset_tiles
+                    push!(new2ix, setix)
+                end
+                ix2new[setix] = length(new2ix)
+            end
+            neword = sortperm(new2ix)
+            new2ix = new2ix[neword]
+            ix2new = invperm(neword)[ix2new]
+        end
+
         tile_sizes = Int[length(view(elmXtile, :, tile_ix)) for tile_ix in 1:size(elmXtile, 2)]
+        tileXset = tileXset[:, new2ix]
         set_sizes = _set_sizes(tileXset, tile_sizes)
-        new{T, S}(ix2elm, elm2ix, copy(setids),
-                  Dict(id => ix for (ix, id) in enumerate(setids)),
-                  set_sizes, copy(set_relevances),
-                  setXelm, elmXset, elmXtile, tileXset,
+        new{T, S}(ix2elm, elm2ix, setids[new2ix],
+                  Dict(id => ix2new[ix] for (ix, id) in enumerate(setids)),
+                  set_sizes, set_relevances[new2ix],
+                  setXelm[new2ix, :], elmXset[:, new2ix], elmXtile, tileXset,
                   _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
     end
 end
