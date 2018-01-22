@@ -86,7 +86,8 @@ setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
     searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
-              max_overlap_logpvalue::Float64 = 0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+              min_nmasked::Integer=2,
+              max_overlap_logpvalue::Float64=0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
 )
     size(elmasks, 1) == nelements(mosaic) ||
         throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
@@ -100,7 +101,7 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
         ntotal_masked = sum(view(elmasks, :, maskix))
         orgsets_mask = view(nmasked_orgsets, :, maskix)
         for (setix, nmasked) in enumerate(orgsets_mask)
-            nmasked == 0 && continue
+            (nmasked < min_nmasked) && continue
             nset = setsize(mosaic, setix)
             @inbounds overlap_pvalue = logpvalue(nmasked, nset, ntotal_masked, ntotal)
             if overlap_pvalue <= max_overlap_logpvalue
@@ -112,9 +113,10 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
     return MaskedSetMosaic(mosaic, elmasks, maskedsets)
 end
 
-mask(mosaic::SetMosaic{T,S}, elmasks::Vector{Set{T}}; max_overlap_logpvalue::Real = 0.0) where {T,S} =
+mask(mosaic::SetMosaic{T,S}, elmasks::Vector{Set{T}};
+     min_nmasked::Integer=2, max_overlap_logpvalue::Real=0.0) where {T,S} =
     mask(mosaic, Bool[in(e, elmask) for e in mosaic.ix2elm, elmask in elmasks],
-         max_overlap_logpvalue=max_overlap_logpvalue)
+         min_nmasked=min_nmasked, max_overlap_logpvalue=max_overlap_logpvalue)
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
