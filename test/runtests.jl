@@ -9,6 +9,7 @@ my_tests = [
     "test_mosaic.jl",
     "test_masked_mosaic.jl",
     "test_cover_problem.jl",
+    "test_multiobj_cover_problem.jl",
     "test_cover_enumerator.jl",
     "test_parallel.jl"
 ]

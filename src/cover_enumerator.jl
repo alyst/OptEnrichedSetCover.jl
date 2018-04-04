@@ -77,9 +77,16 @@ Returns `CoverCollection`.
 function Base.collect(mosaic::MaskedSetMosaic,
                       cover_params::CoverParams=CoverParams(),
                       params::CoverEnumerationParams=CoverEnumerationParams();
+                      problem_type::Symbol=:quadratic,
                       verbose::Bool=false
 )
-    cover_problem = QuadraticCoverProblem(mosaic, cover_params)
+    if problem_type == :quadratic
+        cover_problem = QuadraticCoverProblem(mosaic, cover_params)
+    elseif problem_type == :multiobjective
+        cover_problem = MultiobjectiveCoverProblem(mosaic, cover_params)
+    else
+        throw(ArgumentError("Unsupported cover problem type $problem_type"))
+    end
     cover_coll = CoverCollection(cover_problem, mosaic, params)
     return collect!(cover_coll, cover_problem, mosaic, params, verbose)
 end

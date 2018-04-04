@@ -4,3 +4,4 @@ Distributions
 MathProgBase
 JuMP
 Ipopt
+BlackBoxOptim

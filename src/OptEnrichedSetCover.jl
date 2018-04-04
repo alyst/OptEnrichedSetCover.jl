@@ -3,10 +3,10 @@ __precompile__()
 # Optimal Enriched-Set Cover
 module OptEnrichedSetCover
 
-using DataFrames, Distributions, MathProgBase, JuMP
+using DataFrames, Distributions, MathProgBase, JuMP, BlackBoxOptim
 
 export SetMosaic, CoverParams,
-    AbstractCoverProblem, QuadraticCoverProblem,
+    AbstractCoverProblem, QuadraticCoverProblem, MultiobjectiveCoverProblem,
     CoverEnumerationParams, CoverCollection,
     nelements, ntiles, nsets, nmasks, nvars,
     nmasked, nunmasked, maskedset,
@@ -18,12 +18,15 @@ export SetMosaic, CoverParams,
 using Ipopt
 default_solver() = IpoptSolver(print_level=0)
 
+import BlackBoxOptim: OptimizationProblem
+
 include("sparse_mask_matrix.jl")
 include("set_score.jl")
 include("mosaic.jl")
 include("masked_mosaic.jl")
 include("cover_problem.jl")
 include("quadratic_cover_problem.jl")
+include("multiobj_cover_problem.jl")
 include("cover_enumerator.jl")
 include("parallel.jl")
 

@@ -1,25 +1,25 @@
-@testset "CoverEnumerator" begin # FIXME use weights
+@testset "CoverEnumerator problem_type=$problem_type" for problem_type in (:quadratic, :multiobjective) # FIXME use weights
     @testset "[:a] [:b] [:c] [:a :b :c], mask=[:a :b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
         sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
         # low penality to select sets, high probability to miss active element, so select abc
         cover_params1 = CoverParams(sel_prob=1.0)
-        cover_coll1a = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=10.0))
+        cover_coll1a = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll1a) == 1
-        cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=-1.0))
+        cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=-1.0), problem_type=problem_type)
         @test length(cover_coll1b) == 0
 
         # higher penalty to select sets, high probability to miss active element, so select abc
         cover_params2 = CoverParams(sel_prob=0.75)
-        cover_coll2a = collect(sm_ab, cover_params2, CoverEnumerationParams(max_set_score=10.0))
+        cover_coll2a = collect(sm_ab, cover_params2, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll2a) == 1
-        cover_coll2b = collect(sm_ab, cover_params2, CoverEnumerationParams(max_set_score=-1.0))
+        cover_coll2b = collect(sm_ab, cover_params2, CoverEnumerationParams(max_set_score=-1.0), problem_type=problem_type)
         @test length(cover_coll2b) == 0
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_params3 = CoverParams(sel_prob=1.0)
-        cover_coll3 = collect(sm_ab, cover_params3, CoverEnumerationParams(max_set_score=10.0))
+        cover_coll3 = collect(sm_ab, cover_params3, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         #@show cover_coll2
         @test_broken length(cover_coll3) == 2 # FIXME use a and b weights
     end
@@ -30,7 +30,7 @@
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
-                             CoverEnumerationParams(max_set_score=10.0))
+                             CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll) == 2
         @test cover_coll.results[1].agg_total_score <= cover_coll.results[2].agg_total_score
     end
@@ -42,7 +42,8 @@
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),
-                             CoverEnumerationParams(max_set_score=10.0))
+                             CoverEnumerationParams(max_set_score=10.0),
+                             problem_type=problem_type)
 
         df = DataFrame(cover_coll, sm)
         @test size(df, 1) == 3
@@ -66,7 +67,8 @@
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, sel_prob=0.9),
-                             CoverEnumerationParams(max_set_score=0.0))
+                             CoverEnumerationParams(max_set_score=0.0),
+                             problem_type=problem_type)
 
         df = DataFrame(cover_coll, sm, report=:covered)
         @test size(df, 1) == 5
