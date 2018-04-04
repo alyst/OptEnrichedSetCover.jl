@@ -41,6 +41,7 @@ function logpvalue(nisect::Integer, na::Integer, nb::Integer, ntotal::Integer,
         return log(2.0) + min(logcdf(distr, nisect), logccdf(distr, nisect-1), log(0.5))
     else
         checktail(tail)
+        return NaN # noop
     end
 end
 
