@@ -5,7 +5,8 @@ module OptEnrichedSetCover
 
 using DataFrames, Distributions, MathProgBase, JuMP
 
-export SetMosaic, CoverParams, CoverProblem,
+export SetMosaic, CoverParams,
+    AbstractCoverProblem, QuadraticCoverProblem,
     CoverEnumerationParams, CoverCollection,
     nelements, ntiles, nsets, nmasks, nvars,
     nmasked, nunmasked, maskedset,
@@ -22,6 +23,7 @@ include("set_score.jl")
 include("mosaic.jl")
 include("masked_mosaic.jl")
 include("cover_problem.jl")
+include("quadratic_cover_problem.jl")
 include("cover_enumerator.jl")
 include("parallel.jl")
 

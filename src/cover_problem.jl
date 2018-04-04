@@ -1,5 +1,5 @@
 """
-Parameters for the `CoverProblem` (Optimal Enriched-Set Cover).
+Parameters for the `AbstractCoverProblem` (Optimal Enriched-Set Cover).
 """
 struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
@@ -78,67 +78,12 @@ The optimal sets cover `C = {c₁, c₂, ..., cₙ} ⊂ 𝒞` has to deliver 3 g
 
 Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` range.
 """
-struct CoverProblem
-    params::CoverParams
-
-    var_scores::Vector{Float64}
-    varXvar_scores::Matrix{Float64}
-
-    function CoverProblem(params::CoverParams,
-                          var_scores::Vector{Float64},
-                          varXvar_scores::Matrix{Float64})
-        length(var_scores) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
-            throw(ArgumentError("var_scores and varXvar_scores sizes do not match"))
-        new(params, var_scores, varXvar_scores)
-    end
-end
-
-function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-    var_scores = standalonesetscore.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
-    # prepare varXvar scores
-    varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
-    min_sXs = Inf # minimum finite varXvar_scores element
-    @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
-        for (j, jset) in enumerate(mosaic.maskedsets)
-            sXs = mosaic.original.setXset_scores[iset.set, jset.set]
-            if iset.set != jset.set && isfinite(sXs) && sXs < min_sXs
-                min_sXs = sXs
-            end
-            varXvar_scores[i, j] = varXvar_score(sXs, iset, jset, params, true)
-        end
-    end
-    # replace infinite varXvar score with the minimal finite setXset score
-    sXs_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 1, 0, 0), params, true)
-    mXm_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 2, 0, 0), params, true)
-    @inbounds for i in eachindex(varXvar_scores)
-        if !isfinite(varXvar_scores[i])
-            v1, v2 = ind2sub(size(varXvar_scores), i)
-            warn("var[$v1]×var[$v2] score is $(varXvar_scores[i])")
-            if varXvar_scores[i] < 0.0
-                set1 = mosaic.maskedsets[v1]
-                set2 = mosaic.maskedsets[v2]
-                varXvar_scores[i] = set1.mask == set2.mask ? sXs_min : mXm_min
-            end
-        end
-    end
-    CoverProblem(params, var_scores, varXvar_scores)
-end
+abstract type AbstractCoverProblem{T} end
 
 """
 Total number of problem variables.
 """
-nvars(problem::CoverProblem) = length(problem.var_scores)
-
-"""
-Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
-"""
-function opt_model(problem::CoverProblem)
-    m = JuMP.Model()
-    nw = nvars(problem)
-    @variable(m, 0.0 <= w[1:nw] <= 1.0)
-    @objective(m, :Min, dot(vec(problem.var_scores), w) - dot(w, problem.varXvar_scores * w))
-    return m
-end
+nvars(problem::AbstractCoverProblem) = length(problem.var_scores)
 
 # clamps weights to 0..1 range and returns sum(|w - fixed_w|)
 function fix_cover_weights!(weights::Matrix{Float64})
@@ -153,58 +98,16 @@ function fix_cover_weights!(weights::Matrix{Float64})
 end
 
 """
-Score (probability) of the OESC coverage.
-
-* `w` probabilities of the sets being covered
+Result of `optimize(AbstractCoverProblem)`.
 """
-function score(problem::CoverProblem, w::Vector{Float64})
-    #pen = fix_cover_weights!(w) # FIXME throw an error?
-    dot(problem.var_scores - problem.varXvar_scores * w, w)
-end
-
-aggscore(problem::CoverProblem, w::Vector{Float64}) = score(w, problem)
-
-"""
-Result of `optimize(CoverProblem)`.
-"""
-struct CoverProblemResult
+struct CoverProblemResult{T}
     weights::Vector{Float64}
     var_scores::Vector{Float64}
-    total_score::Float64
+    total_score::T
     agg_total_score::Float64
 end
 
-"""
-Optimize the cover problem.
-"""
-function optimize(problem::CoverProblem;
-                  ini_weights::Vector{Float64} = rand(nvars(problem)),
-                  #iterations::Int = 100,
-                  solver::MathProgBase.SolverInterface.AbstractMathProgSolver = default_solver())
-    (nvars(problem) == 0) && return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), 0.0)
-
-    # Perform the optimization
-    #try
-    # using JuMP
-    m = opt_model(problem)
-    setsolver(m, solver)
-    solve(m)
-    w = copy(getvalue(getindex(m, :w)))
-    # remove small non-zero probabilities due to optimization method errors
-    for i in eachindex(w)
-        @inbounds if w[i] < problem.params.min_weight
-            w[i] = 0.0
-        end
-    end
-    s = getobjectivevalue(m)
-    return CoverProblemResult(w, problem.var_scores .* w, s, s)
-    #catch x
-    #    warn("Exception in optimize(CoverProblem): $x")
-    #    return nothing
-    #end
-end
-
-function penalize_solution!(problem::CoverProblem,
+function penalize_solution!(problem::AbstractCoverProblem,
                             mosaic::MaskedSetMosaic,
                             weights::AbstractVector{Float64})
     @assert length(weights) == nvars(problem)
@@ -225,11 +128,6 @@ function penalize_solution!(problem::CoverProblem,
     problem.var_scores .-= varXvar_mul(problem, penalty_weights)
     return problem
 end
-
-varXvar_mul!(vvXw::AbstractVector{Float64},
-             problem::QuadraticCoverProblem,
-             w::AbstractVector{Float64}) =
-    A_mul_B!(vvXw, problem.varXvar_scores, w)
 
 varXvar_mul(problem::AbstractCoverProblem, w::AbstractVector) =
     varXvar_mul!(similar(w), problem, w)

@@ -16,7 +16,7 @@ end
 """
 The collection of masked set covers.
 """
-struct CoverCollection
+struct CoverCollection{T}
     cover_params::CoverParams
     enum_params::CoverEnumerationParams
     total_masked::Vector{Int}         # total masked elements in the mosaic
@@ -24,17 +24,17 @@ struct CoverCollection
     maskedsets::Vector{MaskedSet}     # sets of the MaskedSetMosaic
     base_setscores::Vector{Float64}   # base set scores
     var2cover::Vector{Int}            # best-scoring cover for the given masked set
-    results::Vector{CoverProblemResult}
+    results::Vector{CoverProblemResult{T}}
 
-    function CoverCollection(problem::CoverProblem, mosaic::MaskedSetMosaic,
-                             params::CoverEnumerationParams)
+    function CoverCollection(problem::AbstractCoverProblem{T}, mosaic::MaskedSetMosaic,
+                             params::CoverEnumerationParams) where T
         # check the problem is compatible with the mosaic
         nvars(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
-            copy(problem.var_scores),
-            zeros(Int, nvars(problem)),
-            Vector{CoverProblemResult}())
+        new{T}(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
+               copy(problem.var_scores),
+               zeros(Int, nvars(problem)),
+               Vector{CoverProblemResult{T}}())
     end
 end
 
@@ -79,9 +79,18 @@ function Base.collect(mosaic::MaskedSetMosaic,
                       params::CoverEnumerationParams=CoverEnumerationParams();
                       verbose::Bool=false
 )
-    verbose && info("Starting covers enumeration...")
-    cover_problem = CoverProblem(mosaic, cover_params)
+    cover_problem = QuadraticCoverProblem(mosaic, cover_params)
     cover_coll = CoverCollection(cover_problem, mosaic, params)
+    return collect!(cover_coll, cover_problem, mosaic, params, verbose)
+end
+
+function collect!(cover_coll::CoverCollection,
+                  cover_problem::AbstractCoverProblem,
+                  mosaic::MaskedSetMosaic,
+                  params::CoverEnumerationParams=CoverEnumerationParams(),
+                  verbose::Bool=false
+)
+    verbose && info("Starting covers enumeration...")
     # thresholds for identifying duplicate covers
     const score_threshold = 1E-3
     const weight_threshold = 1E-3
