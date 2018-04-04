@@ -39,6 +39,11 @@ function standalonesetscore(masked::Number, set::Number, total_masked::Number, t
     return res
 end
 
+standalonesetscore(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
+    standalonesetscore(set.nmasked, set.nmasked + set.nunmasked,
+                       nmasked(mosaic, set.mask), nelements(mosaic),
+                       mosaic.original.set_relevances[set.set], params)
+
 """
 Optimal Enriched-Set Cover problem -- choose the sets from the collection to cover
 the masked(selected) elements.
@@ -64,13 +69,7 @@ struct CoverProblem
 end
 
 function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-    # activating the set in a given mask introduces the penalty
-    # (to constrain the number of activated sets)
-    const log_selp = log(params.sel_prob)
-	@inbounds var_scores = Float64[standalonesetscore(s.nmasked, s.nmasked + s.nunmasked,
-                                                      nmasked(mosaic, s.mask), nelements(mosaic),
-                                                      mosaic.original.set_relevances[s.set],
-                                                      params) - log_selp for s in mosaic.maskedsets]
+    var_scores = standalonesetscore.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
     # prepare varXvar scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
     min_sXs = Inf # minimum finite varXvar_scores element
