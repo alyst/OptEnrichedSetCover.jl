@@ -135,13 +135,14 @@ function opt_model(problem::CoverProblem)
     return m
 end
 
-function fix_uncov_probs!(uncov_probs::Matrix{Float64})
+# clamps weights to 0..1 range and returns sum(|w - fixed_w|)
+function fix_cover_weights!(weights::Matrix{Float64})
     pen = 0.0
-    @inbounds for i in eachindex(uncov_probs)
-        prob = uncov_probs[i]
-        prob_new = clamp(prob, 0.0, 1.0)
-        pen += abs2(prob_new - prob)
-        uncov_probs[i] = prob_new
+    @inbounds for i in eachindex(weights)
+        w = uncov_probs[i]
+        w_new = clamp(w, 0.0, 1.0)
+        pen += abs2(w_new - w)
+        weights[i] = w_new
     end
     return pen
 end
@@ -152,8 +153,7 @@ Score (probability) of the OESC coverage.
 * `w` probabilities of the sets being covered
 """
 function score(problem::CoverProblem, w::Vector{Float64})
-    # FIXME throw an error?
-    #pen = fix_uncov_probs!(uncov_probs)
+    #pen = fix_cover_weights!(w) # FIXME throw an error?
     dot(problem.var_scores - problem.varXvar_scores * w, w)
 end
 
