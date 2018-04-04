@@ -69,11 +69,12 @@ function varXvar_score(setXset::Real, iset::MaskedSet, jset::MaskedSet, params::
 end
 
 """
-Optimal Enriched-Set Cover problem -- choose the sets from the collection to cover
-the masked(selected) elements.
-The optimal sets cover `C` needs to deliver to goals:
-* minimize the P-values of masked elements enrichment for each of `C` sets
-* minimize the P-values of the pairwise non-overlap of `C` sets with each other.
+Optimal Enriched-Set Cover problem -- choose the sets from the collection `𝒞` to cover
+the masked(selected) elements `M`.
+The optimal sets cover `C = {c₁, c₂, ..., cₙ} ⊂ 𝒞` has to deliver 3 goals:
+* be relevant (i.e. minimize the P-values of `M` and `cᵢ` sets overlap)
+* be minimal (i.e. minimize the number of sets in `C`)
+* be non-redundant (i.e. minimize the P-values of the pairwise non-overlap of `C` sets with each other).
 
 Fuzzy set selection is possible -- each set is assigned a weight from `[0, 1]` range.
 """
