@@ -199,3 +199,33 @@ function optimize(problem::CoverProblem;
     #    return nothing
     #end
 end
+
+function penalize_solution!(problem::CoverProblem,
+                            mosaic::MaskedSetMosaic,
+                            weights::AbstractVector{Float64})
+    @assert length(weights) == nvars(problem)
+    varixs = find(w -> w > 0.0, weights)
+    # penalize selecting the sets from the current cover again (also in the other masks)
+    setixs = Set(mosaic.maskedsets[i].set for i in varixs)
+    ext_varixs = Set{Int}()
+    for i in setixs
+        union!(ext_varixs, mosaic.orig2masked[i])
+    end
+    penalty_weights = zeros(weights)
+    penalty_score = -log(problem.params.sel_prob) + 1000.0
+    @inbounds for varix in ext_varixs
+        problem.var_scores[varix] = penalty_score
+        penalty_weights[varix] = 1.0
+    end
+    # overlapping sets are penalized
+    problem.var_scores .-= varXvar_mul(problem, penalty_weights)
+    return problem
+end
+
+varXvar_mul!(vvXw::AbstractVector{Float64},
+             problem::QuadraticCoverProblem,
+             w::AbstractVector{Float64}) =
+    A_mul_B!(vvXw, problem.varXvar_scores, w)
+
+varXvar_mul(problem::AbstractCoverProblem, w::AbstractVector) =
+    varXvar_mul!(similar(w), problem, w)

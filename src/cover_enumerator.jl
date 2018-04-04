@@ -156,20 +156,8 @@ function Base.collect(mosaic::MaskedSetMosaic,
             verbose && info("All sets assigned to covers")
             break
         end
-        # penalize selecting the sets from the current cover again (also in the other masks)
-        used_setixs = Set(mosaic.maskedsets[i].set for i in used_varixs)
-        penalized_varixs = Set{Int}()
-        for i in used_setixs
-            union!(penalized_varixs, mosaic.orig2masked[i])
-        end
-        penalty_weights = zeros(cur_cover.weights)
-        penalty_score = -log(cover_params.sel_prob) + 1000.0
-        @inbounds for varix in penalized_varixs
-            cover_problem.var_scores[varix] = penalty_score
-            penalty_weights[varix] = 1.0
-        end
-        # overlapping sets are penalized
-        cover_problem.var_scores .-= cover_problem.varXvar_scores * penalty_weights
+        # exclude current solution
+        penalize_solution!(cover_problem, mosaic, cur_cover.weights)
     end
     verbose && info("$(length(cover_coll)) cover(s) collected")
     return cover_coll
