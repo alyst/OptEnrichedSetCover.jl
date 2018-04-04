@@ -26,13 +26,13 @@
         @test empty_res.total_score == 0.0
 
         # disabled because :a is all elements
-        dis_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a])), [Set{Symbol}([:a])]))
+        dis_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a])), [Set{Symbol}([:a])], min_nmasked=1))
         @test nvars(dis_problem) == 1
         dis_res = optimize(dis_problem)
         @test dis_res.weights == zeros(Float64, 1)
 
         # enabled because there is :a and :b
-        en_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])), [Set{Symbol}([:a])]))
+        en_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])), [Set{Symbol}([:a])], min_nmasked=1))
         @test nvars(en_problem) == 1
         en_res = optimize(en_problem)
         @test en_res.weights == ones(Float64, 1)
@@ -54,7 +54,7 @@
 
     @testset "[a b] [b c] [a b c], mask=[b]" begin # FIXME take weights into account
         sm = SetMosaic([Set([:a, :b]), Set([:b, :c]), Set([:a, :b, :c])])
-        sm_b = mask(sm, [Set([:b])])
+        sm_b = mask(sm, [Set([:b])], min_nmasked=1)
 
         problem_ignore_overlap = CoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_prob=1E-25))
         @test nvars(problem_ignore_overlap) == 3
@@ -72,7 +72,7 @@
         sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
                         Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
                         Set([:a, :b, :c, :d, :e, :f]))
-        sm_abc = mask(sm, [Set([:a, :b, :c])])
+        sm_abc = mask(sm, [Set([:a, :b, :c])], min_nmasked=1)
 
         # low prior probability to select sets, high probability to miss active element, so select abc
         problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_prob=0.1))
@@ -94,7 +94,7 @@
         sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
                         Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
                         Set([:a, :b, :c, :d, :e, :f]))
-        sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])])
+        sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
         # lower prior probability to select sets, high overlap penalty, so select abd and c
         problem_ignore_overlap = CoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6))

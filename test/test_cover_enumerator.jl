@@ -1,7 +1,7 @@
 @testset "CoverEnumerator" begin # FIXME use weights
     @testset "[:a] [:b] [:c] [:a :b :c], mask=[:a :b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
-        sm_ab = mask(sm, [Set([:a, :b])])
+        sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
         # low penality to select sets, high probability to miss active element, so select abc
         cover_params1 = CoverParams(sel_prob=1.0)
@@ -29,7 +29,7 @@
                             Set([:a, :b, :c, :d, :e]))
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
-        cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])]), CoverParams(sel_prob=1.0),
+        cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=10.0))
         @test length(cover_coll) == 2
         @test cover_coll.results[1].total_score <= cover_coll.results[2].total_score
@@ -38,7 +38,7 @@
     @testset "DataFrame(CoverCollection)" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                             Set([:a, :b, :c, :d, :e]))
-        sm_ab = mask(sm, [Set(Symbol[:a, :b])])
+        sm_ab = mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1)
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),
@@ -62,7 +62,7 @@
         sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
                         Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
                         Set([:a, :b, :c, :d, :e, :f]))
-        sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])])
+        sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, sel_prob=0.9),

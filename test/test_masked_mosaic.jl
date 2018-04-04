@@ -82,7 +82,7 @@
 
     @testset "multimask: A=[:a :b] B=[:c :d] C=[:a :b :c :d], mask=[[:a :b] [:a :b :c] [:a :b :d]]" begin
         sm = SetMosaic(Dict(:A=>Set([:a, :b]), :B=>Set([:c, :d]), :C=>Set([:a, :b, :c, :d])))
-        msm = mask(sm, [Set([:a, :b]), Set([:a, :b, :c]), Set([:a, :b, :d])])
+        msm = mask(sm, [Set([:a, :b]), Set([:a, :b, :c]), Set([:a, :b, :d])], min_nmasked=1)
 
         @test nelements(msm) == 4
         @test nsets(msm) == 8
@@ -95,11 +95,14 @@
         @test maskedset(msm, 6) == MaskedSet(3, 1, 2, 0)
         @test maskedset(msm, 7) == MaskedSet(3, 2, 1, 1)
         @test maskedset(msm, 8) == MaskedSet(3, 3, 3, 1)
+
+        msm2 = mask(sm, [Set([:a, :b]), Set([:a, :b, :c]), Set([:a, :b, :d])], min_nmasked=2)
+        @test nsets(msm2) == 6
     end
 
     @testset "filter!()" begin
         sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c, :d])])
-        msm = mask(sm, [Set([:b, :c])])
+        msm = mask(sm, [Set([:b, :c])], min_nmasked=1)
 
         @test nelements(msm) == 4
         @test nsets(msm) == 3
