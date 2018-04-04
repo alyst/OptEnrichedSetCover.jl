@@ -44,6 +44,30 @@ standalonesetscore(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams)
                        nmasked(mosaic, set.mask), nelements(mosaic),
                        mosaic.original.set_relevances[set.set], params)
 
+function varXvar_score(setXset::Real, iset::MaskedSet, jset::MaskedSet, params::CoverParams, scale::Bool = false)
+    if iset.set == jset.set
+        # no penalty for the overlap with itself, even in different masks
+        # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
+        return zero(typeof(setXset))
+    elseif !isfinite(setXset)
+        return -Inf # fix later with min_score
+    else
+        #if sXs < min_sXs
+        #    min_sXs = sXs
+        #end
+        if iset.mask == jset.mask
+            v = -((1.0-setXset)^params.setXset_shape-1.0)
+            scale && (v *= params.setXset_factor)
+        else
+            # scale the original setXset score by maskXmask_factor if
+            # the sets are from different masks,
+            v = -((1.0-setXset)^(params.maskXmask_shape * params.setXset_shape)-1.0)
+            scale && (v *= params.maskXmask_factor * params.setXset_factor)
+        end
+        return v
+    end
+end
+
 """
 Optimal Enriched-Set Cover problem -- choose the sets from the collection to cover
 the masked(selected) elements.
@@ -73,37 +97,18 @@ function CoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams
     # prepare varXvar scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
     min_sXs = Inf # minimum finite varXvar_scores element
-    k_sXs = params.setXset_factor
-    k_mXm = params.maskXmask_factor * params.setXset_factor
-    α_sXs = params.setXset_shape
-    α_mXm = params.maskXmask_shape * params.setXset_shape
     @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
         for (j, jset) in enumerate(mosaic.maskedsets)
             sXs = mosaic.original.setXset_scores[iset.set, jset.set]
-            if iset.set == jset.set
-                # no penalty for the overlap with itself, even in different masks
-                # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
-                vXv = zero(eltype(varXvar_scores))
-            elseif !isfinite(sXs)
-                vXv = -Inf # fix later with min_score
-            else
-                if sXs < min_sXs
-                    min_sXs = sXs
-                end
-                if iset.mask == jset.mask
-                    vXv = -((1.0-sXs)^α_sXs-1.0)*k_sXs
-                else
-                    # scale the original setXset score by maskXmask_factor if
-                    # the sets are from different masks,
-                    vXv = -((1.0-sXs)^α_mXm-1.0)*k_mXm
-                end
+            if iset.set != jset.set && isfinite(sXs) && sXs < min_sXs
+                min_sXs = sXs
             end
-            varXvar_scores[i, j] = vXv
+            varXvar_scores[i, j] = varXvar_score(sXs, iset, jset, params, true)
         end
     end
     # replace infinite varXvar score with the minimal finite setXset score
-    sXs_min = -((1.0 - 1.25*min_sXs)^α_sXs-1.0)*k_sXs
-    mXm_min = -((1.0 - 1.25*min_sXs)^α_mXm-1.0)*k_mXm
+    sXs_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 1, 0, 0), params, true)
+    mXm_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 2, 0, 0), params, true)
     @inbounds for i in eachindex(varXvar_scores)
         if !isfinite(varXvar_scores[i])
             v1, v2 = ind2sub(size(varXvar_scores), i)
