@@ -10,7 +10,7 @@ struct CoverParams
     maskXmask_factor::Float64   # how much activating overlapping sets in different masks is penalized
     maskXmask_shape::Float64    # how much activating overlapping sets in different masks is penalized
 
-    function CoverParams(; sel_prob::Number=0.9, min_weight::Number = 1E-2,
+    function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
                          set_relevance_shape::Number=1.0,
                          setXset_factor::Number=1.0, setXset_shape::Number=1.0,
                          maskXmask_factor::Number=1.0, maskXmask_shape::Number=1.0)

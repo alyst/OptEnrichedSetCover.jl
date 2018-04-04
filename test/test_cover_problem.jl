@@ -32,7 +32,9 @@
         @test dis_res.weights == zeros(Float64, 1)
 
         # enabled because there is :a and :b
-        en_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])), [Set{Symbol}([:a])], min_nmasked=1))
+        en_problem = CoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])),
+                                                [Set{Symbol}([:a])], min_nmasked=1),
+                                           CoverParams(sel_prob=0.9))
         @test nvars(en_problem) == 1
         en_res = optimize(en_problem)
         @test en_res.weights == ones(Float64, 1)
