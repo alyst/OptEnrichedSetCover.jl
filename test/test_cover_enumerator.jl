@@ -32,7 +32,7 @@
         cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=10.0))
         @test length(cover_coll) == 2
-        @test cover_coll.results[1].total_score <= cover_coll.results[2].total_score
+        @test cover_coll.results[1].agg_total_score <= cover_coll.results[2].agg_total_score
     end
 
     @testset "DataFrame(CoverCollection)" begin

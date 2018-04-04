@@ -11,7 +11,7 @@ export SetMosaic, CoverParams, CoverProblem,
     nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
     unmask, mask,
-    score, # any conflicts
+    aggscore, score, # any conflicts
     optimize # conflicts with Optim.jl
 
 using Ipopt

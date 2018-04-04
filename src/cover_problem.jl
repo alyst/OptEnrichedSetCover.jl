@@ -162,6 +162,8 @@ function score(problem::CoverProblem, w::Vector{Float64})
     dot(problem.var_scores - problem.varXvar_scores * w, w)
 end
 
+aggscore(problem::CoverProblem, w::Vector{Float64}) = score(w, problem)
+
 """
 Result of `optimize(CoverProblem)`.
 """
@@ -169,6 +171,7 @@ struct CoverProblemResult
     weights::Vector{Float64}
     var_scores::Vector{Float64}
     total_score::Float64
+    agg_total_score::Float64
 end
 
 """
@@ -193,7 +196,8 @@ function optimize(problem::CoverProblem;
             w[i] = 0.0
         end
     end
-    return CoverProblemResult(w, problem.var_scores .* w, getobjectivevalue(m))
+    s = getobjectivevalue(m)
+    return CoverProblemResult(w, problem.var_scores .* w, s, s)
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing

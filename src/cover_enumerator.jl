@@ -89,16 +89,16 @@ function Base.collect(mosaic::MaskedSetMosaic,
         verbose && info("Trying to find cover #$(length(cover_coll)+1)...")
         cur_cover = optimize(cover_problem; ini_weights=rand(nvars(cover_problem)),
                              solver=default_solver())
-        verbose && info("New cover found (score=$(cur_cover.total_score)), processing...")
+        verbose && info("New cover found (score=$(cur_cover.total_score), aggscore=$(cur_cover.agg_total_score)), processing...")
         used_varixs = find(w -> w > 0.0, cur_cover.weights)
         if isempty(used_varixs)
             verbose && info("Cover is empty")
             break
         end
-        cover_pos = searchsortedlast(cover_coll.results, cur_cover, by=cover->cover.total_score)+1
+        cover_pos = searchsortedlast(cover_coll.results, cur_cover, by=cover->cover.agg_total_score)+1
         if cover_pos > 1
             cover = cover_coll.results[cover_pos-1]
-            if abs(cur_cover.total_score - cover.total_score) <= score_threshold &&
+            if abs(cur_cover.agg_total_score - cover.agg_total_score) <= score_threshold &&
                all(i -> (@inbounds return abs(cur_cover.weights[i] - cover.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
@@ -107,7 +107,7 @@ function Base.collect(mosaic::MaskedSetMosaic,
         end
         if cover_pos > 1 && isa(params.max_cover_score_delta, Float64)
             # not the best cover
-            cover_score_delta = cur_cover.total_score - cover_coll.results[1].total_score
+            cover_score_delta = cur_cover.agg_total_score - cover_coll.results[1].agg_total_score
             if cover_score_delta > params.max_cover_score_delta
                 verbose && info("Cover score_delta=$(cover_score_delta) above threshold")
                 break
@@ -199,7 +199,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
             push!(relevances, mosaic.set_relevances[maskedset.set])
             push!(mask_ixs, maskedset.mask)
             push!(cover_ixs, cover_ix)
-            push!(cover_scores, cover.total_score)
+            push!(cover_scores, cover.agg_total_score)
             push!(cv_scores, setscore(covers, var_ix, cover))
             push!(sa_scores, standalonesetscore(maskedset.nmasked, setsize(maskedset),
                                                 covers.total_masked[maskedset.mask], nelements(mosaic),
@@ -248,7 +248,7 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
         i = sub2ind(size(coverix_mtx), setix, mset.mask)
         coverix_mtx[i] = coverix
         weights_mtx[i] = covers.results[coverix].weights[varix]
-        cover_scores_mtx[i] = covers.results[coverix].total_score
+        cover_scores_mtx[i] = covers.results[coverix].agg_total_score
         cv_scores_mtx[i] = setscore(covers, varix, coverix)
     end
     sa_scores_mtx = zeros(Float64, size(nmasked_mtx))
