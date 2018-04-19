@@ -251,6 +251,10 @@ function optimize(problem::MultiobjectiveCoverProblem,
 
     bbowrapper = MultiobjectiveCoverProblemBBOWrapper(problem)
     popmatrix = BlackBoxOptim.rand_individuals_lhs(search_space(bbowrapper), opt_params.pop_size)
+    # two extreme solutions and one totally neutral
+    size(popmatrix, 2) > 0 && (popmatrix[:, 1] = 0.0)
+    size(popmatrix, 2) > 1 && (popmatrix[:, 2] = 1.0)
+    size(popmatrix, 2) > 2 && (popmatrix[:, 3] = 0.5)
     population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{3,Float64}), ntransient=1)
 
     go_params = genop_params(opt_params)
