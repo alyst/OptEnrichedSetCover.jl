@@ -65,6 +65,16 @@ nmasks(covers::CoverCollection) = size(covers.elmasks, 2)
 Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
+function OptimizerParams(problem_type::Symbol; kwargs...)
+    if problem_type == :quadratic
+        return QuadraticOptimizerParams(kwargs...)
+    elseif problem_type == :multiobjective
+        return MultiobjectiveOptimizerParams(kwargs...)
+    else
+        throw(ArgumentError("Unsupported cover problem type $problem_type"))
+    end
+end
+
 """
 Greedy enumeration of enriched-set covers.
 * At each iteration an optimal enriched-set cover problem is being solved.
@@ -74,27 +84,29 @@ Greedy enumeration of enriched-set covers.
 
 Returns `CoverCollection`.
 """
+Base.collect(mosaic::MaskedSetMosaic,
+             cover_params::CoverParams=CoverParams(),
+             enum_params::CoverEnumerationParams=CoverEnumerationParams();
+             problem_type::Symbol=:quadratic,
+             verbose::Bool=false,
+             optargs...) =
+    collect(mosaic, cover_params, enum_params, OptimizerParams(problem_type, optargs...), verbose)
+
 function Base.collect(mosaic::MaskedSetMosaic,
-                      cover_params::CoverParams=CoverParams(),
-                      params::CoverEnumerationParams=CoverEnumerationParams();
-                      problem_type::Symbol=:quadratic,
-                      verbose::Bool=false
-)
-    if problem_type == :quadratic
-        cover_problem = QuadraticCoverProblem(mosaic, cover_params)
-    elseif problem_type == :multiobjective
-        cover_problem = MultiobjectiveCoverProblem(mosaic, cover_params)
-    else
-        throw(ArgumentError("Unsupported cover problem type $problem_type"))
-    end
-    cover_coll = CoverCollection(cover_problem, mosaic, params)
-    return collect!(cover_coll, cover_problem, mosaic, params, verbose)
+                      cover_params::CoverParams,
+                      enum_params::CoverEnumerationParams,
+                      opt_params::AbstractOptimizerParams,
+                      verbose::Bool)
+    cover_problem = problemtype(opt_params)(mosaic, cover_params)
+    collect!(CoverCollection(cover_problem, mosaic, enum_params),
+             cover_problem, mosaic, enum_params, opt_params, verbose)
 end
 
 function collect!(cover_coll::CoverCollection,
                   cover_problem::AbstractCoverProblem,
                   mosaic::MaskedSetMosaic,
-                  params::CoverEnumerationParams=CoverEnumerationParams(),
+                  params::CoverEnumerationParams,
+                  opt_params::AbstractOptimizerParams,
                   verbose::Bool=false
 )
     verbose && info("Starting covers enumeration...")
@@ -103,8 +115,7 @@ function collect!(cover_coll::CoverCollection,
     const weight_threshold = 1E-3
     while true
         verbose && info("Trying to find cover #$(length(cover_coll)+1)...")
-        cur_cover = optimize(cover_problem; ini_weights=rand(nvars(cover_problem)),
-                             solver=default_solver())
+        cur_cover = optimize(cover_problem, opt_params)
         verbose && info("New cover found (score=$(cur_cover.total_score), aggscore=$(cur_cover.agg_total_score)), processing...")
         used_varixs = find(w -> w > 0.0, cur_cover.weights)
         if isempty(used_varixs)

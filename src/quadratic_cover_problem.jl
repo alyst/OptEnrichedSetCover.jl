@@ -16,6 +16,18 @@ struct QuadraticCoverProblem <: AbstractCoverProblem{Float64}
     end
 end
 
+struct QuadraticOptimizerParams <: AbstractOptimizerParams{QuadraticCoverProblem}
+    solver::MathProgBase.SolverInterface.AbstractMathProgSolver
+
+    QuadraticOptimizerParams(;
+        solver::MathProgBase.SolverInterface.AbstractMathProgSolver = default_quadratic_solver(),
+        #iterations::Int = 100,
+        #ini_weights::Vector{Float64}
+    ) = new(solver)
+end
+
+quadratic_solver(opt_params::QuadraticOptimizerParams) = opt_params.solver
+
 function QuadraticCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     var_scores = standalonesetscore.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
     # prepare varXvar scores
@@ -71,12 +83,15 @@ end
 aggscore(problem::QuadraticCoverProblem, w::Vector{Float64}) = score(w, problem)
 
 """
+    optimize(problem::AbstractCoverProblem, method_params::QuadraticMethodParams)
+    optimize(problem::AbstractCoverProblem, [method_kwparams...])
+
 Optimize the cover problem.
 """
-function optimize(problem::QuadraticCoverProblem;
-                  ini_weights::Vector{Float64} = rand(nvars(problem)),
-                  #iterations::Int = 100,
-                  solver::MathProgBase.SolverInterface.AbstractMathProgSolver = default_solver())
+function optimize(problem::QuadraticCoverProblem,
+                  opt_params::QuadraticOptimizerParams = QuadraticOptimizerParams(),
+                  ini_weights::Vector{Float64} = rand(nvars(problem)) # unused
+)
     if nvars(problem) == 0
         return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), 0.0, 0.0)
     end
@@ -85,7 +100,7 @@ function optimize(problem::QuadraticCoverProblem;
     #try
     # using JuMP
     m = opt_model(problem)
-    setsolver(m, solver)
+    setsolver(m, quadratic_solver(opt_params))
     solve(m)
     w = copy(getvalue(getindex(m, :w)))
     # remove small non-zero probabilities due to optimization method errors

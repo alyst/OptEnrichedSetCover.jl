@@ -27,6 +27,58 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     end
 end
 
+struct MultiobjectiveOptimizerParams <: AbstractOptimizerParams{MultiobjectiveCoverProblem}
+    pop_size::Int
+    max_steps::Int
+    max_steps_without_progress::Int
+    fitness_tolerance::Float64
+    min_delta_fitness_tolerance::Float64
+    trace_interval::Float64
+    workers::Vector{Int}
+    borg_params::BlackBoxOptim.ParamsDict
+
+    function MultiobjectiveOptimizerParams(;
+        # default Borg/BBO Opt.Controller parameter overrides
+        NWorkers::Integer = 1, Workers::AbstractVector{Int} = Vector{Int}(),
+        PopulationSize::Integer = 100,
+        MaxSteps::Integer = 10_000_000,
+        MaxStepsWithoutProgress::Integer = 10_000,
+        FitnessTolerance::Real = 0.1,
+        MinDeltaFitnessTolerance::Real = 1E-5,
+        TraceInterval::Real = 5.0,
+        kwargs...
+    )
+        if isempty(Workers) && NWorkers > 1
+            Workers = workers()[1:NWorkers]
+        end
+        new(PopulationSize, MaxSteps, MaxStepsWithoutProgress,
+            FitnessTolerance, MinDeltaFitnessTolerance, TraceInterval,
+            Workers,
+            BlackBoxOptim.kwargs2dict(kwargs))
+    end
+end
+
+function borg_params(opt_params::MultiobjectiveOptimizerParams,
+                     problem::MultiobjectiveCoverProblem)
+    BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
+        ParamsDict(:PopulationSize=>opt_params.pop_size,
+                   :ϵ=>0.15),
+        opt_params.borg_params)
+end
+
+bbo_ctrl_params(opt_params::MultiobjectiveOptimizerParams) =
+    BlackBoxOptim.chain(BlackBoxOptim.DefaultParameters,
+        ParamsDict(:PopulationSize=>opt_params.pop_size,
+                   :Workers=>opt_params.workers,
+                   :MaxSteps=>opt_params.max_steps,
+                   :MaxStepsWithoutProgress=>opt_params.max_steps_without_progress,
+                   :FitnessTolerance=>opt_params.fitness_tolerance,
+                   :MinDeltaFitnessTolerance=>opt_params.min_delta_fitness_tolerance,
+                   :TraceInterval=>opt_params.trace_interval))
+
+genop_params(opt_params::MultiobjectiveOptimizerParams) =
+    BlackBoxOptim.ParamsDict()
+
 function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     # calculate variable ranges for each mask
     mask_ranges = Vector{UnitRange}()
@@ -191,40 +243,28 @@ generate_modifier(problem::OptimizationProblem, params) =
                                  MutationClock(PolynomialMutation(search_space(problem), 30.0), 1/numdims(problem)),
                                  MutationClock(UniformMutation(search_space(problem)), 1/numdims(problem))], [0.75, 0.25])
 
-"""
-Optimize the cover problem.
-"""
-function optimize(problem::MultiobjectiveCoverProblem;
-                  NWorkers::Integer = 1, Workers::AbstractVector{Int} = Vector{Int}(),
-                  PopulationSize::Integer = 100, MaxSteps::Integer = 1_000_000,
-                  kw...)
+function optimize(problem::MultiobjectiveCoverProblem,
+                  opt_params::MultiobjectiveOptimizerParams = MultiobjectiveOptimizerParams())
     if nvars(problem) == 0
-        return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), (0.0, 0.0, 0.0), 0.0)
+        return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), (0.0, 0.0, 0.0), 0.0, nothing)
     end
 
-    if isempty(Workers) && NWorkers > 1
-        Workers = workers()[1:NWorkers]
-    end
     bbowrapper = MultiobjectiveCoverProblemBBOWrapper(problem)
-    popmatrix = BlackBoxOptim.rand_individuals_lhs(search_space(bbowrapper), PopulationSize)
+    popmatrix = BlackBoxOptim.rand_individuals_lhs(search_space(bbowrapper), opt_params.pop_size)
     population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{3,Float64}), ntransient=1)
-    params = BlackBoxOptim.chain(ParamsDict(kv[1] => kv[2] for kv in kw),
-                                 ParamsDict(:PopulationSize=>PopulationSize,
-                                            :Workers=>Workers,
-                                            :MaxSteps=>MaxSteps))
 
+    go_params = genop_params(opt_params)
     bboptimizer = BlackBoxOptim.BorgMOEA(bbowrapper, population,
-            generate_recombinators(bbowrapper, params),
-            generate_modifier(bbowrapper, params),
+            generate_recombinators(bbowrapper, go_params),
+            generate_modifier(bbowrapper, go_params),
             RandomBound(search_space(bbowrapper)),
-            BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters, params))
+            borg_params(opt_params))
 
     bboctrl = BlackBoxOptim.OptController(bboptimizer, bbowrapper,
-                 BlackBoxOptim.chain(BlackBoxOptim.DefaultParameters, params))
+                 bbo_ctrl_params(opt_params))
     bbores = bboptimize(bboctrl)
     w = best_candidate(bbores)
     s = best_fitness(bbores)
-    @show w s
 
     # remove small non-zero probabilities due to optimization method errors
     const minw = problem.params.min_weight
