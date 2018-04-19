@@ -27,6 +27,26 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     end
 end
 
+function score_scales(problem::MultiobjectiveCoverProblem)
+    w_min, w_max = extrema(problem.var_scores)
+    sXs_min, sXs_max = Inf, -Inf
+    mXm_min, mXm_max = length(problem.varXvar_scores) > 1 ? (Inf, -Inf) : (0.0, 0.0)
+    for i in 1:size(problem.varXvar_scores, 1)
+        sXs_min_i, sXs_max_i = extrema(problem.varXvar_scores[i, i])
+        (sXs_min > sXs_min_i) && (sXs_min = sXs_min_i)
+        (sXs_max < sXs_max_i) && (sXs_max = sXs_max_i)
+        for j in 1:size(problem.varXvar_scores, 2)
+            (i == j) && continue
+            mXm_min_ij, mXm_max_ij = extrema(problem.varXvar_scores[i, j])
+            (mXm_min > mXm_min_ij) && (mXm_min = mXm_min_ij)
+            (mXm_max < mXm_max_ij) && (mXm_max = mXm_max_ij)
+        end
+    end
+    return (max(w_max - w_min, 0.1),
+            max(sXs_max - sXs_min, 0.1),
+            max(mXm_max - mXm_min, 0.1))
+end
+
 struct MultiobjectiveOptimizerParams <: AbstractOptimizerParams{MultiobjectiveCoverProblem}
     pop_size::Int
     max_steps::Int
@@ -60,9 +80,13 @@ end
 
 function borg_params(opt_params::MultiobjectiveOptimizerParams,
                      problem::MultiobjectiveCoverProblem)
+    eps = get(opt_params.borg_params, :ϵ, 0.1)
+    if eps isa Real
+        eps = eps .* [score_scales(problem)...]
+    end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
-                   :ϵ=>0.15),
+                   :ϵ=>eps),
         opt_params.borg_params)
 end
 
@@ -262,7 +286,7 @@ function optimize(problem::MultiobjectiveCoverProblem,
             generate_recombinators(bbowrapper, go_params),
             generate_modifier(bbowrapper, go_params),
             RandomBound(search_space(bbowrapper)),
-            borg_params(opt_params))
+            borg_params(opt_params, problem))
 
     bboctrl = BlackBoxOptim.OptController(bboptimizer, bbowrapper,
                  bbo_ctrl_params(opt_params))
