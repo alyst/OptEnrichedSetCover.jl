@@ -9,9 +9,9 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     varXvar_scores::Matrix{Matrix{Float64}}
 
     function MultiobjectiveCoverProblem(params::CoverParams,
-                          mask_ranges::AbstractVector{UnitRange},
-                          var_scores::AbstractVector{Float64},
-                          varXvar_scores::AbstractMatrix{Matrix{Float64}})
+                        mask_ranges::AbstractVector{UnitRange},
+                        var_scores::AbstractVector{Float64},
+                        varXvar_scores::AbstractMatrix{Matrix{Float64}})
         length(mask_ranges) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
             throw(ArgumentError("var_scores and varXvar_scores block counts do not match"))
         if !isempty(mask_ranges)
@@ -265,7 +265,8 @@ generate_recombinators(problem::OptimizationProblem, params) =
 generate_modifier(problem::OptimizationProblem, params) =
     FixedGeneticOperatorsMixture(GeneticOperator[
                                  MutationClock(PolynomialMutation(search_space(problem), 30.0), 1/numdims(problem)),
-                                 MutationClock(UniformMutation(search_space(problem)), 1/numdims(problem))], [0.75, 0.25])
+                                 MutationClock(UniformMutation(search_space(problem)), 1/numdims(problem))],
+                                 [0.75, 0.25])
 
 function optimize(problem::MultiobjectiveCoverProblem,
                   opt_params::MultiobjectiveOptimizerParams = MultiobjectiveOptimizerParams())
