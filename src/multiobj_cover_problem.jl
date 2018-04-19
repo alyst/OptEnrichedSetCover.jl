@@ -267,6 +267,7 @@ function optimize(problem::MultiobjectiveCoverProblem,
     bboctrl = BlackBoxOptim.OptController(bboptimizer, bbowrapper,
                  bbo_ctrl_params(opt_params))
     bbores = bboptimize(bboctrl)
+    isinterrupted(bbores) && throw(InterruptException())
     w = best_candidate(bbores)
     s = best_fitness(bbores)
 
