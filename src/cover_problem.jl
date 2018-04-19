@@ -100,11 +100,16 @@ end
 """
 Result of `optimize(AbstractCoverProblem)`.
 """
-struct CoverProblemResult{T}
+struct CoverProblemResult{T, E}
     weights::Vector{Float64}
     var_scores::Vector{Float64}
     total_score::T
     agg_total_score::Float64
+    extra::E
+
+    CoverProblemResult(weights::AbstractVector{Float64}, var_scores::AbstractVector{Float64},
+                       total_score::T, agg_total_score::Float64, extra::E = nothing) where {T, E} =
+        new{T, E}(weights, var_scores, total_score, agg_total_score, extra)
 end
 
 function penalize_solution!(problem::AbstractCoverProblem,
