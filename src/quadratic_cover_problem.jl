@@ -4,15 +4,19 @@ Quadratic Programming Optimal Enriched-Set Cover problem.
 struct QuadraticCoverProblem <: AbstractCoverProblem{Float64}
     params::CoverParams
 
+    var2mset::Vector{Int}
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Float64}
 
     function QuadraticCoverProblem(params::CoverParams,
-                          var_scores::Vector{Float64},
-                          varXvar_scores::Matrix{Float64})
-        length(var_scores) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
-            throw(ArgumentError("var_scores and varXvar_scores sizes do not match"))
-        new(params, var_scores, varXvar_scores)
+            var2mset::Vector{Int},
+            var_scores::Vector{Float64},
+            varXvar_scores::Matrix{Float64}
+    )
+        length(var2mset) == length(var_scores) ==
+        size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
+            throw(ArgumentError("var2mset, var_scores and varXvar_scores sizes do not match"))
+        new(params, var2mset, var_scores, varXvar_scores)
     end
 end
 
@@ -56,7 +60,8 @@ function QuadraticCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = Co
             end
         end
     end
-    QuadraticCoverProblem(params, var_scores, varXvar_scores)
+    QuadraticCoverProblem(params, collect(eachindex(var_scores)),
+                          var_scores, varXvar_scores)
 end
 
 """
@@ -93,7 +98,7 @@ function optimize(problem::QuadraticCoverProblem,
                   ini_weights::Vector{Float64} = rand(nvars(problem)) # unused
 )
     if nvars(problem) == 0
-        return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), 0.0, 0.0)
+        return CoverProblemResult(problem.var2mset, Vector{Float64}(), Vector{Float64}(), 0.0, 0.0)
     end
 
     # Perform the optimization
@@ -110,7 +115,7 @@ function optimize(problem::QuadraticCoverProblem,
         end
     end
     s = getobjectivevalue(m)
-    return CoverProblemResult(w, problem.var_scores .* w, s, s)
+    return CoverProblemResult(problem.var2mset, w, problem.var_scores .* w, s, s)
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
@@ -121,3 +126,20 @@ varXvar_mul!(vvXw::AbstractVector{Float64},
              problem::QuadraticCoverProblem,
              w::AbstractVector{Float64}) =
     A_mul_B!(vvXw, problem.varXvar_scores, w)
+
+function exclude_vars(problem::QuadraticCoverProblem,
+                      vars::AbstractVector{Int};
+                      penalize_overlaps::Bool = true)
+    varmask = fill(true, nvars(problem))
+    varmask[vars] = false
+    var_scores = problem.var_scores[varmask]
+    if penalize_overlaps
+        # penalize overlapping sets
+        penalty_weights = fill(0.0, nvars(problem))
+        penalty_weights[vars] = 1.0
+        var_scores .-= varXvar_mul(problem, penalty_weights)[varmask]
+    end
+    return QuadraticCoverProblem(problem.params,
+                problem.var2mset[varmask],
+                var_scores, problem.varXvar_scores[varmask, varmask])
+end

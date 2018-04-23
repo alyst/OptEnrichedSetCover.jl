@@ -102,37 +102,56 @@ end
 Result of `optimize(AbstractCoverProblem)`.
 """
 struct CoverProblemResult{T, E}
-    weights::Vector{Float64}
+    var2mset::Vector{Int}      # indices of masked sets in MaskedSetMosaic
+    weights::Vector{Float64}        # weights of masked sets
     var_scores::Vector{Float64}
     total_score::T
     agg_total_score::Float64
     extra::E
 
-    CoverProblemResult(weights::AbstractVector{Float64}, var_scores::AbstractVector{Float64},
-                       total_score::T, agg_total_score::Float64, extra::E = nothing) where {T, E} =
-        new{T, E}(weights, var_scores, total_score, agg_total_score, extra)
+    function CoverProblemResult(
+            var2mset::AbstractVector{Int},
+            weights::AbstractVector{Float64},
+            var_scores::AbstractVector{Float64},
+            total_score::T, agg_total_score::Float64, extra::E = nothing) where {T, E}
+        length(var2mset) == length(weights) == length(var_scores) ||
+            throw(ArgumentError("Lengths of cover result components do not match"))
+        new{T, E}(var2mset, weights, var_scores,
+                  total_score, agg_total_score, extra)
+    end
 end
 
-function penalize_solution!(problem::AbstractCoverProblem,
-                            mosaic::MaskedSetMosaic,
-                            weights::AbstractVector{Float64})
+function mset2var(result::CoverProblemResult, msetix::Int)
+    varix = searchsortedlast(result.var2mset, msetix)
+    if varix > 0 && result.var2mset[varix] == msetix
+        return varix
+    else
+        return 0
+    end
+end
+
+function selectvars(problem::AbstractCoverProblem,
+                    mosaic::MaskedSetMosaic,
+                    weights::AbstractVector{Float64};
+                    selothermasks::Bool = true # propagate the selection to the selected sets in the other masks
+)
     @assert length(weights) == nvars(problem)
-    varixs = find(w -> w > 0.0, weights)
-    # penalize selecting the sets from the current cover again (also in the other masks)
-    setixs = Set(mosaic.maskedsets[i].set for i in varixs)
-    ext_varixs = Set{Int}()
-    for i in setixs
-        union!(ext_varixs, mosaic.orig2masked[i])
+    varixs = find(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
+    if selothermasks
+        maskedset2var = Dict(ms => i for (i, ms) in enumerate(problem.var2mset))
+        setixs = Set(mosaic.maskedsets[problem.var2mset[i]].set for i in varixs)
+        ext_varixs = Set{Int}(varixs)
+        for i in setixs
+            msets = mosaic.orig2masked[i]
+            for ms in msets
+                v = get(maskedset2var, ms, 0)
+                (v > 0) && push!(ext_varixs, v)
+            end
+        end
+        return collect(ext_varixs)
+    else
+        return varixs
     end
-    penalty_weights = zeros(weights)
-    penalty_score = -log(problem.params.sel_prob) + 1000.0
-    @inbounds for varix in ext_varixs
-        problem.var_scores[varix] = penalty_score
-        penalty_weights[varix] = 1.0
-    end
-    # overlapping sets are penalized
-    problem.var_scores .-= varXvar_mul(problem, penalty_weights)
-    return problem
 end
 
 varXvar_mul(problem::AbstractCoverProblem, w::AbstractVector) =

@@ -4,26 +4,30 @@ Multi-objective optimal Enriched-Set Cover problem.
 struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     params::CoverParams
 
+    var2mset::Vector{Int}
     var_ranges::Vector{UnitRange}
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Matrix{Float64}}
 
     function MultiobjectiveCoverProblem(params::CoverParams,
+                        var2mset::AbstractVector{Int},
                         var_ranges::AbstractVector{UnitRange},
                         var_scores::AbstractVector{Float64},
                         varXvar_scores::AbstractMatrix{Matrix{Float64}})
-        length(var_ranges) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
+        length(var_ranges) ==
+        size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
             throw(ArgumentError("var_scores and varXvar_scores block counts do not match"))
-        if !isempty(var_ranges)
-            length(var_scores) == sum(length, var_ranges) ||
-                throw(ArgumentError("var_scores and var_ranges sizes do not match"))
+        if !isempty(var2mset)
+            length(var_scores) == length(var2mset) == sum(length, var_ranges) ||
+                throw(ArgumentError("var_scores and var2mset sizes do not match"))
             length.(var_ranges) ==
             size.(view(varXvar_scores, :, 1), 1) == size.(view(varXvar_scores, 1, :), 2) ||
-                throw(ArgumentError("var_ranges and varXvar_scores block sizes do not match"))
+                throw(ArgumentError("var_scores and varXvar_scores block sizes do not match"))
         else
-            isempty(var_scores) || throw(ArgumentError("var_scores and var_ranges sizes do not match"))
+            isempty(var_scores) || throw(ArgumentError("var_scores and var2mset sizes do not match"))
         end
-        new(params, var_ranges, var_scores, varXvar_scores)
+        new(params, var2mset, var_ranges,
+            var_scores, varXvar_scores)
     end
 end
 
@@ -106,6 +110,7 @@ genop_params(opt_params::MultiobjectiveOptimizerParams) =
     BlackBoxOptim.ParamsDict()
 
 function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
+    var2mset = collect(1:nsets(mosaic))
     # calculate variable ranges for each mask
     var_ranges = Vector{UnitRange}()
     maskset1 = nextset = 1
@@ -155,7 +160,8 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
             end
         end
     end
-    MultiobjectiveCoverProblem(params, var_ranges, var_scores, varXvar_scores)
+    MultiobjectiveCoverProblem(params, var2mset,
+                               var_ranges, var_scores, varXvar_scores)
 end
 
 function varXvar_mul!(vvXw::AbstractVector{Float64},
@@ -176,6 +182,44 @@ function varXvar_mul!(vvXw::AbstractVector{Float64},
         end
     end
     return vvXw
+end
+
+function exclude_vars(problem::MultiobjectiveCoverProblem,
+                      vars::AbstractVector{Int};
+                      penalize_overlaps::Bool = true)
+    # constuct new var2mset and var_ranges
+    newvar_ranges = similar(problem.var_ranges)
+    var2mset = similar(problem.var2mset)
+    varmask = fill(true, nvars(problem))
+    varmask[vars] = false
+    var2mset = problem.var2mset[varmask]
+    last_mask_newvar = 0
+    newvar_ranges = similar(problem.var_ranges)
+    for (i, var_range) in enumerate(problem.var_ranges)
+        range_len = sum(view(varmask, var_range))
+        newvar_ranges[i] = (last_mask_newvar+1):(last_mask_newvar+range_len)
+        last_mask_newvar += range_len
+    end
+    var_scores = problem.var_scores[varmask]
+    if penalize_overlaps
+        penalty_weights = fill(0.0, nvars(problem))
+        penalty_weights[vars] = problem.params.setXset_factor # FIXME should treat diagonal and non-blocks separately
+        var_scores .-= varXvar_mul(problem, penalty_weights)[varmask]
+    end
+    # filter out vars from the matrix
+    varXvar_scores = similar(problem.varXvar_scores)
+    for j in 1:size(problem.varXvar_scores, 2)
+        jseg = problem.var_ranges[j]
+        jmask = view(varmask, jseg)
+        for i in 1:size(problem.varXvar_scores, 1)
+            iseg = problem.var_ranges[i]
+            imask = view(varmask, iseg)
+            varXvar_scores[i, j] = problem.varXvar_scores[i, j][imask, jmask]
+        end
+    end
+    return MultiobjectiveCoverProblem(problem.params,
+                var2mset, newvar_ranges,
+                var_scores, varXvar_scores)
 end
 
 """
@@ -273,7 +317,8 @@ generate_modifier(problem::OptimizationProblem, params) =
 function optimize(problem::MultiobjectiveCoverProblem,
                   opt_params::MultiobjectiveOptimizerParams = MultiobjectiveOptimizerParams())
     if nvars(problem) == 0
-        return CoverProblemResult(Vector{Float64}(), Vector{Float64}(), (0.0, 0.0, 0.0), 0.0, nothing)
+        return CoverProblemResult(Vector{Int}(), Vector{Float64}(), Vector{Float64}(),
+                                  (0.0, 0.0, 0.0), 0.0, nothing)
     end
 
     bbowrapper = MultiobjectiveCoverProblemBBOWrapper(problem)
@@ -311,7 +356,7 @@ function optimize(problem::MultiobjectiveCoverProblem,
 
     fitness_frontier = [af.orig for af in archived_fitness.(pareto_frontier(bbores))]
 
-    return CoverProblemResult(w, problem.var_scores .* w, s,
+    return CoverProblemResult(problem.var2mset, w, problem.var_scores .* w, s,
                               BlackBoxOptim.aggregate(s, fitness_scheme(bbores)),
                               fitness_frontier)
 end
