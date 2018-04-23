@@ -4,26 +4,26 @@ Multi-objective optimal Enriched-Set Cover problem.
 struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     params::CoverParams
 
-    mask_ranges::Vector{UnitRange}
+    var_ranges::Vector{UnitRange}
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Matrix{Float64}}
 
     function MultiobjectiveCoverProblem(params::CoverParams,
-                        mask_ranges::AbstractVector{UnitRange},
+                        var_ranges::AbstractVector{UnitRange},
                         var_scores::AbstractVector{Float64},
                         varXvar_scores::AbstractMatrix{Matrix{Float64}})
-        length(mask_ranges) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
+        length(var_ranges) == size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
             throw(ArgumentError("var_scores and varXvar_scores block counts do not match"))
-        if !isempty(mask_ranges)
-            length(var_scores) == sum(length, mask_ranges) ||
-                throw(ArgumentError("var_scores and mask_ranges sizes do not match"))
-            length.(mask_ranges) ==
+        if !isempty(var_ranges)
+            length(var_scores) == sum(length, var_ranges) ||
+                throw(ArgumentError("var_scores and var_ranges sizes do not match"))
+            length.(var_ranges) ==
             size.(view(varXvar_scores, :, 1), 1) == size.(view(varXvar_scores, 1, :), 2) ||
-                throw(ArgumentError("mask_ranges and varXvar_scores block sizes do not match"))
+                throw(ArgumentError("var_ranges and varXvar_scores block sizes do not match"))
         else
-            isempty(var_scores) || throw(ArgumentError("var_scores and mask_ranges sizes do not match"))
+            isempty(var_scores) || throw(ArgumentError("var_scores and var_ranges sizes do not match"))
         end
-        new(params, mask_ranges, var_scores, varXvar_scores)
+        new(params, var_ranges, var_scores, varXvar_scores)
     end
 end
 
@@ -105,26 +105,26 @@ genop_params(opt_params::MultiobjectiveOptimizerParams) =
 
 function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     # calculate variable ranges for each mask
-    mask_ranges = Vector{UnitRange}()
+    var_ranges = Vector{UnitRange}()
     maskset1 = nextset = 1
     while nextset <= length(mosaic.maskedsets)
         nextset += 1
         curmask = mosaic.maskedsets[maskset1].mask
         nextmask = nextset > length(mosaic.maskedsets) ? -1 : mosaic.maskedsets[nextset].mask
         if nextset > length(mosaic.maskedsets) || curmask != mosaic.maskedsets[nextset].mask
-            @assert curmask == length(mask_ranges)+1
-            push!(mask_ranges, maskset1:(nextset-1))
+            @assert curmask == length(var_ranges)+1
+            push!(var_ranges, maskset1:(nextset-1))
             maskset1 = nextset
         end
     end
     var_scores = msetscore_detached.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
 
     # prepare varXvar scores block-matrix
-    varXvar_scores = Matrix{typeof(mosaic.original.setXset_scores)}(length(mask_ranges), length(mask_ranges))
+    varXvar_scores = Matrix{typeof(mosaic.original.setXset_scores)}(length(var_ranges), length(var_ranges))
     min_sXs = Inf # minimum finite varXvar_scores element
-    @inbounds for (ii, irange) in enumerate(mask_ranges)
-        for jj in ii:length(mask_ranges)
-            jrange = mask_ranges[jj]
+    @inbounds for (ii, irange) in enumerate(var_ranges)
+        for jj in ii:length(var_ranges)
+            jrange = var_ranges[jj]
             varXvar_scores[ii, jj] = mXm_mtx = similar(mosaic.original.setXset_scores, length(irange), length(jrange))
             for (i, iset) in enumerate(view(mosaic.maskedsets, irange))
                 for (j, jset) in enumerate(view(mosaic.maskedsets, jrange))
@@ -146,14 +146,14 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
         for i in eachindex(mXm_mtx)
             if !isfinite(mXm_mtx[i])
                 v1, v2 = ind2sub(size(mXm_mtx), i)
-                warn("var[$(mask_ranges[m1][v1])]×var[$(mask_ranges[m2][v2])] score is $(mXm_mtx[i])")
+                warn("var[$(var_ranges[m1][v1])]×var[$(var_ranges[m2][v2])] score is $(mXm_mtx[i])")
                 if mXm_mtx[i] < 0.0
                     mXm_mtx[i] = m1 == m2 ? sXs_min : mXm_min
                 end
             end
         end
     end
-    MultiobjectiveCoverProblem(params, mask_ranges, var_scores, varXvar_scores)
+    MultiobjectiveCoverProblem(params, var_ranges, var_scores, varXvar_scores)
 end
 
 function varXvar_mul!(vvXw::AbstractVector{Float64},
@@ -162,14 +162,14 @@ function varXvar_mul!(vvXw::AbstractVector{Float64},
     @assert length(vvXw) == length(w) == length(problem.var_scores)
     fill!(vvXw, 0.0)
     for i in 1:size(problem.varXvar_scores, 1)
-        wseg = problem.mask_ranges[i]
-        wi = view(w, wseg)
-        vvXwi = view(vvXw, wseg)
+        iseg = problem.var_ranges[i]
+        wi = view(w, iseg)
+        vvXwi = view(vvXw, iseg)
         A_mul_B!(vvXwi, problem.varXvar_scores[i, i], wi)
         tmpi = similar(wi)
         for j in 1:size(problem.varXvar_scores, 2)
             (i == j) && continue
-            A_mul_B!(tmpi, problem.varXvar_scores[i, j], view(w, problem.mask_ranges[j]))
+            A_mul_B!(tmpi, problem.varXvar_scores[i, j], view(w, problem.var_ranges[j]))
             vvXwi .= min.(vvXwi, tmpi)
         end
     end
@@ -190,15 +190,15 @@ function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
     setXset = 0.0
     ww = fill!(similar(w), 0.0)
     for i in 1:size(problem.varXvar_scores, 1)
-        wseg = problem.mask_ranges[i]
-        wi = view(w, wseg)
-        wwi = fill(0.0, length(wseg))
+        iseg = problem.var_ranges[i]
+        wi = view(w, iseg)
+        wwi = fill(0.0, length(iseg))
         tmpi = similar(wwi)
         A_mul_B!(tmpi, problem.varXvar_scores[i, i], wi)
         setXset += dot(tmpi, wi)
         for j in 1:size(problem.varXvar_scores, 2)
             (i == j) && continue
-            wj = view(w, problem.mask_ranges[j])
+            wj = view(w, problem.var_ranges[j])
             A_mul_B!(tmpi, problem.varXvar_scores[i, j], wj)
             wwi .= min.(wwi, tmpi)
         end
