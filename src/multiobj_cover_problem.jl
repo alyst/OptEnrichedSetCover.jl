@@ -80,9 +80,11 @@ end
 
 function borg_params(opt_params::MultiobjectiveOptimizerParams,
                      problem::MultiobjectiveCoverProblem)
-    eps = get(opt_params.borg_params, :ϵ, 0.1)
-    if eps isa Real
-        eps = eps .* [score_scales(problem)...]
+    if haskey(opt_params.borg_params, :ϵ)
+        eps = opt_params.borg_params[:ϵ]
+    else
+        eps_scale = get(opt_params.borg_params, :ϵ_scale, [0.2, 0.1, 0.1])
+        eps = eps_scale .* [score_scales(problem)...]
     end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
