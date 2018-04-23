@@ -26,7 +26,7 @@
 
     @testset "[:a] [:b] [:c] [:a :b :c] :d :e, mask=[:a :b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
-                            Set([:a, :b, :c, :d, :e]))
+                       Set([:a, :b, :c, :d, :e]))
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),

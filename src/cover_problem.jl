@@ -44,7 +44,8 @@ msetscore_detached(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams)
                        nmasked(mosaic, set.mask), nelements(mosaic),
                        mosaic.original.set_relevances[set.set], params)
 
-function varXvar_score(setXset::Real, iset::MaskedSet, jset::MaskedSet, params::CoverParams, scale::Bool = false)
+function varXvar_score(setXset::Real, iset::MaskedSet, jset::MaskedSet,
+                       params::CoverParams, scale::Bool = false)
     if iset.set == jset.set
         # no penalty for the overlap with itself, even in different masks
         # (in which case it's zero to encourage the reuse of the same sets to cover different masks)

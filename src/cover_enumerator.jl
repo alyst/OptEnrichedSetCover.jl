@@ -90,7 +90,9 @@ Base.collect(mosaic::MaskedSetMosaic,
              problem_type::Symbol=:quadratic,
              verbose::Bool=false,
              optargs...) =
-    collect(mosaic, cover_params, enum_params, OptimizerParams(problem_type, optargs...), verbose)
+    collect(mosaic, cover_params, enum_params,
+            OptimizerParams(problem_type, optargs...),
+            verbose)
 
 function Base.collect(mosaic::MaskedSetMosaic,
                       cover_params::CoverParams,
