@@ -140,7 +140,7 @@ end
 """
 Exclude `setmask` sets from the `mosaic` and update the set of its active tiles.
 """
-function Base.filter!(mosaic::MaskedSetMosaic, setmask::Union{Vector{Bool},BitVector})
+function Base.filter!(mosaic::MaskedSetMosaic, setmask::AbstractVector{Bool})
     nsets(mosaic) == length(setmask) ||
         throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
     mosaic.maskedsets = mosaic.maskedsets[setmask]
