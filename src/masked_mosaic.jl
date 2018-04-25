@@ -113,10 +113,13 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
     return MaskedSetMosaic(mosaic, elmasks, maskedsets)
 end
 
-mask(mosaic::SetMosaic{T,S}, elmasks::Vector{Set{T}};
-     min_nmasked::Integer=2, max_overlap_logpvalue::Real=0.0) where {T,S} =
-    mask(mosaic, Bool[in(e, elmask) for e in mosaic.ix2elm, elmask in elmasks],
+function mask(mosaic::SetMosaic{T}, elmasks #= iterable with eltype()==Set{T} =#;
+     min_nmasked::Integer=2, max_overlap_logpvalue::Real=0.0) where T
+    @assert eltype(elmasks) === Set{T}
+    mask(mosaic, Bool[in(e, elmask::Set{T}) for e in mosaic.ix2elm, elmask in elmasks],
          min_nmasked=min_nmasked, max_overlap_logpvalue=max_overlap_logpvalue)
+end
+
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
