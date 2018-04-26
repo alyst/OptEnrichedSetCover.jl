@@ -8,7 +8,7 @@ using DataFrames, Distributions, MathProgBase, JuMP, BlackBoxOptim
 export SetMosaic, CoverParams,
     AbstractCoverProblem, QuadraticCoverProblem, MultiobjectiveCoverProblem,
     AbstractOptimizerParams, QuadraticOptimizerParams, MultiobjectiveOptimizerParams,
-    CoverEnumerationParams, CoverCollection,
+    CoverEnumerationParams, CoverCollection, CoverProblemResult,
     nelements, ntiles, nsets, nmasks, nvars,
     nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
