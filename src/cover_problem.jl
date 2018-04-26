@@ -28,10 +28,10 @@ struct CoverParams
 end
 
 """
-Linear component of an individual set score for the `CoverProblem`.
+Linear component of an individual masked set score for the `CoverProblem`.
 Doesn't take into account the overlap with the other selected sets.
 """
-function standalonesetscore(masked::Number, set::Number, total_masked::Number, total::Number, relevance::Number, params::CoverParams)
+function msetscore_detached(masked::Number, set::Number, total_masked::Number, total::Number, relevance::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
     #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*(relevance^params.set_relevance_shape) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
@@ -39,8 +39,8 @@ function standalonesetscore(masked::Number, set::Number, total_masked::Number, t
     return res
 end
 
-standalonesetscore(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
-    standalonesetscore(set.nmasked, set.nmasked + set.nunmasked,
+msetscore_detached(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
+    msetscore_detached(set.nmasked, set.nmasked + set.nunmasked,
                        nmasked(mosaic, set.mask), nelements(mosaic),
                        mosaic.original.set_relevances[set.set], params)
 

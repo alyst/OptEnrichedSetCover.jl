@@ -117,7 +117,7 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
             maskset1 = nextset
         end
     end
-    var_scores = standalonesetscore.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
+    var_scores = msetscore_detached.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
 
     # prepare varXvar scores block-matrix
     varXvar_scores = Matrix{typeof(mosaic.original.setXset_scores)}(length(mask_ranges), length(mask_ranges))

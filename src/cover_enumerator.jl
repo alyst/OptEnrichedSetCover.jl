@@ -22,7 +22,7 @@ struct CoverCollection{T}
     total_masked::Vector{Int}         # total masked elements in the mosaic
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     maskedsets::Vector{MaskedSet}     # sets of the MaskedSetMosaic
-    base_setscores::Vector{Float64}   # base set scores
+    base_msetscores::Vector{Float64}  # base set scores
     var2cover::Vector{Int}            # best-scoring cover for the given masked set
     results::Vector{CoverProblemResult{T}}
 
@@ -38,23 +38,23 @@ struct CoverCollection{T}
     end
 end
 
-function setscore(covers::CoverCollection, varix::Int, cover::CoverProblemResult)
+function msetscore(covers::CoverCollection, varix::Int, cover::CoverProblemResult)
     if cover.weights[varix] > 0.0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return covers.base_setscores[varix] - log(cover.weights[varix])
+        return covers.base_msetscores[varix] - log(cover.weights[varix])
     else
         # the set is not selected
         return Inf
     end
 end
 
-setscore(covers::CoverCollection, varix::Int, coverix::Int) =
-    setscore(covers, varix, covers.results[coverix])
+msetscore(covers::CoverCollection, varix::Int, coverix::Int) =
+    msetscore(covers, varix, covers.results[coverix])
 
-function setscore(covers::CoverCollection, varix::Int)
+function msetscore(covers::CoverCollection, varix::Int)
     if covers.var2cover[varix] > 0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return setscore(covers, varix, covers.var2cover[varix])
+        return msetscore(covers, varix, covers.var2cover[varix])
     else
         # the set is not covered
         return NaN
@@ -152,8 +152,8 @@ function collect!(cover_coll::CoverCollection,
         # update the best set scores
         @inbounds for varix in used_varixs
             # adjust the set scores by delta
-            new_score = setscore(cover_coll, varix, cur_cover)
-            cur_score = setscore(cover_coll, varix)
+            new_score = msetscore(cover_coll, varix, cur_cover)
+            cur_score = msetscore(cover_coll, varix)
             if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
                 scores_updated = true
                 cover_coll.var2cover[varix] = -1 # mark for setting to the cover_pos
@@ -213,7 +213,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
     weights = sizehint!(Vector{Float64}(), nselsets)
     relevances = sizehint!(Vector{Float64}(), nselsets)
     cv_scores = sizehint!(Vector{Float64}(), nselsets)
-    sa_scores = sizehint!(Vector{Float64}(), nselsets)
+    de_scores = sizehint!(Vector{Float64}(), nselsets)
     nmasked_v = sizehint!(Vector{Int}(), nselsets)
     nunmasked_v = sizehint!(Vector{Int}(), nselsets)
     for (cover_ix, cover) in enumerate(covers.results)
@@ -227,8 +227,8 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
             push!(mask_ixs, maskedset.mask)
             push!(cover_ixs, cover_ix)
             push!(cover_scores, cover.agg_total_score)
-            push!(cv_scores, setscore(covers, var_ix, cover))
-            push!(sa_scores, standalonesetscore(maskedset.nmasked, setsize(maskedset),
+            push!(cv_scores, msetscore(covers, var_ix, cover))
+            push!(de_scores, msetscore_detached(maskedset.nmasked, setsize(maskedset),
                                                 covers.total_masked[maskedset.mask], nelements(mosaic),
                                                 1.0 #= ignore relevance =#, covers.cover_params))
             push!(nmasked_v, maskedset.nmasked)
@@ -243,9 +243,9 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
               relevance = relevances,
-              cover_weight = weights,
-              covered_score = cv_scores,
-              stdalone_score = sa_scores)
+              mset_cover_weight = weights,
+              mset_score_covered = cv_scores,
+              mset_score_detached = de_scores)
 end
 
 # DataFrame report for each mask X each set,
@@ -276,13 +276,13 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
         coverix_mtx[i] = coverix
         weights_mtx[i] = covers.results[coverix].weights[varix]
         cover_scores_mtx[i] = covers.results[coverix].agg_total_score
-        cv_scores_mtx[i] = setscore(covers, varix, coverix)
+        cv_scores_mtx[i] = msetscore(covers, varix, coverix)
     end
-    sa_scores_mtx = zeros(Float64, size(nmasked_mtx))
+    de_scores_mtx = zeros(Float64, size(nmasked_mtx))
     @inbounds for j in 1:nmasks
         for i in eachindex(sets_v)
             setix = sets_v[i]
-            sa_scores_mtx[i, j] = standalonesetscore(nmasked_mtx[i, j], setsizes_v[i],
+            de_scores_mtx[i, j] = msetscore_detached(nmasked_mtx[i, j], setsizes_v[i],
                                                      covers.total_masked[j], nelements(mosaic),
                                                      1.0 #= ignore relevance =#, covers.cover_params)
         end
@@ -296,6 +296,6 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
               nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
               relevance = repeat(mosaic.set_relevances[sets_v], outer=[nmasks]),
               cover_weight = vec(weights_mtx),
-              covered_score = vec(cv_scores_mtx),
-              stdalone_score = vec(sa_scores_mtx))
+              mset_score_covered = vec(cv_scores_mtx),
+              mset_score_detached = vec(de_scores_mtx))
 end
