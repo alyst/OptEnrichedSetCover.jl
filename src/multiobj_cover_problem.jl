@@ -36,11 +36,12 @@ function score_scales(problem::MultiobjectiveCoverProblem)
     sXs_min, sXs_max = Inf, -Inf
     mXm_min, mXm_max = length(problem.varXvar_scores) > 1 ? (Inf, -Inf) : (0.0, 0.0)
     for i in 1:size(problem.varXvar_scores, 1)
+        isempty(problem.var_ranges[i]) && continue # skip empty (no extrema)
         sXs_min_i, sXs_max_i = extrema(problem.varXvar_scores[i, i])
         (sXs_min > sXs_min_i) && (sXs_min = sXs_min_i)
         (sXs_max < sXs_max_i) && (sXs_max = sXs_max_i)
         for j in 1:size(problem.varXvar_scores, 2)
-            (i == j) && continue
+            ((i == j) || isempty(problem.var_ranges[j])) && continue
             mXm_min_ij, mXm_max_ij = extrema(problem.varXvar_scores[i, j])
             (mXm_min > mXm_min_ij) && (mXm_min = mXm_min_ij)
             (mXm_max < mXm_max_ij) && (mXm_max = mXm_max_ij)
@@ -117,12 +118,23 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
     while nextset <= length(mosaic.maskedsets)
         nextset += 1
         curmask = mosaic.maskedsets[maskset1].mask
-        nextmask = nextset > length(mosaic.maskedsets) ? -1 : mosaic.maskedsets[nextset].mask
-        if nextset > length(mosaic.maskedsets) || curmask != mosaic.maskedsets[nextset].mask
-            @assert curmask == length(var_ranges)+1
+        nextmask = nextset > length(mosaic.maskedsets) ?
+                   nmasks(mosaic)+1 : mosaic.maskedsets[nextset].mask
+        if curmask != nextmask
+            @assert curmask < nextmask
+            # insert empty masks before curmask
+            while length(var_ranges) < curmask-1
+                push!(var_ranges, maskset1:(maskset1-1))
+                @assert nsets(mosaic, length(var_ranges)) == 0
+            end
             push!(var_ranges, maskset1:(nextset-1))
             maskset1 = nextset
         end
+    end
+    # fill with empty masks to the end
+    while length(var_ranges) < nmasks(mosaic)
+        push!(var_ranges, maskset1:(maskset1-1))
+        @assert nsets(mosaic, length(var_ranges)) == 0
     end
     var_scores = msetscore_detached.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
 
