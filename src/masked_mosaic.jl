@@ -124,7 +124,8 @@ unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
 nsets(mosaic::MaskedSetMosaic) = length(mosaic.maskedsets)
-nsets(mosaic::MaskedSetMosaic, maskix::Int) = sum(ms -> ms.mask == maskix, mosaic.maskedsets)
+nsets(mosaic::MaskedSetMosaic, maskix::Int) = # FIXME remove empty workaround
+    isempty(mosaic.maskedsets) ? 0 : sum(ms -> ms.mask == maskix, mosaic.maskedsets)
 nmasks(mosaic::MaskedSetMosaic) = length(mosaic.total_masked)
 nmasked(mosaic::MaskedSetMosaic, maskix::Int) = mosaic.total_masked[maskix]
 nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.total_masked[maskix]
