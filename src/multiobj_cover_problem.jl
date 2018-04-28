@@ -176,26 +176,6 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
                                var_ranges, var_scores, varXvar_scores)
 end
 
-function varXvar_mul!(vvXw::AbstractVector{Float64},
-                      problem::MultiobjectiveCoverProblem,
-                      w::AbstractVector{Float64})
-    @assert length(vvXw) == length(w) == length(problem.var_scores)
-    fill!(vvXw, 0.0)
-    for i in 1:size(problem.varXvar_scores, 1)
-        iseg = problem.var_ranges[i]
-        wi = view(w, iseg)
-        vvXwi = view(vvXw, iseg)
-        A_mul_B!(vvXwi, problem.varXvar_scores[i, i], wi)
-        tmpi = similar(wi)
-        for j in 1:size(problem.varXvar_scores, 2)
-            (i == j) && continue
-            A_mul_B!(tmpi, problem.varXvar_scores[i, j], view(w, problem.var_ranges[j]))
-            vvXwi .= min.(vvXwi, tmpi)
-        end
-    end
-    return vvXw
-end
-
 function exclude_vars(problem::MultiobjectiveCoverProblem,
                       vars::AbstractVector{Int};
                       penalize_overlaps::Bool = true)
@@ -212,12 +192,30 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
         newvar_ranges[i] = (last_mask_newvar+1):(last_mask_newvar+range_len)
         last_mask_newvar += range_len
     end
-    var_scores = problem.var_scores[varmask]
+    var_scores = copy(problem.var_scores)
     if penalize_overlaps
         penalty_weights = fill(0.0, nvars(problem))
-        penalty_weights[vars] = problem.params.setXset_factor # FIXME should treat diagonal and non-blocks separately
-        var_scores .-= varXvar_mul(problem, penalty_weights)[varmask]
+        penalty_weights[vars] = 1.0
+        wXw = fill!(similar(penalty_weights), 0.0) # intermask overlap penalties
+        for i in 1:size(problem.varXvar_scores, 1)
+            iseg = problem.var_ranges[i]
+            wi = view(penalty_weights, iseg)
+            tmpi = problem.varXvar_scores[i, i] * wi
+            tmpi .*= wi
+            # penalize within-mask overlaps
+            var_scores_i = view(var_scores, iseg)
+            var_scores_i .-= problem.params.setXset_factor .* tmpi
+            # update intermask overlaps
+            for j in 1:size(problem.varXvar_scores, 2)
+                (i == j) && continue
+                jseg = problem.var_ranges[j]
+                view(wXw, jseg) .+= (problem.varXvar_scores[i, j] * view(penalty_weights, jseg)) .* wi
+            end
+        end
+        # penalize intermask overlaps
+        var_scores .-= (problem.params.setXset_factor*problem.params.maskXmask_factor) .* wXw
     end
+    var_scores = var_scores[varmask] # filter out unused vars
     # filter out vars from the matrix
     varXvar_scores = similar(problem.varXvar_scores)
     for j in 1:size(problem.varXvar_scores, 2)

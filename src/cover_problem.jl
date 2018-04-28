@@ -154,9 +154,6 @@ function selectvars(problem::AbstractCoverProblem,
     end
 end
 
-varXvar_mul(problem::AbstractCoverProblem, w::AbstractVector) =
-    varXvar_mul!(similar(w), problem, w)
-
 abstract type AbstractOptimizerParams{P <: AbstractCoverProblem} end;
 
 problemtype(params::AbstractOptimizerParams{P}) where P = P

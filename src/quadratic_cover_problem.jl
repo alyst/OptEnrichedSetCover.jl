@@ -122,11 +122,6 @@ function optimize(problem::QuadraticCoverProblem,
     #end
 end
 
-varXvar_mul!(vvXw::AbstractVector{Float64},
-             problem::QuadraticCoverProblem,
-             w::AbstractVector{Float64}) =
-    A_mul_B!(vvXw, problem.varXvar_scores, w)
-
 function exclude_vars(problem::QuadraticCoverProblem,
                       vars::AbstractVector{Int};
                       penalize_overlaps::Bool = true)
@@ -137,7 +132,7 @@ function exclude_vars(problem::QuadraticCoverProblem,
         # penalize overlapping sets
         penalty_weights = fill(0.0, nvars(problem))
         penalty_weights[vars] = 1.0
-        var_scores .-= varXvar_mul(problem, penalty_weights)[varmask]
+        var_scores .-= (problem.varXvar_scores * penalty_weights)[varmask]
     end
     return QuadraticCoverProblem(problem.params,
                 problem.var2mset[varmask],
