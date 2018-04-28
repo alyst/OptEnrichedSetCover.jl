@@ -93,6 +93,7 @@ function borg_params(opt_params::MultiobjectiveOptimizerParams,
     end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
+                   :Workers=>opt_params.workers,
                    :ϵ=>eps),
         opt_params.borg_params)
 end
@@ -100,7 +101,6 @@ end
 bbo_ctrl_params(opt_params::MultiobjectiveOptimizerParams) =
     BlackBoxOptim.chain(BlackBoxOptim.DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
-                   :Workers=>opt_params.workers,
                    :MaxSteps=>opt_params.max_steps,
                    :MaxStepsWithoutProgress=>opt_params.max_steps_without_progress,
                    :FitnessTolerance=>opt_params.fitness_tolerance,
