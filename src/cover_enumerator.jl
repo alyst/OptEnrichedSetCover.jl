@@ -72,11 +72,11 @@ nmasks(covers::CoverCollection) = size(covers.elmasks, 2)
 Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
-function OptimizerParams(problem_type::Symbol; kwargs...)
+function OptimizerParams(problem_type::Symbol, params::ParamsDict)
     if problem_type == :quadratic
-        return QuadraticOptimizerParams(kwargs...)
+        return QuadraticOptimizerParams(;params...)
     elseif problem_type == :multiobjective
-        return MultiobjectiveOptimizerParams(kwargs...)
+        return MultiobjectiveOptimizerParams(;params...)
     else
         throw(ArgumentError("Unsupported cover problem type $problem_type"))
     end
@@ -98,7 +98,7 @@ Base.collect(mosaic::MaskedSetMosaic,
              verbose::Bool=false,
              optargs...) =
     collect(mosaic, cover_params, enum_params,
-            OptimizerParams(problem_type, optargs...),
+            OptimizerParams(problem_type, ParamsDict(optargs)),
             verbose)
 
 function Base.collect(mosaic::MaskedSetMosaic,
