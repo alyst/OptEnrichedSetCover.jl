@@ -1,8 +1,79 @@
+# defines how to fold fitness components
+abstract type MultiobjectiveProblemFitnessFolding{N} end
+
+BlackBoxOptim.numobjectives(::Type{<:MultiobjectiveProblemFitnessFolding{N}}) where N = N
+BlackBoxOptim.numobjectives(::MultiobjectiveProblemFitnessFolding{N}) where N = N
+
+BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: MultiobjectiveProblemFitnessFolding{N} where N =
+    ParetoFitnessScheme{N, Float64, true, MultiobjectiveCoverProblemScoreAggregator{FF}}
+BlackBoxOptim.fitness_type(::Type{FF}) where FF <: MultiobjectiveProblemFitnessFolding =
+    fitness_type(fitness_scheme_type(FF))
+BlackBoxOptim.fitness_type(::FF) where FF <: MultiobjectiveProblemFitnessFolding =
+    fitness_type(FF)
+BlackBoxOptim.fitness_scheme_type(::FF) where FF <: MultiobjectiveProblemFitnessFolding =
+    fitness_scheme_type(FF)
+
+function MultiobjectiveProblemFitnessFolding(mosaic::MaskedSetMosaic, params::CoverParams,
+                                             fitfolding::Union{Symbol, Void} = nothing)
+    if fitfolding === nothing || fitfolding == :auto # chose folding automatically
+        if nmasks(mosaic) <= 1
+            return MultiobjectiveProblemDrop3()
+        else
+            return MultiobjectiveProblemFold12(params.setXset_factor)
+        end
+    elseif fitfolding == :none
+        return MultiobjectiveProblemNoFolding()
+    elseif fitfolding == :drop_maskXmask
+        return MultiobjectiveProblemDrop3()
+    elseif fitfolding == :sum_sets_and_setXset
+        return MultiobjectiveProblemFold12(params.setXset_factor)
+    else
+        throw(ArgumentError("Unknown fitfolding $fitfolding"))
+    end
+end
+
+# no folding of fitness components
+struct MultiobjectiveProblemNoFolding <: MultiobjectiveProblemFitnessFolding{3}
+end
+(f::MultiobjectiveProblemNoFolding)(fitness::NTuple{3,Float64}) =
+    (fitness[1], fitness[2], fitness[3])
+
+# sum var scores and setXset penalties (maskXmask penalties are separate)
+struct MultiobjectiveProblemFold12 <: MultiobjectiveProblemFitnessFolding{2}
+    setXset_factor::Float64
+end
+(f::MultiobjectiveProblemFold12)(fitness::NTuple{3,Float64}) =
+    (muladd(f.setXset_factor, fitness[2], fitness[1]), fitness[3])
+
+# drop 3rd components (maskXmask)
+struct MultiobjectiveProblemDrop3 <: MultiobjectiveProblemFitnessFolding{2}
+end
+(f::MultiobjectiveProblemDrop3)(fitness::NTuple{3,Float64}) =
+    (fitness[1], fitness[2])
+
+struct MultiobjectiveCoverProblemScoreAggregator{FF <: MultiobjectiveProblemFitnessFolding}
+    k_sXs::Float64
+    k_mXm::Float64
+
+    MultiobjectiveCoverProblemScoreAggregator{FF}(params::CoverParams) where FF =
+        new{FF}(params.setXset_factor, params.maskXmask_factor * params.setXset_factor)
+end
+
+(agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemNoFolding})(score::NTuple{3, Float64}) =
+    score[1] + agg.k_sXs * score[2] + agg.k_mXm * score[3]
+
+(agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemFold12})(score::NTuple{2, Float64}) =
+    score[1] + agg.k_mXm * score[2]
+
+(agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemDrop3})(score::NTuple{2, Float64}) =
+    score[1] + agg.k_sXs * score[2]
+
 """
 Multi-objective optimal Enriched-Set Cover problem.
 """
-struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
+struct MultiobjectiveCoverProblem{FF<:MultiobjectiveProblemFitnessFolding, F} <: AbstractCoverProblem{F}
     params::CoverParams
+    fitfolding::FF
 
     var2mset::Vector{Int}
     var_ranges::Vector{UnitRange}           # variables grouped by mask
@@ -10,10 +81,12 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     varXvar_scores::Matrix{Matrix{Float64}}
 
     function MultiobjectiveCoverProblem(params::CoverParams,
+                        fitfolding::FF,
                         var2mset::AbstractVector{Int},
                         var_ranges::AbstractVector{UnitRange},
                         var_scores::AbstractVector{Float64},
-                        varXvar_scores::AbstractMatrix{Matrix{Float64}})
+                        varXvar_scores::AbstractMatrix{Matrix{Float64}}
+    ) where {FF<:MultiobjectiveProblemFitnessFolding}
         length(var_ranges) ==
         size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
             throw(ArgumentError("var_scores and varXvar_scores block counts do not match"))
@@ -26,12 +99,20 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
         else
             isempty(var_scores) || throw(ArgumentError("var_scores and var2mset sizes do not match"))
         end
-        new(params, var2mset, var_ranges,
-            var_scores, varXvar_scores)
+        F = fitness_type(FF)
+        new{FF, F}(params, fitfolding,
+                   var2mset, var_ranges, var_scores, varXvar_scores)
     end
 end
 
 nmasks(problem::MultiobjectiveCoverProblem) = length(problem.var_ranges)
+
+BlackBoxOptim.fitness_scheme_type(::Type{<:MultiobjectiveCoverProblem{FF}}) where FF =
+    BlackBoxOptim.fitness_scheme_type(FF)
+BlackBoxOptim.fitness_type(::Type{<:MultiobjectiveCoverProblem{FF}}) where FF =
+    BlackBoxOptim.fitness_type(FF)
+BlackBoxOptim.numobjectives(::Type{<:MultiobjectiveCoverProblem{FF}}) where FF =
+    numobjectives(FF)
 
 function score_scales(problem::MultiobjectiveCoverProblem)
     w_min, w_max = extrema(problem.var_scores)
@@ -112,7 +193,8 @@ bbo_ctrl_params(opt_params::MultiobjectiveOptimizerParams) =
 genop_params(opt_params::MultiobjectiveOptimizerParams) =
     BlackBoxOptim.ParamsDict()
 
-function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
+function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams();
+                                    fitfolding::Union{Symbol, Void} = nothing)
     var2mset = collect(1:nsets(mosaic))
     # calculate variable ranges for each mask
     var_ranges = Vector{UnitRange}()
@@ -174,7 +256,8 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
             end
         end
     end
-    MultiobjectiveCoverProblem(params, var2mset,
+    MultiobjectiveCoverProblem(params, MultiobjectiveProblemFitnessFolding(mosaic, params, fitfolding),
+                               var2mset,
                                var_ranges, var_scores, varXvar_scores)
 end
 
@@ -286,7 +369,7 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
             varXvar_scores[i, j] = problem.varXvar_scores[i, j][imask, jmask]
         end
     end
-    return MultiobjectiveCoverProblem(problem.params,
+    return MultiobjectiveCoverProblem(problem.params, problem.fitfolding,
                 var2mset, newvar_ranges,
                 var_scores, varXvar_scores)
 end
@@ -299,7 +382,7 @@ Score (probability) of the OESC coverage.
 function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
     if problem.params.setXset_factor == 0.0
         # skip set interactions as it would be aggregated to zero
-        return (dot(problem.var_scores, w), 0.0, 0.0)
+        return problem.fitfolding((dot(problem.var_scores, w), 0.0, 0.0))
     end
     setXset = 0.0
     wXw = fill!(similar(w), 0.0)
@@ -315,33 +398,25 @@ function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
         end
     end
     maskXmask = sum(wXw)
-    return (dot(problem.var_scores, w), -setXset, -maskXmask)
+    return problem.fitfolding((dot(problem.var_scores, w), -setXset, -maskXmask))
 end
 
-struct MultiobjectiveCoverProblemScoreAggregator
-    k_sXs::Float64
-    k_mXm::Float64
-
-    MultiobjectiveCoverProblemScoreAggregator(params::CoverParams) =
-        new(params.setXset_factor, params.maskXmask_factor * params.setXset_factor)
-end
-
-(agg::MultiobjectiveCoverProblemScoreAggregator)(score::NTuple{3, Float64}) =
-    score[1] + agg.k_sXs * score[2] + agg.k_mXm * score[3]
-
-aggscore(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64}) =
-    MultiobjectiveCoverProblemScoreAggregator(problem.params)(score(problem, w))
+aggscore(problem::MultiobjectiveCoverProblem{FF}, w::AbstractVector{Float64}) where {FF} =
+    MultiobjectiveCoverProblemScoreAggregator{FF}(problem.params)(score(problem, w))
 
 # wraps MultiobjectiveCoverProblem as BlackBoxOptim OptimizationProblem
-struct MultiobjectiveCoverProblemBBOWrapper <:
-        BlackBoxOptim.OptimizationProblem{ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}}
-    orig::MultiobjectiveCoverProblem
-    fitness_scheme::ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}
+struct MultiobjectiveCoverProblemBBOWrapper{FF <: MultiobjectiveProblemFitnessFolding, FS <: FitnessScheme, F} <:
+        BlackBoxOptim.OptimizationProblem{FS}
+    orig::MultiobjectiveCoverProblem{FF, F}
+    fitness_scheme::FS
     search_space::SearchSpace
 
-    function MultiobjectiveCoverProblemBBOWrapper(orig::MultiobjectiveCoverProblem)
-        fitscheme = ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}(aggregator=MultiobjectiveCoverProblemScoreAggregator(orig.params))
-        new(orig, fitscheme, symmetric_search_space(nvars(orig), (0.0, 1.0)))
+    function MultiobjectiveCoverProblemBBOWrapper(
+            orig::MultiobjectiveCoverProblem{FF, F}; digits::Integer=2
+    ) where {FF, F}
+        FS = fitness_scheme_type(FF)
+        fitscheme = FS(aggregator=MultiobjectiveCoverProblemScoreAggregator{FF}(orig.params))
+        new{FF, FS, F}(orig, fitscheme, symmetric_search_space(nvars(orig), (0.0, 1.0), digits=digits))
     end
 end
 
@@ -349,13 +424,23 @@ BlackBoxOptim.search_space(p::MultiobjectiveCoverProblemBBOWrapper) = p.search_s
 
 Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) = MultiobjectiveCoverProblemBBOWrapper(problem.orig)
 
-BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64}, problem::MultiobjectiveCoverProblemBBOWrapper) =
-   @printf(io, "  sets=%.3f set×set=%.3f mask×mask=%.3f\n", score...)
+BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
+                           problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemNoFolding}) =
+    @printf(io, "  sets=%.3f set×set=%.3f mask×mask=%.3f\n", score[1], score[2], score[3])
 
-BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness{2,Float64}, problem::MultiobjectiveCoverProblemBBOWrapper) =
+BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
+                           problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemDrop3}) =
+    @printf(io, "  sets=%.3f set×set=%.3f\n", score[1], score[2])
+
+BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
+                           problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemFold12}) =
+  @printf(io, "  sets+set×set=%.3f mask×mask=%.3f\n", score[1], score[2])
+
+BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjectiveCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
 
-BlackBoxOptim.fitness(x, p::MultiobjectiveCoverProblemBBOWrapper) = score(p.orig, x)
+BlackBoxOptim.fitness(x::BlackBoxOptim.AbstractIndividual,
+                      p::MultiobjectiveCoverProblemBBOWrapper) = score(p.orig, x)
 
 generate_recombinators(problem::OptimizationProblem, params) =
   CrossoverOperator[BlackBoxOptim.DiffEvoRandBin1(chain(BlackBoxOptim.DE_DefaultOptions, params)),
@@ -397,7 +482,7 @@ function optimize(problem::MultiobjectiveCoverProblem,
         (size(popmatrix, 2) < i + 4) && break
         popmatrix[:, i+4] = ifelse.(problem.var_scores .<= score_qtls[i], 1.0, 0.0)
     end
-    population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{3,Float64}), ntransient=1)
+    population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{numobjectives(typeof(problem)),Float64}), ntransient=1)
 
     go_params = genop_params(opt_params)
     bboptimizer = BlackBoxOptim.BorgMOEA(bbowrapper, population,

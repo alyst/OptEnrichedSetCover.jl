@@ -5,7 +5,7 @@
         problem = MultiobjectiveCoverProblem(msm)
         @test nvars(problem) == 0
         @test nmasks(problem) == 1
-        @test score(problem, Float64[]) == (0.0, 0.0, 0.0)
+        @test score(problem, Float64[]) == (0.0, 0.0)
 
         res = optimize(problem)
         @test res.weights == Vector{Float64}()
@@ -76,7 +76,7 @@
         problem_ignore_overlap = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_prob=0.1))
         @test nvars(problem_ignore_overlap) == 5 # d is out
         @test aggscore(problem_ignore_overlap, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(problem_ignore_overlap, [1.0, 1.0, 0.0, 0.0, 0.0])
-        res_ignore_overlap = optimize(problem_ignore_overlap)
+        res_ignore_overlap = optimize(problem_ignore_overlap, MultiobjectiveOptimizerParams(ϵ=[0.02, 0.02]))
         #@show problem_ab_lowp
         @test_broken res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0]# atol=1E-4
 
@@ -84,7 +84,7 @@
         problem_low_penalty = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.9))
         @test aggscore(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(problem_low_penalty, [1.0, 1.0, 0.0, 0.0, 0.0])
         @test aggscore(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(problem_low_penalty, [0.0, 0.0, 0.0, 1.0, 0.0])
-        res_low_penalty = optimize(problem_low_penalty)
+        res_low_penalty = optimize(problem_low_penalty, MultiobjectiveOptimizerParams(ϵ=[0.001, 0.001]))
         @test find(x -> x >= 0.99, res_low_penalty.weights) == [1, 3]
     end
 
@@ -95,17 +95,18 @@
         sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
         # lower prior probability to select sets, high overlap penalty, so select abd and c
-        problem_ignore_overlap = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6))
+        problem_ignore_overlap = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6), fitfolding=:none)
         @test nmasks(problem_ignore_overlap) == 2
         @test nvars(problem_ignore_overlap) == 9 # c and 2xd are out
-        res_ignore_overlap = optimize(problem_ignore_overlap)
+        res_ignore_overlap = optimize(problem_ignore_overlap, MultiobjectiveOptimizerParams(ϵ=[0.1, 0.1, 0.1]))
         #@show problem_ab_lowp
         @test res_ignore_overlap.weights ≈ [1.0, 0.0, 1.0, #=d,=# 0.0, 0.0,
                                             0.0, 0.0, #=c,=# #=d,=# 0.0, 0.0] atol=1E-2
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         problem_low_penalty = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=0.05, sel_prob=0.9))
-        res_low_penalty = optimize(problem_low_penalty)
+        @test nmasks(problem_low_penalty) == 2
+        res_low_penalty = optimize(problem_low_penalty, MultiobjectiveOptimizerParams(ϵ=[0.001, 0.001]))
         #@show res_low_penalty.weights
         @test find(x -> x >= 0.85, res_low_penalty.weights) == [1, 2, 3, 4, 8]
     end
