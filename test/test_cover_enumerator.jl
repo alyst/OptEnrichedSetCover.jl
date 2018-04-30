@@ -68,7 +68,10 @@
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, sel_prob=0.9),
                              CoverEnumerationParams(max_set_score=0.0),
-                             problem_type=problem_type)
+                             problem_type==:quadratic ?
+                                OptEnrichedSetCover.QuadraticOptimizerParams() :
+                                OptEnrichedSetCover.MultiobjectiveOptimizerParams(ϵ=0.01),
+                             false)
 
         df = DataFrame(cover_coll, sm, report=:covered)
         @test size(df, 1) == 5
