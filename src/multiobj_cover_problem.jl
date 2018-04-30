@@ -36,20 +36,20 @@ end
 struct MultiobjectiveProblemNoFolding <: MultiobjectiveProblemFitnessFolding{3}
 end
 (f::MultiobjectiveProblemNoFolding)(fitness::NTuple{3,Float64}) =
-    (fitness[1], fitness[2], fitness[3])
+    (fitness[1], sqrt(fitness[2]), sqrt(fitness[3]))
 
 # sum var scores and setXset penalties (maskXmask penalties are separate)
 struct MultiobjectiveProblemFold12 <: MultiobjectiveProblemFitnessFolding{2}
     setXset_factor::Float64
 end
 (f::MultiobjectiveProblemFold12)(fitness::NTuple{3,Float64}) =
-    (muladd(f.setXset_factor, fitness[2], fitness[1]), fitness[3])
+    (muladd(f.setXset_factor, fitness[2], fitness[1]), sqrt(fitness[3]))
 
 # drop 3rd components (maskXmask)
 struct MultiobjectiveProblemDrop3 <: MultiobjectiveProblemFitnessFolding{2}
 end
 (f::MultiobjectiveProblemDrop3)(fitness::NTuple{3,Float64}) =
-    (fitness[1], fitness[2])
+    (fitness[1], sqrt(fitness[2]))
 
 struct MultiobjectiveCoverProblemScoreAggregator{FF <: MultiobjectiveProblemFitnessFolding}
     k_sXs::Float64
@@ -60,13 +60,13 @@ struct MultiobjectiveCoverProblemScoreAggregator{FF <: MultiobjectiveProblemFitn
 end
 
 (agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemNoFolding})(score::NTuple{3, Float64}) =
-    score[1] + agg.k_sXs * score[2] + agg.k_mXm * score[3]
+    score[1] + agg.k_sXs * score[2]^2 + agg.k_mXm * score[3]^2
 
 (agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemFold12})(score::NTuple{2, Float64}) =
-    score[1] + agg.k_mXm * score[2]
+    score[1] + agg.k_mXm * score[2]^2
 
 (agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemDrop3})(score::NTuple{2, Float64}) =
-    score[1] + agg.k_sXs * score[2]
+    score[1] + agg.k_sXs * score[2]^2
 
 """
 Multi-objective optimal Enriched-Set Cover problem.
@@ -426,15 +426,15 @@ Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) = MultiobjectiveCoverPr
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemNoFolding}) =
-    @printf(io, "  sets=%.3f set×set=%.3f mask×mask=%.3f\n", score[1], score[2], score[3])
+    @printf(io, "  sets=%.3f set×set=%.3f mask×mask=%.3f\n", score[1], score[2]^2, score[3]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemDrop3}) =
-    @printf(io, "  sets=%.3f set×set=%.3f\n", score[1], score[2])
+    @printf(io, "  sets=%.3f set×set=%.3f\n", score[1], score[2]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemFold12}) =
-  @printf(io, "  sets+set×set=%.3f mask×mask=%.3f\n", score[1], score[2])
+  @printf(io, "  sets+set×set=%.3f mask×mask=%.3f\n", score[1], score[2]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjectiveCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
