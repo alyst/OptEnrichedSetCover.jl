@@ -5,7 +5,7 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
     params::CoverParams
 
     var2mset::Vector{Int}
-    var_ranges::Vector{UnitRange}
+    var_ranges::Vector{UnitRange}           # variables grouped by mask
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Matrix{Float64}}
 
@@ -30,6 +30,8 @@ struct MultiobjectiveCoverProblem <: AbstractCoverProblem{NTuple{3, Float64}}
             var_scores, varXvar_scores)
     end
 end
+
+nmasks(problem::MultiobjectiveCoverProblem) = length(problem.var_ranges)
 
 function score_scales(problem::MultiobjectiveCoverProblem)
     w_min, w_max = extrema(problem.var_scores)

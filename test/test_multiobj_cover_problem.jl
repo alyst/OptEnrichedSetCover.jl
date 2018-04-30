@@ -4,7 +4,7 @@
         msm = mask(sm, [Set{Symbol}()])
         problem = MultiobjectiveCoverProblem(msm)
         @test nvars(problem) == 0
-        @test_skip nmasks(problem) == 1
+        @test nmasks(problem) == 1
         @test score(problem, Float64[]) == (0.0, 0.0, 0.0)
 
         res = optimize(problem)
@@ -96,7 +96,7 @@
 
         # lower prior probability to select sets, high overlap penalty, so select abd and c
         problem_ignore_overlap = MultiobjectiveCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6))
-        @test_skip nmasks(problem_ignore_overlap) == 2
+        @test nmasks(problem_ignore_overlap) == 2
         @test nvars(problem_ignore_overlap) == 9 # c and 2xd are out
         res_ignore_overlap = optimize(problem_ignore_overlap)
         #@show problem_ab_lowp
