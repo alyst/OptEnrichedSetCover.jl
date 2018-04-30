@@ -337,6 +337,13 @@ function optimize(problem::MultiobjectiveCoverProblem,
     size(popmatrix, 2) > 0 && (popmatrix[:, 1] = 0.0)
     size(popmatrix, 2) > 1 && (popmatrix[:, 2] = 1.0)
     size(popmatrix, 2) > 2 && (popmatrix[:, 3] = 0.5)
+    size(popmatrix, 2) > 3 && (popmatrix[:, 4] = sortperm(problem.var_scores, rev=true)./length(problem.var_scores))
+    # solutions that select topN most significant sets
+    score_qtls = quantile(problem.var_scores, linspace(0.0, 1.0, 10))
+    for i in 1:10
+        (size(popmatrix, 2) < i + 4) && break
+        popmatrix[:, i+4] = ifelse.(problem.var_scores .<= score_qtls[i], 1.0, 0.0)
+    end
     population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{3,Float64}), ntransient=1)
 
     go_params = genop_params(opt_params)
