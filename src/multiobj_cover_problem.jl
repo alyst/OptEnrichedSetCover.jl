@@ -178,6 +178,62 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
                                var_ranges, var_scores, varXvar_scores)
 end
 
+# \sum_{i, j} A_{i, j} min(w_i, w_j)
+function minplus_quad(A::AbstractMatrix{T},
+                      w::AbstractVector{T}) where T
+    length(w) == size(A, 1) == size(A, 2) ||
+        throw(DimensionMismatch("A $(size(A)) and w ($(length(w))) size mismatch"))
+    isempty(w) && return zero(T)
+    res = zero(T)
+    @inbounds for i in eachindex(w)
+        const wi = w[i]
+        const ioffset = (i-1)*size(A, 1)
+        resi = zero(T)
+        if zero(T) < wi < one(T)
+            @simd for j in eachindex(w)
+                resi += A[ioffset+j]*min(wi, w[j])
+            end
+        elseif wi == one(T) # wi >= maxw
+            @simd for j in eachindex(w)
+                resi += A[ioffset+j] * w[j] # FIXME dotprod() faster?
+            end
+        end
+        res += resi
+    end
+    return res
+end
+
+# calculate r_i = fold(r_i, \sum_{j = 1} A_{i, j} min(u_i, v_j)), i = 1..N
+function minplus_bilinear!(foldl::Function,
+                           res::AbstractVector{T},
+                           A::AbstractMatrix{T},
+                           u::AbstractVector{T},
+                           v::AbstractVector{T}) where T
+    length(res) == length(u) == size(A, 2) ||
+        throw(DimensionMismatch("res ($(length(res))), u ($(length(u))) or A $(size(A)) size mismatch"))
+    length(v) == size(A, 1) ||
+        throw(DimensionMismatch("v ($(length(v))) and A $(size(A)) size mismatch"))
+    n = length(res)
+    @inbounds for i in 1:size(A, 2)
+        const ui = u[i]
+        const ioffset = (i-1)*size(A, 1)
+        x = zero(T)
+        if zero(T) < ui < one(T)
+            @simd for j in eachindex(v)
+                x += A[ioffset+j] * min(ui, v[j])
+            end
+        elseif ui == one(T)
+            @simd for j in eachindex(v)
+                x += A[ioffset+j] * v[j] # FIXME dotprod() faster?
+            end
+        end
+        res[i] = foldl(res[i], x)
+    end
+    return res
+end
+
+take2(u, v) = v
+
 function exclude_vars(problem::MultiobjectiveCoverProblem,
                       vars::AbstractVector{Int};
                       penalize_overlaps::Bool = true)
@@ -202,8 +258,8 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
         for i in 1:size(problem.varXvar_scores, 1)
             iseg = problem.var_ranges[i]
             wi = view(penalty_weights, iseg)
-            tmpi = problem.varXvar_scores[i, i] * wi
-            tmpi .*= wi
+            tmpi = similar(wi)
+            minplus_bilinear!(take2, tmpi, problem.varXvar_scores[i, i], wi, wi)
             # penalize within-mask overlaps
             var_scores_i = view(var_scores, iseg)
             var_scores_i .-= problem.params.setXset_factor .* tmpi
@@ -211,7 +267,8 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
             for j in 1:size(problem.varXvar_scores, 2)
                 (i == j) && continue
                 jseg = problem.var_ranges[j]
-                view(wXw, jseg) .+= (problem.varXvar_scores[i, j] * view(penalty_weights, jseg)) .* wi
+                minplus_bilinear!(min, view(wXw, jseg), problem.varXvar_scores[i, j],
+                                  view(penalty_weights, jseg), wi)
             end
         end
         # penalize intermask overlaps
@@ -244,24 +301,20 @@ function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
         # skip set interactions as it would be aggregated to zero
         return (dot(problem.var_scores, w), 0.0, 0.0)
     end
-    maskXmask = 0.0
     setXset = 0.0
-    ww = fill!(similar(w), 0.0)
+    wXw = fill!(similar(w), 0.0)
     for i in 1:size(problem.varXvar_scores, 1)
         iseg = problem.var_ranges[i]
         wi = view(w, iseg)
-        wwi = fill(0.0, length(iseg))
-        tmpi = similar(wwi)
-        A_mul_B!(tmpi, problem.varXvar_scores[i, i], wi)
-        setXset += dot(tmpi, wi)
+        setXset += minplus_quad(problem.varXvar_scores[i, i], wi)
         for j in 1:size(problem.varXvar_scores, 2)
             (i == j) && continue
-            wj = view(w, problem.var_ranges[j])
-            A_mul_B!(tmpi, problem.varXvar_scores[i, j], wj)
-            wwi .= min.(wwi, tmpi)
+            jseg = problem.var_ranges[j]
+            minplus_bilinear!(min, view(wXw, jseg), problem.varXvar_scores[i, j],
+                              view(w, jseg), wi)
         end
-        maskXmask += dot(wwi, wi)
     end
+    maskXmask = sum(wXw)
     return (dot(problem.var_scores, w), -setXset, -maskXmask)
 end
 
