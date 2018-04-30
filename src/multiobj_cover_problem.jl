@@ -265,15 +265,6 @@ function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
     return (dot(problem.var_scores, w), -setXset, -maskXmask)
 end
 
-struct MultiobjectiveCoverProblemBBOWrapper <: BlackBoxOptim.OptimizationProblem{ParetoFitnessScheme{3}}
-    orig::MultiobjectiveCoverProblem
-    search_space::SearchSpace
-
-    function MultiobjectiveCoverProblemBBOWrapper(orig::MultiobjectiveCoverProblem)
-        new(orig, symmetric_search_space(nvars(orig), (0.0, 1.0)))
-    end
-end
-
 struct MultiobjectiveCoverProblemScoreAggregator
     k_sXs::Float64
     k_mXm::Float64
@@ -288,13 +279,20 @@ end
 aggscore(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64}) =
     MultiobjectiveCoverProblemScoreAggregator(problem.params)(score(problem, w))
 
-BlackBoxOptim.name(::MultiobjectiveCoverProblemBBOWrapper) = "MultiObjectiveOptimalSetCoverProblem"
+# wraps MultiobjectiveCoverProblem as BlackBoxOptim OptimizationProblem
+struct MultiobjectiveCoverProblemBBOWrapper <:
+        BlackBoxOptim.OptimizationProblem{ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}}
+    orig::MultiobjectiveCoverProblem
+    fitness_scheme::ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}
+    search_space::SearchSpace
 
-BlackBoxOptim.numdims(p::MultiobjectiveCoverProblemBBOWrapper) = BlackBoxOptim.numdims(p.search_space)
+    function MultiobjectiveCoverProblemBBOWrapper(orig::MultiobjectiveCoverProblem)
+        fitscheme = ParetoFitnessScheme{3, Float64, true, MultiobjectiveCoverProblemScoreAggregator}(aggregator=MultiobjectiveCoverProblemScoreAggregator(orig.params))
+        new(orig, fitscheme, symmetric_search_space(nvars(orig), (0.0, 1.0)))
+    end
+end
+
 BlackBoxOptim.search_space(p::MultiobjectiveCoverProblemBBOWrapper) = p.search_space
-BlackBoxOptim.fitness_scheme(p::MultiobjectiveCoverProblemBBOWrapper) =
-    ParetoFitnessScheme{3}(is_minimizing=true,
-                           aggregator=MultiobjectiveCoverProblemScoreAggregator(p.orig.params))
 
 Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) = MultiobjectiveCoverProblemBBOWrapper(problem.orig)
 
