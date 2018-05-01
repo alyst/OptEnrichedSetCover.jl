@@ -29,7 +29,7 @@ struct CoverCollection{T}
     function CoverCollection(problem::AbstractCoverProblem{T}, mosaic::MaskedSetMosaic,
                              params::CoverEnumerationParams) where T
         # check the problem is compatible with the mosaic
-        nvars(problem) == nsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
+        nvars(problem) == nmaskedsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
         new{T}(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
                copy(problem.var_scores),

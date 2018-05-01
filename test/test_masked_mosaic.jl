@@ -13,6 +13,7 @@
         @test unmask(msm) == sm
         @test nelements(msm) == 0
         @test nsets(msm) == 0
+        @test nmaskedsets(msm) == 0
         @test nmasks(msm) == 1
     end
 
@@ -22,6 +23,7 @@
         @test unmask(msm) == sm
         @test nelements(msm) == 2
         @test nsets(msm) == 0
+        @test nmaskedsets(msm) == 0
         @test nmasks(msm) == 1
         @test nmasked(msm, 1) == 1
         @test nunmasked(msm, 1) == 1
@@ -36,6 +38,7 @@
         @test nmasked(msm, 1) == 2
         @test nunmasked(msm, 1) == 2
         @test nsets(msm) == 2
+        @test nmaskedsets(msm) == 2
         @test nmasks(msm) == 1
         @test maskedset(msm, 1) == MaskedSet(1, 1, 2, 0)
         @test maskedset(msm, 2) == MaskedSet(1, 3, 2, 2)
@@ -57,6 +60,7 @@
         @test nmasked(msm2, 1) == 2
         @test nunmasked(msm2, 1) == 2
         @test nsets(msm2) == 2
+        @test nmaskedsets(msm2) == 2
         @test maskedset(msm, 1) == MaskedSet(1, 1, 2, 0)
         @test maskedset(msm, 2) == MaskedSet(1, 3, 2, 2)
 
@@ -66,6 +70,7 @@
         @test nmasked(msm3, 1) == 2
         @test nunmasked(msm3, 1) == 2
         @test nsets(msm3) == 1
+        @test nmaskedsets(msm3) == 1
         @test maskedset(msm, 1) == MaskedSet(1, 1, 2, 0)
     end
 
@@ -75,6 +80,7 @@
 
         @test nelements(msm) == 4
         @test nsets(msm) == 2
+        @test nmaskedsets(msm) == 2
         @test nmasks(msm) == 1
         @test maskedset(msm, 1) == MaskedSet(1, 1, 2, 0)
         @test maskedset(msm, 2) == MaskedSet(1, 3, 2, 2)
@@ -85,7 +91,8 @@
         msm = mask(sm, [Set([:a, :b]), Set([:a, :b, :c]), Set([:a, :b, :d])], min_nmasked=1)
 
         @test nelements(msm) == 4
-        @test nsets(msm) == 8
+        @test nmaskedsets(msm) == 8
+        @test nsets(msm) == 3
         @test nmasks(msm) == 3
         @test maskedset(msm, 1) == MaskedSet(1, 1, 2, 0)
         @test maskedset(msm, 2) == MaskedSet(1, 3, 2, 2)
@@ -97,7 +104,8 @@
         @test maskedset(msm, 8) == MaskedSet(3, 3, 3, 1)
 
         msm2 = mask(sm, [Set([:a, :b]), Set([:a, :b, :c]), Set([:a, :b, :d])], min_nmasked=2)
-        @test nsets(msm2) == 6
+        @test nmaskedsets(msm2) == 6
+        @test nsets(msm2) == 2
     end
 
     @testset "filter!()" begin
@@ -105,6 +113,7 @@
         msm = mask(sm, [Set([:b, :c])], min_nmasked=1)
 
         @test nelements(msm) == 4
+        @test nmaskedsets(msm) == 3
         @test nsets(msm) == 3
         @test maskedset(msm, 1) == MaskedSet(1, 1, 1, 1)
         @test maskedset(msm, 2) == MaskedSet(1, 2, 1, 1)
@@ -112,13 +121,15 @@
 
         filter!(msm, Bool[true, true, false])
         @test nelements(msm) == 4
-        @test nsets(msm) == 2
+        @test nmaskedsets(msm) == 2
+        @test_broken nsets(msm) == 2
         @test maskedset(msm, 1) == MaskedSet(1, 1, 1, 1)
         @test maskedset(msm, 2) == MaskedSet(1, 2, 1, 1)
 
         filter!(msm, Bool[false, true])
         @test nelements(msm) == 4
-        @test nsets(msm) == 1
+        @test nmaskedsets(msm) == 1
+        @test_broken nsets(msm) == 1
         @test maskedset(msm, 1) == MaskedSet(1, 2, 1, 1)
     end
 end

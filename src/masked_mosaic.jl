@@ -123,7 +123,8 @@ end
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
-nsets(mosaic::MaskedSetMosaic) = length(mosaic.maskedsets)
+nmaskedsets(mosaic::MaskedSetMosaic) = length(mosaic.maskedsets)
+nsets(mosaic::MaskedSetMosaic) = length(mosaic.orig2masked)
 nsets(mosaic::MaskedSetMosaic, maskix::Int) = # FIXME remove empty workaround
     isempty(mosaic.maskedsets) ? 0 : sum(ms -> ms.mask == maskix, mosaic.maskedsets)
 nmasks(mosaic::MaskedSetMosaic) = length(mosaic.total_masked)
@@ -145,8 +146,9 @@ end
 Exclude `setmask` sets from the `mosaic` and update the set of its active tiles.
 """
 function Base.filter!(mosaic::MaskedSetMosaic, setmask::AbstractVector{Bool})
-    nsets(mosaic) == length(setmask) ||
-        throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of sets in mosaic ($(nsets(mosaic)))"))
+    nmaskedsets(mosaic) == length(setmask) ||
+        throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of masked sets in mosaic ($(nmaskedsets(mosaic)))"))
     mosaic.maskedsets = mosaic.maskedsets[setmask]
+    # FIXME broken: should update orig2masked and indices of masked sets
     return mosaic
 end
