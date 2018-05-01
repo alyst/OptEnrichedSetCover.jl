@@ -220,7 +220,7 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
         push!(var_ranges, maskset1:(maskset1-1))
         @assert nsets(mosaic, length(var_ranges)) == 0
     end
-    var_scores = msetscore_detached.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
+    var_scores = overlap_score.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
 
     # prepare varXvar scores block-matrix
     varXvar_scores = Matrix{typeof(mosaic.original.setXset_scores)}(length(var_ranges), length(var_ranges))

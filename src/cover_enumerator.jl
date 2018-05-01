@@ -226,7 +226,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
     weights = sizehint!(Vector{Float64}(), nselsets)
     relevances = sizehint!(Vector{Float64}(), nselsets)
     cv_scores = sizehint!(Vector{Float64}(), nselsets)
-    de_scores = sizehint!(Vector{Float64}(), nselsets)
+    ol_scores = sizehint!(Vector{Float64}(), nselsets)
     nmasked_v = sizehint!(Vector{Int}(), nselsets)
     nunmasked_v = sizehint!(Vector{Int}(), nselsets)
     for (cover_ix, cover) in enumerate(covers.results)
@@ -242,9 +242,9 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
             push!(cover_ixs, cover_ix)
             push!(cover_scores, cover.agg_total_score)
             push!(cv_scores, msetscore(covers, mset_ix, cover, var_ix))
-            push!(de_scores, msetscore_detached(maskedset.nmasked, setsize(maskedset),
-                                                covers.total_masked[maskedset.mask], nelements(mosaic),
-                                                1.0 #= ignore relevance =#, covers.cover_params))
+            push!(ol_scores, overlap_score(maskedset.nmasked, setsize(maskedset),
+                                           covers.total_masked[maskedset.mask], nelements(mosaic),
+                                           1.0 #= ignore relevance =#, covers.cover_params))
             push!(nmasked_v, maskedset.nmasked)
             push!(nunmasked_v, maskedset.nunmasked)
         end
@@ -259,7 +259,7 @@ function report_covered(covers::CoverCollection, mosaic::SetMosaic)
               relevance = relevances,
               mset_cover_weight = weights,
               mset_score_covered = cv_scores,
-              mset_score_detached = de_scores)
+              mset_score_overlap = ol_scores)
 end
 
 # DataFrame report for each mask X each set,
@@ -294,13 +294,13 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
         cover_scores_mtx[i] = cover.agg_total_score
         cv_scores_mtx[i] = msetscore(covers, msetix, coverix, varix)
     end
-    de_scores_mtx = zeros(Float64, size(nmasked_mtx))
+    ol_scores_mtx = zeros(Float64, size(nmasked_mtx))
     @inbounds for j in 1:nmasks
         for i in eachindex(sets_v)
             setix = sets_v[i]
-            de_scores_mtx[i, j] = msetscore_detached(nmasked_mtx[i, j], setsizes_v[i],
-                                                     covers.total_masked[j], nelements(mosaic),
-                                                     1.0 #= ignore relevance =#, covers.cover_params)
+            ol_scores_mtx[i, j] = overlap_score(nmasked_mtx[i, j], setsizes_v[i],
+                                                covers.total_masked[j], nelements(mosaic),
+                                                1.0 #= ignore relevance =#, covers.cover_params)
         end
     end
     DataFrame(cover_ix = vec(coverix_mtx),
@@ -313,5 +313,5 @@ function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
               relevance = repeat(mosaic.set_relevances[sets_v], outer=[nmasks]),
               cover_weight = vec(weights_mtx),
               mset_score_covered = vec(cv_scores_mtx),
-              mset_score_detached = vec(de_scores_mtx))
+              mset_score_overlap = vec(ol_scores_mtx))
 end

@@ -33,7 +33,7 @@ end
 quadratic_solver(opt_params::QuadraticOptimizerParams) = opt_params.solver
 
 function QuadraticCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-    var_scores = msetscore_detached.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
+    var_scores = overlap_score.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
     # prepare varXvar scores
     varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
     min_sXs = Inf # minimum finite varXvar_scores element
