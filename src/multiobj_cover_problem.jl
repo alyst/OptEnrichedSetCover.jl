@@ -429,15 +429,15 @@ Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) = MultiobjectiveCoverPr
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemNoFolding}) =
-    @printf(io, "  sets=%.3f set×set=%.3f mask×mask=%.3f\n", score[1], score[2]^2, score[3]^2)
+    @printf(io, "(sets=%.3f set×set=%.3f mask×mask=%.3f)\n", score[1], score[2]^2, score[3]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemDrop3}) =
-    @printf(io, "  sets=%.3f set×set=%.3f\n", score[1], score[2]^2)
+    @printf(io, "(sets=%.3f set×set=%.3f)\n", score[1], score[2]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemFold12}) =
-  @printf(io, "  sets+set×set=%.3f mask×mask=%.3f\n", score[1], score[2]^2)
+  @printf(io, "(sets+set×set=%.3f mask×mask=%.3f)\n", score[1], score[2]^2)
 
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjectiveCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
