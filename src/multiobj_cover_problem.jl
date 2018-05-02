@@ -1,17 +1,20 @@
 # defines how to fold fitness components
-abstract type MultiobjectiveProblemFitnessFolding{N} end
+abstract type AbstractFitnessFolding{N} end
 
-BlackBoxOptim.numobjectives(::Type{<:MultiobjectiveProblemFitnessFolding{N}}) where N = N
-BlackBoxOptim.numobjectives(::MultiobjectiveProblemFitnessFolding{N}) where N = N
+BlackBoxOptim.numobjectives(::Type{<:AbstractFitnessFolding{N}}) where N = N
+BlackBoxOptim.numobjectives(::AbstractFitnessFolding{N}) where N = N
+
+BlackBoxOptim.fitness_type(::Type{FF}) where FF <: AbstractFitnessFolding =
+    fitness_type(fitness_scheme_type(FF))
+BlackBoxOptim.fitness_type(::FF) where FF <: AbstractFitnessFolding =
+    fitness_type(FF)
+BlackBoxOptim.fitness_scheme_type(::FF) where FF <: AbstractFitnessFolding =
+    fitness_scheme_type(FF)
+
+abstract type MultiobjectiveProblemFitnessFolding{N} <: AbstractFitnessFolding{N} end
 
 BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: MultiobjectiveProblemFitnessFolding{N} where N =
     ParetoFitnessScheme{N, Float64, true, MultiobjectiveCoverProblemScoreAggregator{FF}}
-BlackBoxOptim.fitness_type(::Type{FF}) where FF <: MultiobjectiveProblemFitnessFolding =
-    fitness_type(fitness_scheme_type(FF))
-BlackBoxOptim.fitness_type(::FF) where FF <: MultiobjectiveProblemFitnessFolding =
-    fitness_type(FF)
-BlackBoxOptim.fitness_scheme_type(::FF) where FF <: MultiobjectiveProblemFitnessFolding =
-    fitness_scheme_type(FF)
 
 function MultiobjectiveProblemFitnessFolding(mosaic::MaskedSetMosaic, params::CoverParams,
                                              fitfolding::Union{Symbol, Void} = nothing)
