@@ -445,7 +445,7 @@ BlackBoxOptim.fitness(x::BlackBoxOptim.AbstractIndividual,
                       p::MultiobjectiveCoverProblemBBOWrapper) = score(p.orig, x)
 
 generate_recombinators(problem::OptimizationProblem, params) =
-  CrossoverOperator[BlackBoxOptim.DiffEvoRandBin1(chain(BlackBoxOptim.DE_DefaultOptions, params)),
+    CrossoverOperator[BlackBoxOptim.DiffEvoRandBin1(chain(BlackBoxOptim.DE_DefaultOptions, params)),
                     SimplexCrossover{3}(1.05),
                     SimplexCrossover{2}(1.1),
                     SimulatedBinaryCrossover(0.05, 16.0),
