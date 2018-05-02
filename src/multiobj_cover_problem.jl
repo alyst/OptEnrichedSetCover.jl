@@ -423,8 +423,6 @@ struct MultiobjectiveCoverProblemBBOWrapper{FF <: MultiobjectiveProblemFitnessFo
     end
 end
 
-BlackBoxOptim.search_space(p::MultiobjectiveCoverProblemBBOWrapper) = p.search_space
-
 Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) = MultiobjectiveCoverProblemBBOWrapper(problem.orig)
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
