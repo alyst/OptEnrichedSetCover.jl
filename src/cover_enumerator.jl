@@ -21,47 +21,58 @@ struct CoverCollection{T}
     enum_params::CoverEnumerationParams
     total_masked::Vector{Int}         # total masked elements in the mosaic
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
-    maskedsets::Vector{MaskedSet}     # sets of the MaskedSetMosaic
-    base_msetscores::Vector{Float64}  # base set scores
-    mset2cover::Vector{Int}           # best-scoring cover for the given masked set
+    setixs::Vector{Int}               # sets referenced by the MaskedSetMosaic
+    base_selscores::Vector{Float64}   # base selected set scores
+    sel2cover::Vector{Int}            # best-scoring cover for the given selected set
     results::Vector{CoverProblemResult{T}}
 
     function CoverCollection(problem::AbstractCoverProblem{T}, mosaic::MaskedSetMosaic,
                              params::CoverEnumerationParams) where T
         # check the problem is compatible with the mosaic
-        nvars(problem) == nmaskedsets(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of sets differ"))
+        nvars(problem) == nsets(mosaic) ||
+                throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of vars and sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new{T}(problem.params, params, mosaic.total_masked, mosaic.elmasks, mosaic.maskedsets,
-               copy(problem.var_scores),
-               zeros(Int, nvars(problem)),
+        new{T}(problem.params, params, mosaic.total_masked, mosaic.elmasks,
+               problem.var2set, copy(problem.var_scores), zeros(Int, nvars(problem)),
                Vector{CoverProblemResult{T}}())
     end
 end
 
-function msetscore(covers::CoverCollection, msetix::Int,
-                   cover::CoverProblemResult, varix::Int=0)
+function set2sel(covers::CoverCollection, setix::Int, selix::Int=0)
+    if selix == 0
+        return searchsortedlast(covers.setixs, setix)
+    elseif covers.setixs[selix] != setix
+        throw(ArgumentError("Incorrect selix hint ($selix)"))
+    else
+        return selix
+    end
+end
+
+function setscore(covers::CoverCollection, setix::Int,
+                  cover::CoverProblemResult, selix::Int=0, varix::Int=0)
+    selix = set2sel(covers, setix, selix)
+    (selix == 0) && return NaN # the set is not a part of the cover collection
     if varix == 0
-        varix = mset2var(cover, msetix)
+        varix = set2var(cover, setix)
         (varix == 0) && return NaN # the set is not a part of the cover problem
-    elseif cover.var2mset[varix] != msetix
+    elseif cover.var2set[varix] != setix
         throw(ArgumentError("Incorrect varix hint ($varix)"))
     end
     if cover.weights[varix] > 0.0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return covers.base_msetscores[msetix] - log(cover.weights[varix])
+        return covers.base_selscores[selix] - log(cover.weights[varix])
     else
         # the set is not selected
         return Inf
     end
 end
 
-msetscore(covers::CoverCollection, msetix::Int, coverix::Int, varix::Int=0) =
-    msetscore(covers, msetix, covers.results[coverix], varix)
-
-function msetscore(covers::CoverCollection, msetix::Int)
-    if covers.mset2cover[msetix] > 0
+function setscore(covers::CoverCollection, setix::Int, selix::Int=0)
+    selix = set2sel(covers, setix, selix)
+    (selix == 0) && return NaN # the set is not a part of the cover collection
+    if covers.sel2cover[selix] > 0
         # problem set score + delta score for the best variant, where it was covered - log(set weight)
-        return msetscore(covers, msetix, covers.mset2cover[msetix])
+        return setscore(covers, setix, covers.sel2cover[selix], selix)
     else
         # the set is not covered
         return NaN
@@ -136,7 +147,7 @@ function collect!(cover_coll::CoverCollection,
         if cover_pos > 1
             cover = cover_coll.results[cover_pos-1]
             if abs(cur_cover.agg_total_score - cover.agg_total_score) <= score_threshold &&
-               cur_cover.var2mset == cover.var2mset #= should never happen =# &&
+               cur_cover.var2set == cover.var2set #= should never happen =# &&
                all(i -> (@inbounds return abs(cur_cover.weights[i] - cover.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
                 verbose && info("Duplicate solution")
@@ -163,12 +174,14 @@ function collect!(cover_coll::CoverCollection,
         # update the best set scores
         @inbounds for varix in used_varixs
             # adjust the set scores by delta
-            msetix = cur_cover.var2mset[varix]
-            new_score = msetscore(cover_coll, msetix, cur_cover, varix)
-            cur_score = msetscore(cover_coll, msetix)
+            setix = cur_cover.var2set[varix]
+            selix = set2sel(cover_coll, setix)
+            @assert selix > 0
+            new_score = setscore(cover_coll, setix, cur_cover, selix, varix)
+            cur_score = setscore(cover_coll, setix, selix)
             if isfinite(new_score) && (!isfinite(cur_score) || cur_score > new_score)
                 scores_updated = true
-                cover_coll.mset2cover[msetix] = -1 # mark for setting to the cover_pos
+                cover_coll.sel2cover[selix] = -1 # mark for setting to the cover_pos
             end
         end
         if !scores_updated
@@ -179,19 +192,19 @@ function collect!(cover_coll::CoverCollection,
         insert!(cover_coll.results, cover_pos, cur_cover)
         verbose && info("Cover collected")
         # update pointers to the best covers for the sets
-        for i in eachindex(cover_coll.mset2cover)
-            if cover_coll.mset2cover[i] == -1
-                cover_coll.mset2cover[i] = cover_pos
-            elseif cover_coll.mset2cover[i] >= cover_pos
+        for i in eachindex(cover_coll.sel2cover)
+            if cover_coll.sel2cover[i] == -1
+                cover_coll.sel2cover[i] = cover_pos
+            elseif cover_coll.sel2cover[i] >= cover_pos
                 # the variant has moved down
-                cover_coll.mset2cover[i] += 1
+                cover_coll.sel2cover[i] += 1
             end
         end
         if params.max_covers > 0 && length(cover_coll) >= params.max_covers
             verbose && info("Maximal number of covers collected")
             break
         end
-        if all(x -> x > 0, cover_coll.mset2cover)
+        if all(x -> x > 0, cover_coll.sel2cover)
             verbose && info("All sets assigned to covers")
             break
         end
@@ -203,115 +216,63 @@ function collect!(cover_coll::CoverCollection,
     return cover_coll
 end
 
-"""
-Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
-"""
-function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic; report::Symbol=:covered)
-    if report == :covered
-        return report_covered(covers, mosaic)
-    elseif report == :matrix
-        return report_matrix(covers, mosaic)
-    else
-        throw(ArgumentError("Unknown report mode '$report'"))
-    end
-end
-
-# DataFrame report for the covered sets (weight > 0)
-function report_covered(covers::CoverCollection, mosaic::SetMosaic)
-    nselsets = sum(count(x -> x > 0.0, variant.weights) for variant in covers.results)
-    set_ixs = sizehint!(Vector{Int}(), nselsets)
-    mask_ixs = sizehint!(Vector{Int}(), nselsets)
-    cover_ixs = sizehint!(Vector{Int}(), nselsets)
-    cover_scores = sizehint!(Vector{Float64}(), nselsets)
-    weights = sizehint!(Vector{Float64}(), nselsets)
-    relevances = sizehint!(Vector{Float64}(), nselsets)
-    cv_scores = sizehint!(Vector{Float64}(), nselsets)
-    ol_scores = sizehint!(Vector{Float64}(), nselsets)
-    nmasked_v = sizehint!(Vector{Int}(), nselsets)
-    nunmasked_v = sizehint!(Vector{Int}(), nselsets)
-    for (cover_ix, cover) in enumerate(covers.results)
-        @inbounds for var_ix in eachindex(cover.weights)
-            weight = cover.weights[var_ix]
-            (weight > 0.0) || continue
-            mset_ix = cover.var2mset[var_ix]
-            maskedset = covers.maskedsets[mset_ix]
-            push!(set_ixs, maskedset.set)
-            push!(weights, weight)
-            push!(relevances, mosaic.set_relevances[maskedset.set])
-            push!(mask_ixs, maskedset.mask)
-            push!(cover_ixs, cover_ix)
-            push!(cover_scores, cover.agg_total_score)
-            push!(cv_scores, msetscore(covers, mset_ix, cover, var_ix))
-            push!(ol_scores, overlap_score(maskedset.nmasked, setsize(maskedset),
-                                           covers.total_masked[maskedset.mask], nelements(mosaic),
-                                           1.0 #= ignore relevance =#, covers.cover_params))
-            push!(nmasked_v, maskedset.nmasked)
-            push!(nunmasked_v, maskedset.nunmasked)
-        end
-    end
-    DataFrame(cover_ix = cover_ixs,
-              set_ix = set_ixs,
-              set_id = mosaic.ix2set[set_ixs],
-              mask_ix = mask_ixs,
-              cover_score = cover_scores,
-              nmasked = nmasked_v,
-              nunmasked = nunmasked_v,
-              relevance = relevances,
-              mset_cover_weight = weights,
-              mset_score_covered = cv_scores,
-              mset_score_overlap = ol_scores)
-end
 
 # DataFrame report for each mask X each set,
 # where all set that are covered in at least one mask are considered
 # only the best covers used
-function report_matrix(covers::CoverCollection, mosaic::SetMosaic)
+"""
+Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
+"""
+function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
+                              min_nmasked::Integer=0, min_weight::Real=0.0, best_only::Bool=true)
     # collect all sets that are covered in at least one mask
-    selsets = Set{Int}()
-    for (msetix, coverix) in enumerate(covers.mset2cover)
-        if coverix > 0
-            push!(selsets, covers.maskedsets[msetix].set)
-        end
-    end
+    selsets = Set{Int}(covers.setixs)
     nmasks = size(covers.elmasks, 2)
-    sets_v = sort!(collect(selsets))
-    setsizes_v = setsize.(mosaic, sets_v)
-    set2index = Dict(zip(sets_v, 1:length(sets_v)))
-    nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2index)
-    coverix_mtx = zeros(Int, size(nmasked_mtx))
-    weights_mtx = zeros(Float64, size(nmasked_mtx))
-    cover_scores_mtx = zeros(Float64, size(nmasked_mtx))
-    cv_scores_mtx = fill(NaN, size(nmasked_mtx))
-    @inbounds for (msetix, coverix) in enumerate(covers.mset2cover)
-        coverix > 0 || continue
-        mset = covers.maskedsets[msetix]
-        setix = set2index[mset.set]
-        i = sub2ind(size(coverix_mtx), setix, mset.mask)
-        cover = covers.results[coverix]
-        varix = mset2var(cover, msetix)
-        coverix_mtx[i] = coverix
-        weights_mtx[i] = cover.weights[varix]
-        cover_scores_mtx[i] = cover.agg_total_score
-        cv_scores_mtx[i] = msetscore(covers, msetix, coverix, varix)
-    end
-    ol_scores_mtx = zeros(Float64, size(nmasked_mtx))
-    @inbounds for j in 1:nmasks
-        for i in eachindex(sets_v)
-            setix = sets_v[i]
-            ol_scores_mtx[i, j] = overlap_score(nmasked_mtx[i, j], setsizes_v[i],
-                                                covers.total_masked[j], nelements(mosaic),
-                                                1.0 #= ignore relevance =#, covers.cover_params)
+    selsize_v = setsize.(mosaic, covers.setixs)
+    set2sel = Dict(zip(covers.setixs, 1:length(covers.setixs)))
+    nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2sel)
+    coverix_v = Vector{Int}()
+    setix_v = Vector{Int}()
+    maskix_v = Vector{Int}()
+    nmasked_v = Vector{Int}()
+    nunmasked_v = Vector{Int}()
+    weight_v = Vector{Float64}()
+    cover_score_v = Vector{Float64}()
+    set_score_covered_v = Vector{Float64}()
+    set_score_overlap_v = Vector{Float64}()
+
+    @inbounds for (coverix, cover) in enumerate(covers.results)
+        for (varix, setix) in enumerate(cover.var2set)
+            selix = set2sel[setix]
+            set_weight = cover.weights[varix]
+            set_weight <= min_weight && continue
+            set_score = setscore(covers, setix, cover, selix, varix)
+            best_only && covers.sel2cover[selix] != coverix && continue
+            for maskix in 1:nmasks
+                min_nmasked > 0 && nmasked_mtx[selix, maskix] < min_nmasked && continue
+                push!(coverix_v, coverix)
+                push!(setix_v, setix)
+                push!(maskix_v, maskix)
+                push!(weight_v, set_weight)
+                push!(cover_score_v, cover.agg_total_score)
+                push!(set_score_covered_v, set_score)
+                push!(nmasked_v, nmasked_mtx[selix, maskix])
+                push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
+                push!(set_score_overlap_v, overlap_score(last(nmasked_v), selsize_v[selix],
+                                                   covers.total_masked[maskix], nelements(mosaic),
+                                                   1.0 #= ignore relevance =#, covers.cover_params))
+            end
         end
     end
-    DataFrame(cover_ix = vec(coverix_mtx),
-              set_ix = repeat(sets_v, outer=[nmasks]),
-              set_id = repeat(mosaic.ix2set[sets_v], outer=[nmasks]),
-              mask_ix = repeat(collect(1:nmasks), inner=[length(sets_v)]),
-              cover_score = vec(cover_scores_mtx),
-              nmasked = vec(nmasked_mtx),
-              nunmasked = repeat(setsizes_v, outer=[nmasks]) .- vec(nmasked_mtx),
-              relevance = repeat(mosaic.set_relevances[sets_v], outer=[nmasks]),
-              cover_weight = vec(weights_mtx),
-              mset_score_covered = vec(cv_scores_mtx),
-              mset_score_overlap = vec(ol_scores_mtx))
+    DataFrame(cover_ix = coverix_v,
+              set_ix = setix_v,
+              set_id = mosaic.ix2set[setix_v],
+              mask_ix = maskix_v,
+              cover_score = cover_score_v,
+              nmasked = nmasked_v,
+              nunmasked = nunmasked_v,
+              set_relevance = mosaic.set_relevances[setix_v],
+              set_weight = weight_v,
+              set_score_covered = set_score_covered_v,
+              set_score_overlap = set_score_overlap_v)
 end

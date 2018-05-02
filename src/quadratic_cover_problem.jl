@@ -4,19 +4,19 @@ Quadratic Programming Optimal Enriched-Set Cover problem.
 struct QuadraticCoverProblem <: AbstractCoverProblem{Float64}
     params::CoverParams
 
-    var2mset::Vector{Int}
+    var2set::Vector{Int}
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Float64}
 
     function QuadraticCoverProblem(params::CoverParams,
-            var2mset::Vector{Int},
+            var2set::Vector{Int},
             var_scores::Vector{Float64},
             varXvar_scores::Matrix{Float64}
     )
-        length(var2mset) == length(var_scores) ==
+        length(var2set) == length(var_scores) ==
         size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
-            throw(ArgumentError("var2mset, var_scores and varXvar_scores sizes do not match"))
-        new(params, var2mset, var_scores, varXvar_scores)
+            throw(ArgumentError("var2set, var_scores and varXvar_scores sizes do not match"))
+        new(params, var2set, var_scores, varXvar_scores)
     end
 end
 
@@ -33,35 +33,10 @@ end
 quadratic_solver(opt_params::QuadraticOptimizerParams) = opt_params.solver
 
 function QuadraticCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
-    var_scores = overlap_score.(mosaic.maskedsets, mosaic, params) .- log(params.sel_prob)
-    # prepare varXvar scores
-    varXvar_scores = zeros(eltype(mosaic.original.setXset_scores), length(var_scores), length(var_scores))
-    min_sXs = Inf # minimum finite varXvar_scores element
-    @inbounds for (i, iset) in enumerate(mosaic.maskedsets)
-        for (j, jset) in enumerate(mosaic.maskedsets)
-            sXs = mosaic.original.setXset_scores[iset.set, jset.set]
-            if iset.set != jset.set && isfinite(sXs) && sXs < min_sXs
-                min_sXs = sXs
-            end
-            varXvar_scores[i, j] = varXvar_score(sXs, iset, jset, params, true)
-        end
-    end
-    # replace infinite varXvar score with the minimal finite setXset score
-    sXs_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 1, 0, 0), params, true)
-    mXm_min = varXvar_score(1.25*min_sXs, MaskedSet(1, 1, 0, 0), MaskedSet(2, 2, 0, 0), params, true)
-    @inbounds for i in eachindex(varXvar_scores)
-        if !isfinite(varXvar_scores[i])
-            v1, v2 = ind2sub(size(varXvar_scores), i)
-            warn("var[$v1]×var[$v2] score is $(varXvar_scores[i])")
-            if varXvar_scores[i] < 0.0
-                set1 = mosaic.maskedsets[v1]
-                set2 = mosaic.maskedsets[v2]
-                varXvar_scores[i] = set1.mask == set2.mask ? sXs_min : mXm_min
-            end
-        end
-    end
-    QuadraticCoverProblem(params, collect(eachindex(var_scores)),
-                          var_scores, varXvar_scores)
+    v2set = var2set(mosaic)
+    QuadraticCoverProblem(params, v2set,
+                          var_scores(mosaic, v2set, params),
+                          varXvar_scores(mosaic, v2set, params, true))
 end
 
 """
@@ -98,7 +73,7 @@ function optimize(problem::QuadraticCoverProblem,
                   ini_weights::Vector{Float64} = rand(nvars(problem)) # unused
 )
     if nvars(problem) == 0
-        return CoverProblemResult(problem.var2mset, Vector{Float64}(), Vector{Float64}(), 0.0, 0.0)
+        return CoverProblemResult(problem.var2set, Vector{Float64}(), Vector{Float64}(), 0.0, 0.0)
     end
 
     # Perform the optimization
@@ -115,7 +90,7 @@ function optimize(problem::QuadraticCoverProblem,
         end
     end
     s = getobjectivevalue(m)
-    return CoverProblemResult(problem.var2mset, w, problem.var_scores .* w, s, s)
+    return CoverProblemResult(problem.var2set, w, problem.var_scores .* w, s, s)
     #catch x
     #    warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
@@ -127,14 +102,14 @@ function exclude_vars(problem::QuadraticCoverProblem,
                       penalize_overlaps::Bool = true)
     varmask = fill(true, nvars(problem))
     varmask[vars] = false
-    var_scores = problem.var_scores[varmask]
+    v_scores = problem.var_scores[varmask]
     if penalize_overlaps
         # penalize overlapping sets
         penalty_weights = fill(0.0, nvars(problem))
         penalty_weights[vars] = 1.0
-        var_scores .-= (problem.varXvar_scores * penalty_weights)[varmask]
+        v_scores .-= (problem.varXvar_scores * penalty_weights)[varmask]
     end
     return QuadraticCoverProblem(problem.params,
-                problem.var2mset[varmask],
-                var_scores, problem.varXvar_scores[varmask, varmask])
+                problem.var2set[varmask],
+                v_scores, problem.varXvar_scores[varmask, varmask])
 end

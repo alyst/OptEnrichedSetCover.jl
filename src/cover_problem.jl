@@ -7,23 +7,17 @@ struct CoverParams
     set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
     setXset_shape::Float64      # how much set-set overlaps are penalized (setXset_score shape), 0 = no penalty
-    maskXmask_factor::Float64   # how much activating overlapping sets in different masks is penalized
-    maskXmask_shape::Float64    # how much activating overlapping sets in different masks is penalized
 
     function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
                          set_relevance_shape::Number=1.0,
-                         setXset_factor::Number=1.0, setXset_shape::Number=1.0,
-                         maskXmask_factor::Number=1.0, maskXmask_shape::Number=1.0)
+                         setXset_factor::Number=1.0, setXset_shape::Number=1.0)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= setXset_shape) || throw(ArgumentError("`setXset_shape` must be ≥0"))
-        (0.0 <= maskXmask_factor) || throw(ArgumentError("`maskXmask_factor` must be ≥0"))
-        (0.0 <= maskXmask_shape) || throw(ArgumentError("`maskXmask_shape` must be ≥0"))
         new(sel_prob, min_weight, set_relevance_shape,
-            setXset_factor, setXset_shape,
-            maskXmask_factor, maskXmask_shape)
+            setXset_factor, setXset_shape)
     end
 end
 
@@ -44,29 +38,61 @@ overlap_score(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
                   nmasked(mosaic, set.mask), nelements(mosaic),
                   mosaic.original.set_relevances[set.set], params)
 
-function varXvar_score(setXset::Real, iset::MaskedSet, jset::MaskedSet,
-                       params::CoverParams, scale::Bool = false)
-    if iset.set == jset.set
-        # no penalty for the overlap with itself, even in different masks
-        # (in which case it's zero to encourage the reuse of the same sets to cover different masks)
-        return zero(typeof(setXset))
-    elseif !isfinite(setXset)
-        return -Inf # fix later with min_score
-    else
-        #if sXs < min_sXs
-        #    min_sXs = sXs
-        #end
-        if iset.mask == jset.mask
-            v = -((1.0-setXset)^params.setXset_shape-1.0)
-            scale && (v *= params.setXset_factor)
-        else
-            # scale the original setXset score by maskXmask_factor if
-            # the sets are from different masks,
-            v = -((1.0-setXset)^(params.maskXmask_shape * params.setXset_shape)-1.0)
-            scale && (v *= params.maskXmask_factor * params.setXset_factor)
+var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.orig2masked)))
+
+function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
+    # calculate the sum of scores of given set in each mask
+    sel_penalty = log(params.sel_prob)
+    nmasked_mtx = nmasked_perset(mosaic.original, mosaic.elmasks,
+                                 Dict(s => i for (i, s) in enumerate(var2set)))
+    v_scores = Vector{Float64}(length(var2set))
+    for (varix, setix) in enumerate(var2set)
+        nelems = setsize(mosaic.original, setix)
+        scoresum = 0.0
+        noverlaps = 0
+        for maskix in 1:nmasks(mosaic)
+            nmasked_elems = nmasked_mtx[varix, maskix]
+            mset = MaskedSet(maskix, setix, nmasked_elems, nelems - nmasked_elems)
+            score = overlap_score(mset, mosaic, params)
+            (nmasked_elems > 0) && (noverlaps += 1) # the set is relevant to the mask
+            scoresum += score
         end
-        return v
+        v_scores[varix] = scoresum - sel_penalty + noverlaps*log(noverlaps)
     end
+    return v_scores
+end
+
+function varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false)
+    vXv = 1.0-(1.0-setXset)^params.setXset_shape
+    scale && (vXv *= params.setXset_factor)
+    return vXv
+end
+
+function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
+                        params::CoverParams, scale::Bool = false)
+    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2set, var2set],
+                                params, scale)
+    for i in eachindex(var2set)
+        @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
+    end
+    vXv_min = Inf # minimum finite varXvar_scores element
+    @inbounds for vXv in vXv_scores
+        if isfinite(vXv) && vXv < vXv_min
+            vXv_min = vXv
+        end
+    end
+    # replace infinite varXvar score with the minimal finite setXset score
+    vXv_subst = varXvar_score(1.25*vXv_min, params, true)
+    @inbounds for i in eachindex(vXv_scores)
+        if !isfinite(vXv_scores[i])
+            v1, v2 = ind2sub(size(vXv_scores), i)
+            warn("var[$v1]×var[$v2] score is $(vXv_scores[i])")
+            if vXv_scores[i] < 0.0
+                vXv_scores[i] = vXv_subst
+            end
+        end
+    end
+    return vXv_scores
 end
 
 """
@@ -102,28 +128,28 @@ end
 Result of `optimize(AbstractCoverProblem)`.
 """
 struct CoverProblemResult{T, E}
-    var2mset::Vector{Int}      # indices of masked sets in MaskedSetMosaic
-    weights::Vector{Float64}        # weights of masked sets
-    var_scores::Vector{Float64}
+    var2set::Vector{Int}        # indices of sets in the original SetMosaic
+    weights::Vector{Float64}    # solution: weights of the sets
+    var_scores::Vector{Float64} # scores of the sets
     total_score::T
     agg_total_score::Float64
     extra::E
 
     function CoverProblemResult(
-            var2mset::AbstractVector{Int},
+            var2set::AbstractVector{Int},
             weights::AbstractVector{Float64},
             var_scores::AbstractVector{Float64},
             total_score::T, agg_total_score::Float64, extra::E = nothing) where {T, E}
-        length(var2mset) == length(weights) == length(var_scores) ||
+        length(var2set) == length(weights) == length(var_scores) ||
             throw(ArgumentError("Lengths of cover result components do not match"))
-        new{T, E}(var2mset, weights, var_scores,
+        new{T, E}(var2set, weights, var_scores,
                   total_score, agg_total_score, extra)
     end
 end
 
-function mset2var(result::CoverProblemResult, msetix::Int)
-    varix = searchsortedlast(result.var2mset, msetix)
-    if varix > 0 && result.var2mset[varix] == msetix
+function set2var(result::CoverProblemResult, setix::Int)
+    varix = searchsortedlast(result.var2set, setix)
+    if varix > 0 && result.var2set[varix] == setix
         return varix
     else
         return 0
@@ -132,26 +158,10 @@ end
 
 function selectvars(problem::AbstractCoverProblem,
                     mosaic::MaskedSetMosaic,
-                    weights::AbstractVector{Float64};
-                    selothermasks::Bool = true # propagate the selection to the selected sets in the other masks
+                    weights::AbstractVector{Float64}
 )
     @assert length(weights) == nvars(problem)
-    varixs = find(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
-    if selothermasks
-        maskedset2var = Dict(ms => i for (i, ms) in enumerate(problem.var2mset))
-        setixs = Set(mosaic.maskedsets[problem.var2mset[i]].set for i in varixs)
-        ext_varixs = Set{Int}(varixs)
-        for i in setixs
-            msets = mosaic.orig2masked[i]
-            for ms in msets
-                v = get(maskedset2var, ms, 0)
-                (v > 0) && push!(ext_varixs, v)
-            end
-        end
-        return collect(ext_varixs)
-    else
-        return varixs
-    end
+    return find(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
 end
 
 abstract type AbstractOptimizerParams{P <: AbstractCoverProblem} end;

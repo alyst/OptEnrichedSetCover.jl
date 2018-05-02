@@ -101,16 +101,14 @@
         # lower prior probability to select sets, high overlap penalty, so select abd and c
         problem_ignore_overlap = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6))
         @test_skip nmasks(problem_ignore_overlap) == 2
-        @test nvars(problem_ignore_overlap) == 9 # c and 2xd are out
+        @test nvars(problem_ignore_overlap) == 5 # d is out
         res_ignore_overlap = optimize(problem_ignore_overlap)
-        #@show problem_ab_lowp
-        @test res_ignore_overlap.weights ≈ [1.0, 0.0, 1.0, #=d,=# 0.0, 0.0,
-                                            0.0, 0.0, #=c,=# #=d,=# 0.0, 0.0] atol=1E-4
+        @test res_ignore_overlap.weights ≈ [0.0, 0.0, 1.0, #=d,=# 0.0, 0.0] atol=1E-4
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
         problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=0.05, sel_prob=0.9))
         res_low_penalty = optimize(problem_low_penalty)
         #@show res_low_penalty.weights
-        @test find(res_low_penalty.weights) == [1, 2, 3, 4, 8]
+        @test find(res_low_penalty.weights) == [3]# [1, 3, 4]
     end
 end

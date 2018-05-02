@@ -49,14 +49,12 @@
         @test size(df, 1) == 3
         @test df[:cover_ix] == [1, 1, 2]
         @test df[:set_id] == [1, 2, 4]
-        @test df == DataFrame(cover_coll, sm, report=:covered)
+        @test df == DataFrame(cover_coll, sm, min_nmasked=1)
 
-        df2 = DataFrame(cover_coll, sm, report=:matrix)
+        df2 = DataFrame(cover_coll, sm, min_nmasked=0)
         @test size(df2, 1) == 3
         @test df2[:cover_ix] == [1, 1, 2]
         @test df2[:set_id] == [1, 2, 4]
-
-        @test_throws ArgumentError DataFrame(cover_coll, sm, report=:unknown)
     end
 
     @testset "multimask: [a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[[a b c] [b e]]" begin # FIXME take weights into account
@@ -73,16 +71,17 @@
                                 OptEnrichedSetCover.MultiobjectiveOptimizerParams(ϵ=0.01),
                              false)
 
-        df = DataFrame(cover_coll, sm, report=:covered)
-        @test size(df, 1) == 5
-        @test df[:cover_ix] == [1, 1, 1, 1, 1]
-        @test df[:mask_ix] == [1, 1, 1, 1, 2]
-        @test df[:set_id] == [1, 2, 3, 5, 5]
+        df = DataFrame(cover_coll, sm, best_only=true)
+        @test size(df, 1) == 8
+        @test df[:cover_ix] == [1, 1, 1, 1, 1, 1, 2, 2]
+        @test df[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df[:set_id] == [1, 1, 3, 3, 5, 5, 2, 2]
 
-        df2 = DataFrame(cover_coll, sm, report=:matrix)
+        # FIXME real example when set covered twice
+        df2 = DataFrame(cover_coll, sm, best_only=false)
         @test size(df2, 1) == 8
-        @test df2[:cover_ix] == [1, 1, 1, 1, 0, 0, 0, 1]
-        @test df2[:mask_ix] == [1, 1, 1, 1, 2, 2, 2, 2]
-        @test df2[:set_id] == [1, 2, 3, 5, 1, 2, 3, 5]
+        @test df2[:cover_ix] == [1, 1, 1, 1, 1, 1, 2, 2]
+        @test df2[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df2[:set_id] == [1, 1, 3, 3, 5, 5, 2, 2]
     end
 end
