@@ -101,17 +101,21 @@ Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, 
     SparseMaskMatrix(mtx.m, length(cols), colptr, rowvals)
 end
 
-Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon)
-    old2new = Dict(oldix => newix for (newix, oldix) in enumerate(rows))
+function Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon)
+    old2new = Dict{Int,Vector{Int}}()
+    for (newix, oldix) in enumerate(rows)
+        push!(get!(() -> Vector{Int}(), old2new, oldix), newix)
+    end
     rowval = Vector{Int}()
     thiscol = Vector{Int}()
     colptr = [1]
+    nonew = Vector{Int}()
     @inbounds for j in 1:mtx.n
         # collect new row indices of j-th column
         empty!(thiscol)
         for i in _colrange(mtx, j)
-            newrow = get(old2new, mtx.rowval[i], 0)
-            (newrow != 0) && push!(thiscol, newrow)
+            newrows = get(old2new, mtx.rowval[i], nonew)
+            append!(thiscol, newrows)
         end
         append!(rowval, sort!(thiscol))
         push!(colptr, length(rowval)+1)

@@ -80,4 +80,15 @@
         @test mtx3 isa Matrix{Bool}
         @test mtx3 == mtx2
     end
+
+    @testset "getindex(SparseMaskMatrix)" begin
+        sm = SparseMaskMatrix([false false true; true false false])
+
+        @testset "SMS[?, :]" begin
+            @test_broken sm[1, :] == [false false true] # not implemented yet
+            @test sm[[1], :] == SparseMaskMatrix([false false true])
+            @inferred sm[[2,1,2], :]
+            @test sm[[2,1,2], :] == SparseMaskMatrix([true false false; false false true; true false false])
+        end
+    end
 end
