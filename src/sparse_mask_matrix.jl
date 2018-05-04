@@ -60,7 +60,7 @@ function SparseMaskMatrix(sets, elm2ix::Dict{T, Int}) where T
     return SparseMaskMatrix(length(elm2ix), length(sets), set_ranges, elm_ixs)
 end
 
-function SparseMaskMatrix(mtx::Matrix{Bool})
+function SparseMaskMatrix(mtx::AbstractMatrix{Bool})
     colptr = sizehint!(Vector{Int}(), size(mtx, 2)+1)
     rowval = Vector{Int}()
     @inbounds for j in 1:size(mtx, 2)
@@ -81,7 +81,8 @@ end
 @inline _colrange(mtx::SparseMaskMatrix, col::Integer) = mtx.colptr[col]:(mtx.colptr[col+1]-1)
 
 @inline Base.getindex(mtx::SparseMaskMatrix, ::Colon, col::Integer) = mtx.rowval[_colrange(mtx, col)]
-Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, cols::Vector{Int})
+
+Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, cols::AbstractVector{Int})
     rowvals = Vector{Int}()
     colptr = Vector{Int}()
     for col in cols
@@ -111,7 +112,7 @@ Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, rows::Abs
     SparseMaskMatrix(length(rows), mtx.n, colptr, rowval)
 end
 
-Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::Union{Vector{Bool},BitVector})
+Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::AbstractVector{Bool})
     length(colmask) == size(mtx, 2) || throw(ArgumentError("Column mask length should match the number of columns"))
     mtx[:, find(colmask)]
 end
