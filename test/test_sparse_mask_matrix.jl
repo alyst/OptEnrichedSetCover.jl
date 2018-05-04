@@ -56,4 +56,20 @@
         @test view(sm, :, 2) == Int[]
         @test view(sm, :, 3) == [1]
     end
+
+    @testset "convert(Matrix{Bool}, SparseMaskMatrix)" begin
+        sm1 = SparseMaskMatrix()
+        @inferred convert(Matrix{Bool}, sm1)
+        mtx1 = convert(Matrix{Bool}, sm1)
+        @test mtx1 isa Matrix{Bool}
+        @test mtx1 == Matrix{Bool}(0, 0)
+
+        sm2 = SparseMaskMatrix([false false true; true false false])
+        mtx2 = convert(Matrix{Bool}, sm2)
+        @test mtx2 == [false false true; true false false]
+
+        mtx3 = convert(Matrix, sm2)
+        @test mtx3 isa Matrix{Bool}
+        @test mtx3 == mtx2
+    end
 end

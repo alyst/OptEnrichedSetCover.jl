@@ -118,3 +118,15 @@ Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, 
 end
 
 Base.view(mtx::SparseMaskMatrix, ::Colon, col::Integer) = view(mtx.rowval, _colrange(mtx, col))
+
+function Base.convert(::Type{Matrix{Bool}}, mtx::SparseMaskMatrix)
+    res = fill(false, size(mtx))
+    @inbounds for i in 1:size(mtx, 2)
+        for j in _colrange(mtx, i)
+            res[mtx.rowval[j], i] = true
+        end
+    end
+    return res
+end
+
+Base.convert(::Type{Matrix}, mtx::SparseMaskMatrix) = convert(Matrix{Bool}, mtx)
