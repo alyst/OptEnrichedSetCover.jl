@@ -101,7 +101,9 @@ Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, 
     SparseMaskMatrix(mtx.m, length(cols), colptr, rowvals)
 end
 
-function Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon)
+function Base.getindex(mtx::SparseMaskMatrix,
+                       rows::AbstractVector{Int},
+                       cols::AbstractVector{Int})
     old2new = Dict{Int,Vector{Int}}()
     for (newix, oldix) in enumerate(rows)
         push!(get!(() -> Vector{Int}(), old2new, oldix), newix)
@@ -110,7 +112,8 @@ function Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon
     thiscol = Vector{Int}()
     colptr = [1]
     nonew = Vector{Int}()
-    @inbounds for j in 1:mtx.n
+    @inbounds for j in cols
+        @assert 1 <= j <= mtx.n
         # collect new row indices of j-th column
         empty!(thiscol)
         for i in _colrange(mtx, j)
@@ -120,8 +123,14 @@ function Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon
         append!(rowval, sort!(thiscol))
         push!(colptr, length(rowval)+1)
     end
-    SparseMaskMatrix(length(rows), mtx.n, colptr, rowval)
+    SparseMaskMatrix(length(rows), length(cols), colptr, rowval)
 end
+
+Base.getindex(mtx::SparseMaskMatrix, rows::AbstractVector{Int}, ::Colon) =
+    getindex(mtx, rows, Base.OneTo(mtx.n))
+
+Base.getindex(mtx::SparseMaskMatrix, row::Integer, col::Integer) =
+    !isempty(searchsorted(view(mtx, :, col), row))
 
 Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::AbstractVector{Bool})
     length(colmask) == size(mtx, 2) || throw(ArgumentError("Column mask length should match the number of columns"))

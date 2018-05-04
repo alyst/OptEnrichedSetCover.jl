@@ -105,5 +105,13 @@
             @inferred sm[[2,1,2], :]
             @test sm[[2,1,2], :] == SparseMaskMatrix([true false false; false false true; true false false])
         end
+
+        @testset "SMS[?, ?]" begin
+            @inferred sm[1, 2]
+            @test sm[1, 1] == false
+            @test sm[1, 3] == true
+            @inferred sm[[2,1,2], [1]]
+            @test sm[[2,1,2], [1]] == SparseMaskMatrix(reshape([true, false, true], 3, 1))
+        end
     end
 end
