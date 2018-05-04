@@ -20,6 +20,13 @@ struct SparseMaskMatrix <: AbstractMatrix{Bool}
     end
 end
 
+Base.isequal(x::SparseMaskMatrix, y::SparseMaskMatrix) =
+    x.m == y.m && x.n == y.n &&
+    x.colptr == y.colptr &&
+    x.rowval == y.rowval # though potentially rows may have different order within one column
+
+Base.:(==)(x::SparseMaskMatrix, y::SparseMaskMatrix) = isequal(x, y)
+
 Base.copy(mtx::SparseMaskMatrix) = SparseMaskMatrix(mtx.m, mtx.n, copy(mtx.colptr), copy(mtx.rowval))
 
 """

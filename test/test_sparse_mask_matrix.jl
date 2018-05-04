@@ -13,9 +13,12 @@
         @test view(empty2, :, 1) == Int[]
         @test view(empty2, :, 2) == Int[]
         @test view(empty2, :, 3) == Int[]
+        @test mask != empty2
+        @test empty2 == SparseMaskMatrix(2, 3)
     end
 
     @testset "1x1" begin
+        @inferred SparseMaskMatrix(1, 1, [1, 1], Int[])
         empty = SparseMaskMatrix(1, 1, [1, 1], Int[])
         @test size(empty) == (1, 1)
         @test size(empty, 1) == 1
@@ -29,6 +32,7 @@
         @test size(nonempty, 2) == 1
         @test nonempty[:, 1] == [1]
         @test view(nonempty, :, 1) == [1]
+        @test nonempty != empty
     end
 
     @testset "SparseMaskMatrix(Collection{Set}, elm2ix)" begin
@@ -55,6 +59,10 @@
         @test view(sm, :, 1) == [2]
         @test view(sm, :, 2) == Int[]
         @test view(sm, :, 3) == [1]
+        @test sm == SparseMaskMatrix(2, [[2], Int[], [1]])
+        @test sm != SparseMaskMatrix(3, [[2], Int[], [1]])
+        @test sm != SparseMaskMatrix(2, [[1], Int[], [1]])
+        @test sm != SparseMaskMatrix(2, [[2], [1], Int[]])
     end
 
     @testset "convert(Matrix{Bool}, SparseMaskMatrix)" begin
