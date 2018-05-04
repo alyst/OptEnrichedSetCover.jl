@@ -84,6 +84,21 @@
     @testset "getindex(SparseMaskMatrix)" begin
         sm = SparseMaskMatrix([false false true; true false false])
 
+        @testset "SMS[:, ?]" begin
+            @inferred sm[:, 1]
+            @test sm[:, 1] == [2]
+            @test sm[:, 2] == Int[]
+
+            @inferred sm[:, [1, 2]]
+            sm1 = sm[:, [1, 2]]
+            @test sm1 isa SparseMaskMatrix
+            @test convert(Matrix, sm1) == [false false; true false]
+            @test size(sm1) == (2, 2)
+            @inferred sm[:, [false, true, true]]
+            @test sm[:, [2, 3]] == sm[:, [false, true, true]]
+            @test sm[:, [2, 1, 3, 1]] == SparseMaskMatrix([false false true false; false true false true])
+        end
+
         @testset "SMS[?, :]" begin
             @test_broken sm[1, :] == [false false true] # not implemented yet
             @test sm[[1], :] == SparseMaskMatrix([false false true])
