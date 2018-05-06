@@ -25,7 +25,8 @@ end
 Linear component of an individual masked set score for the `CoverProblem`.
 Doesn't take into account the overlap with the other selected sets.
 """
-function overlap_score(masked::Number, set::Number, total_masked::Number, total::Number, relevance::Number, params::CoverParams)
+function overlap_score(masked::Number, set::Number, total_masked::Number, total::Number,
+                       relevance::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
     #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*(relevance^params.set_relevance_shape) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)

@@ -93,17 +93,17 @@ a "mosaic" of non-overlapping "tiles".
 * `S` type of set keys
 """
 struct SetMosaic{T,S}
-    ix2elm::Vector{T}       # element index to element
-    elm2ix::Dict{T, Int}    # element to its index
+    ix2elm::Vector{T}           # element index to element
+    elm2ix::Dict{T, Int}        # element to its index
 
-    ix2set::Vector{S}       # set index to the ID of the most relevant set (if there are duplicates)
-    set2ix::Dict{S, Int}    # set ID to index
+    ix2set::Vector{S}           # set index to the ID of the most relevant set (if there are duplicates)
+    set2ix::Dict{S, Int}        # set ID to index
 
     set_sizes::Vector{Int}
     set_relevances::Vector{Float64}  # 0..1 set relevance score
 
-    setXelm::SparseMaskMatrix  # set×element membership
-    elmXset::SparseMaskMatrix  # element×set membership (transpose of setXelm)
+    setXelm::SparseMaskMatrix   # set×element membership
+    elmXset::SparseMaskMatrix   # element×set membership (transpose of setXelm)
     elmXtile::SparseMaskMatrix  # element-to-tile mask
     tileXset::SparseMaskMatrix  # rows = tiles, cols = sets from collection, true if tile is a subset of a set
 

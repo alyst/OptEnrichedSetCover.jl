@@ -114,7 +114,7 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
 end
 
 function mask(mosaic::SetMosaic{T}, elmasks #= iterable with eltype()==Set{T} =#;
-     min_nmasked::Integer=2, max_overlap_logpvalue::Real=0.0) where T
+              min_nmasked::Integer=2, max_overlap_logpvalue::Real=0.0) where T
     @assert eltype(elmasks) === Set{T}
     mask(mosaic, Bool[in(e, elmask::Set{T}) for e in mosaic.ix2elm, elmask in elmasks],
          min_nmasked=min_nmasked, max_overlap_logpvalue=max_overlap_logpvalue)
