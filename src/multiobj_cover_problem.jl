@@ -398,8 +398,11 @@ function optimize(problem::MultiobjectiveCoverProblem,
     end
 
     fitness_frontier = [af.orig for af in archived_fitness.(pareto_frontier(bbores))]
+    raw_fitness_frontier = [rawscore(problem, w) for w in BlackBoxOptim.params.(pareto_frontier(bbores))]
+    frontier_perm = sortperm(raw_fitness_frontier)
 
     return CoverProblemResult(problem.var2set, w, problem.var_scores .* w, s,
                               BlackBoxOptim.aggregate(s, fitness_scheme(bbores)),
-                              fitness_frontier)
+                              (fitness_frontier[frontier_perm],
+                               raw_fitness_frontier[frontier_perm]))
 end
