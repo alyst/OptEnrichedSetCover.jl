@@ -261,20 +261,31 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
 end
 
 """
-Score (probability) of the OESC coverage.
+Unfolded multiobjective score (fitness) of the OESC coverage.
 
 * `w` probabilities of the sets being covered
 """
-function score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
+function rawscore(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
+    @assert length(w) == nvars(problem)
+    a = dot(problem.var_scores, w)
     if problem.params.setXset_factor == 0.0
+        b = 0.0
+    else
         # skip set interactions as it would be aggregated to zero
-        return problem.fitfolding((dot(problem.var_scores, w), 0.0))
+        setXset = fill!(similar(w), 0.0)
+        minplus_bilinear!(min, setXset, problem.varXvar_scores, w, w)
+        b = -sum(setXset)
     end
-    setXset = fill!(similar(w), 0.0)
-    minplus_bilinear!(min, setXset, problem.varXvar_scores, w, w)
-    #penalty = max(0.0, sum(w) - problem.params.sel_prob*length(w))
-    return problem.fitfolding((dot(problem.var_scores, w), -sum(setXset)))
+    return (a, b)
 end
+
+"""
+Score (fitness) of the OESC coverage.
+
+* `w` probabilities of the sets being covered
+"""
+score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64}) =
+    problem.fitfolding(rawscore(problem, w))
 
 aggscore(problem::MultiobjectiveCoverProblem{FF}, w::AbstractVector{Float64}) where FF =
     MultiobjectiveCoverProblemScoreAggregator{FF}(problem.params)(score(problem, w))
@@ -340,8 +351,9 @@ generate_modifier(problem::OptimizationProblem, params) =
 function optimize(problem::MultiobjectiveCoverProblem,
                   opt_params::MultiobjectiveOptimizerParams = MultiobjectiveOptimizerParams())
     if nvars(problem) == 0
-        return CoverProblemResult(Vector{Int}(), Vector{Float64}(), Vector{Float64}(),
-                                  (0.0, 0.0, 0.0), 0.0, nothing)
+        w = Vector{Float64}()
+        return CoverProblemResult(Vector{Int}(), w, Vector{Float64}(),
+                                  score(problem, w), 0.0, nothing)
     end
 
     bbowrapper = MultiobjectiveCoverProblemBBOWrapper(problem)
