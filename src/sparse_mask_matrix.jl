@@ -16,7 +16,7 @@ struct SparseMaskMatrix <: AbstractMatrix{Bool}
     end
 
     function SparseMaskMatrix(m::Integer=0, n::Integer=0) # empty mask
-        new(m, n, fill(0, n+1), Vector{Int}())
+        new(m, n, fill(1, n+1), Vector{Int}())
     end
 end
 
