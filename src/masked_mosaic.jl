@@ -86,7 +86,7 @@ setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
     searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
-              min_nmasked::Integer=2,
+              min_nmasked::Integer=1,
               max_overlap_logpvalue::Float64=0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
 )
     size(elmasks, 1) == nelements(mosaic) ||

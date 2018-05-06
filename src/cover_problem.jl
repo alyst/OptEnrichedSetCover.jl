@@ -44,21 +44,14 @@ var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.orig2masked)))
 function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
     sel_penalty = log(params.sel_prob)
-    nmasked_mtx = nmasked_perset(mosaic.original, mosaic.elmasks,
-                                 Dict(s => i for (i, s) in enumerate(var2set)))
     v_scores = Vector{Float64}(length(var2set))
     for (varix, setix) in enumerate(var2set)
-        nelems = setsize(mosaic.original, setix)
         scoresum = 0.0
-        noverlaps = 0
-        for maskix in 1:nmasks(mosaic)
-            nmasked_elems = nmasked_mtx[varix, maskix]
-            mset = MaskedSet(maskix, setix, nmasked_elems, nelems - nmasked_elems)
-            score = overlap_score(mset, mosaic, params)
-            (nmasked_elems > 0) && (noverlaps += 1) # the set is relevant to the mask
-            scoresum += score
+        msetixs = mosaic.orig2masked[setix]
+        for msetix in msetixs
+            scoresum += overlap_score(mosaic.maskedsets[msetix], mosaic, params)
         end
-        v_scores[varix] = scoresum - sel_penalty + noverlaps*log(noverlaps)
+        v_scores[varix] = scoresum - sel_penalty + length(msetixs)*log(length(msetixs))
     end
     return v_scores
 end
