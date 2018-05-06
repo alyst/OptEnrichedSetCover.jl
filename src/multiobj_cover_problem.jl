@@ -30,40 +30,50 @@ function MultiobjectiveProblemFitnessFolding(mosaic::MaskedSetMosaic, params::Co
 end
 
 struct MultiobjectiveCoverProblemScoreAggregator{FF <: MultiobjectiveProblemFitnessFolding}
-    k_sXs::Float64
-    k_uncovered::Float64
+    setXset_factor::Float64
+    uncovered_factor::Float64
+    covered_factor::Float64
 
     MultiobjectiveCoverProblemScoreAggregator{FF}(params::CoverParams) where FF =
-        new{FF}(params.setXset_factor, NaN)
+        new{FF}(params.setXset_factor,
+                params.uncovered_factor,
+                params.covered_factor)
 end
 
 # no folding of fitness components
-struct MultiobjectiveProblemNoFolding <: MultiobjectiveProblemFitnessFolding{3}
+struct MultiobjectiveProblemNoFolding <: MultiobjectiveProblemFitnessFolding{4}
 end
-(::MultiobjectiveProblemNoFolding)(fitness::NTuple{2,Float64}) = fitness
+(::MultiobjectiveProblemNoFolding)(fitness::NTuple{4,Float64}) = fitness
 
-(agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemNoFolding})(score::NTuple{2, Float64}) =
-    score[1] + agg.k_sXs * score[2]# + agg.k_mXm * score[3]^2
+(agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemNoFolding})(score::NTuple{4, Float64}) =
+    score[1] + agg.setXset_factor * score[2] +
+    agg.uncovered_factor * score[3] + agg.covered_factor * score[4]
 
 # sum var scores and setXset penalties (maskXmask penalties are separate)
 struct MultiobjectiveProblemSoft12Convolute <: MultiobjectiveProblemFitnessFolding{2}
     setXset_factor::Float64
+    uncovered_factor::Float64
+    covered_factor::Float64
 
     MultiobjectiveProblemSoft12Convolute(params::CoverParams) =
-        new(params.setXset_factor)
+        new(params.setXset_factor,
+            params.setXset_factor > 0.0 ? params.uncovered_factor/params.setXset_factor : 1.0,
+            params.setXset_factor > 0.0 ? params.covered_factor/params.setXset_factor : 1.0)
 end
 
-function (f::MultiobjectiveProblemSoft12Convolute)(fitness::NTuple{2,Float64})
+function (f::MultiobjectiveProblemSoft12Convolute)(fitness::NTuple{4,Float64})
     a = fitness[1]
-    b = fitness[2]
-    k = b/max(100.0, -a) - 3.0
+    b = fitness[2] +
+        f.uncovered_factor * fitness[3] +
+        f.covered_factor * fitness[4]
+    k = b/max(100.0, -a) - 1.0
     (k <= 0.0) && return (a, b)
     kk = 1.0 - 1.0/(1.0 + k)
     return (muladd(kk * f.setXset_factor, b, a), (1.0 - kk) * b)
 end
 
 (agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemSoft12Convolute})(score::NTuple{2, Float64}) =
-    score[1] + agg.k_sXs * score[2]
+    score[1] + agg.setXset_factor * score[2]
 
 #=
 # drop 3rd components (maskXmask)
@@ -83,24 +93,37 @@ struct MultiobjectiveCoverProblem{FF<:MultiobjectiveProblemFitnessFolding, F} <:
     fitfolding::FF
 
     var2set::Vector{Int}
+
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Float64}
+
+    tileXvar::SparseMaskMatrix      # tile-in-mask X set(var)
+    nmasked_pertile::Vector{Int}    # number of masked elements for each tile
+    nunmasked_pertile::Vector{Int}  # number of unmasked elements for each tile
 
     function MultiobjectiveCoverProblem(params::CoverParams,
                         fitfolding::FF,
                         var2set::AbstractVector{Int},
                         var_scores::AbstractVector{Float64},
-                        varXvar_scores::AbstractMatrix{Float64}
+                        varXvar_scores::AbstractMatrix{Float64},
+                        tileXvar::SparseMaskMatrix,
+                        nmasked_pertile::AbstractVector{Int},
+                        nunmasked_pertile::AbstractVector{Int}
     ) where {FF<:MultiobjectiveProblemFitnessFolding}
         length(var2set) == length(var_scores) ==
-        size(varXvar_scores, 1) == size(varXvar_scores, 2) ||
+        size(varXvar_scores, 1) == size(varXvar_scores, 2) ==
+        size(tileXvar, 2) ||
             throw(ArgumentError("var2set, var_scores and varXvar_scores counts do not match"))
+        size(tileXvar, 1) == length(nmasked_pertile) == length(nunmasked_pertile) ||
+            throw(ArgumentError("tileXvar and nmasked_pertile rows count does not match"))
         F = fitness_type(FF)
-        new{FF, F}(params, fitfolding, var2set, var_scores, varXvar_scores)
+        new{FF, F}(params, fitfolding, var2set,
+                   var_scores, varXvar_scores,
+                   tileXvar, nmasked_pertile, nunmasked_pertile)
     end
 end
 
-nmasks(problem::MultiobjectiveCoverProblem) = length(problem.var_ranges)
+ntiles(problem::MultiobjectiveCoverProblem) = length(problem.nmasked_pertile)
 
 BlackBoxOptim.fitness_scheme_type(::Type{<:MultiobjectiveCoverProblem{FF}}) where FF =
     BlackBoxOptim.fitness_scheme_type(FF)
@@ -180,8 +203,10 @@ function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams
     v2set = var2set(mosaic)
     v_scores = var_scores(mosaic, v2set, params)
     vXv_scores = varXvar_scores(mosaic, v2set, params, false)
+    tXv, nmasked_pertile, nunmasked_pertile = tilemaskXvar(mosaic)
     MultiobjectiveCoverProblem(params, MultiobjectiveProblemFitnessFolding(mosaic, params, fitfolding),
-                               v2set, v_scores, vXv_scores)
+                               v2set, v_scores, vXv_scores,
+                               tXv, nmasked_pertile, nunmasked_pertile)
 end
 
 # \sum_{i, j} A_{i, j} min(w_i, w_j)
@@ -258,7 +283,29 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
     end
     return MultiobjectiveCoverProblem(problem.params, problem.fitfolding,
                 problem.var2set[varmask],
-                v_scores, problem.varXvar_scores[varmask, varmask])
+                v_scores, problem.varXvar_scores[varmask, varmask],
+                problem.tileXvar[:, varmask], # FIXME can also remove unused tiles
+                problem.nmasked_pertile, problem.nunmasked_pertile)
+end
+
+# the total number of covered masked elements (in all masks overlapping with the cover)
+# the total number of unconvered masked elements (in all masks overlapping with the cover) minus
+function miscover_score(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64})
+    @assert length(w) == nvars(problem)
+    isempty(problem.nmasked_pertile) && return (0.0, 0.0)
+    # calculate the tile coverage weights
+    wtile = fill(0.0, ntiles(problem))
+    @inbounds for (varix, wvar) in enumerate(w)
+        if wvar == 1.0
+            wtile[view(problem.tileXvar, :, varix)] = 1.0
+        elseif wvar > 0.0
+            for tileix in view(problem.tileXvar, :, varix)
+                wtile[tileix] = max(wtile[tileix], wvar)
+            end
+        end
+    end
+    return sum(problem.nmasked_pertile) - dot(problem.nmasked_pertile, wtile),
+           dot(problem.nunmasked_pertile, wtile)
 end
 
 """
@@ -277,7 +324,15 @@ function rawscore(problem::MultiobjectiveCoverProblem, w::AbstractVector{Float64
         minplus_bilinear!(min, setXset, problem.varXvar_scores, w, w)
         b = -sum(setXset)
     end
-    return (a, b)
+    if problem.params.covered_factor == 0.0 &&
+       problem.params.uncovered_factor == 0.0
+        # skip miscover score calculation if it's excluded from aggregation
+        c = 0.0
+        d = 0.0
+    else
+        c, d = miscover_score(problem, w)
+    end
+    return (a, b, c, d)
 end
 
 """

@@ -7,17 +7,23 @@ struct CoverParams
     set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
     setXset_shape::Float64      # how much set-set overlaps are penalized (setXset_score shape), 0 = no penalty
+    uncovered_factor::Float64   # how much masked uncovered elements penalize the score
+    covered_factor::Float64     # how much unmasked covered elements penalize the score
 
     function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
                          set_relevance_shape::Number=1.0,
-                         setXset_factor::Number=1.0, setXset_shape::Number=1.0)
+                         setXset_factor::Number=1.0, setXset_shape::Number=1.0,
+                         uncovered_factor::Number=0.1, covered_factor::Number=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= setXset_shape) || throw(ArgumentError("`setXset_shape` must be ≥0"))
+        (0.0 <= uncovered_factor) || throw(ArgumentError("`uncovered_factor` must be ≥0"))
+        (0.0 <= covered_factor) || throw(ArgumentError("`covered_factor` must be ≥0"))
         new(sel_prob, min_weight, set_relevance_shape,
-            setXset_factor, setXset_shape)
+            setXset_factor, setXset_shape,
+            uncovered_factor, covered_factor)
     end
 end
 
@@ -40,6 +46,64 @@ overlap_score(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
                   mosaic.original.set_relevances[set.set], params)
 
 var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.orig2masked)))
+
+# extracts
+# 1) var-to-tile mapping (only relevant tiles are considered)
+# 2) the total number of masked elements in all masks for each tile
+# 3) the total number of unmasked elements in all active masks (overlapping with the tile) for each tile
+function tilemaskXvar(mosaic::MaskedSetMosaic)
+    setixs = var2set(mosaic)
+    nm = nmasks(mosaic)
+    used_tilemasks = Set{Tuple{Int, Int}}()
+    @inbounds for (varix, setix) in enumerate(setixs)
+        set_tiles = view(mosaic.original.tileXset, :, setix)
+        for msetix in mosaic.orig2masked[setix]
+            maskix = mosaic.maskedsets[msetix].mask
+            for tileix in set_tiles
+                push!(used_tilemasks, (tileix, maskix))
+            end
+        end
+    end
+    used_tilemask_v = sort!(collect(used_tilemasks)) # sort lexicographically
+    nmasked_pertilemask = Vector{Int}(length(used_tilemask_v))
+    nunmasked_pertilemask = Vector{Int}(length(used_tilemask_v))
+    last_tileix = 0
+    tile_size = 0
+    tile_elms = view([], 1:0) # empty range for type stability
+    for (ix, (tileix, maskix)) in enumerate(used_tilemask_v)
+        if tileix != last_tileix
+            tile_elms = view(mosaic.original.elmXtile, :, tileix)
+            tile_size = length(tile_elms)
+            last_tileix = tileix
+        end
+        nmasked = sum(view(mosaic.elmasks, tile_elms, maskix))
+        nmasked_pertilemask[ix] = nmasked
+        nunmasked_pertilemask[ix] = tile_size - nmasked
+    end
+    tileXvar = mosaic.original.tileXset[first.(used_tilemask_v), setixs]
+    if isempty(tileXvar)
+        return tileXvar, nmasked_pertilemask, nunmasked_pertilemask
+    end
+
+    # find tiles that refer to the identical set of variables
+    varXtile = transpose(tileXvar)
+    vars2tileixs = Dict{Vector{Int}, Vector{Int}}()
+    for tileix in 1:size(varXtile, 2)
+        varixs = varXtile[:, tileix]
+        tileixs = get!(() -> Vector{Int}(), vars2tileixs, varixs)
+        push!(tileixs, tileix)
+    end
+    if length(vars2tileixs) == size(varXtile, 2) # no duplicates
+        return tileXvar, nmasked_pertilemask, nunmasked_pertilemask
+    end
+    tileXvar = tileXvar[[first(tileixs) for tileixs in values(vars2tileixs)], :] # take the 1st of duplicated tiles
+    # aggregate n[un]masked over duplicated tiles
+    nmasked_pertilegroup = [sum(i -> nmasked_pertilemask[i], tileixs)
+                            for tileixs in values(vars2tileixs)]
+    nunmasked_pertilegroup = [sum(i -> nunmasked_pertilemask[i], tileixs)
+                            for tileixs in values(vars2tileixs)]
+    return tileXvar, nmasked_pertilegroup, nunmasked_pertilegroup
+end
 
 function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
