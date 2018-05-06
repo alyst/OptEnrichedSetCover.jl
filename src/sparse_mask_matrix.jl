@@ -151,6 +151,13 @@ end
 
 Base.convert(::Type{Matrix}, mtx::SparseMaskMatrix) = convert(Matrix{Bool}, mtx)
 
+function Base.sum(mtx::SparseMaskMatrix, dim::Integer)
+    (dim != 1) && throw(ArgumentError("sum(SparseMaskMatrix, dim=$dim) not implemented"))
+    return [colptr[i+1] - colptr[i] for i in 1:n]
+end
+
+Base.sum(mtx::SparseMaskMatrix) = length(mtx.rowval)
+
 function Base.permutedims(mtx::SparseMaskMatrix, perm)
     if perm == [1, 2]
         return copy(mtx)
