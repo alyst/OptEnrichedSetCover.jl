@@ -54,11 +54,12 @@ struct MultiobjectiveProblemSoft12Convolute <: MultiobjectiveProblemFitnessFoldi
 end
 
 function (f::MultiobjectiveProblemSoft12Convolute)(fitness::NTuple{2,Float64})
-    k = fitness[2]/max(100.0, -fitness[1]) - 3.0
-    (k <= 0.0) && return fitness
-    kk = 1.0/(1.0 + k^2)
-    return (muladd(kk * f.setXset_factor, fitness[2], fitness[1]),
-            (1.0 - kk) * fitness[2])
+    a = fitness[1]
+    b = fitness[2]
+    k = b/max(100.0, -a) - 3.0
+    (k <= 0.0) && return (a, b)
+    kk = 1.0 - 1.0/(1.0 + k)
+    return (muladd(kk * f.setXset_factor, b, a), (1.0 - kk) * b)
 end
 
 (agg::MultiobjectiveCoverProblemScoreAggregator{MultiobjectiveProblemSoft12Convolute})(score::NTuple{2, Float64}) =
