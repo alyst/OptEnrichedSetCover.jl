@@ -136,11 +136,10 @@ nmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
 nunmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
     (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nunmasked_perset[setix, maskix] : setsize(mosaic.original, mosaic.original.set2ix[set]))
 
-function Base.copy(mosaic::MaskedSetMosaic)
-    # copy everything, except the original mosaic (leave the reference to the same object)
+# copy everything, except the original mosaic (leave the reference to the same object)
+Base.copy(mosaic::MaskedSetMosaic) =
     MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.total_masked),
                     copy(mosaic.maskedsets), copy(mosaic.orig2masked))
-end
 
 """
 Exclude `setmask` sets from the `mosaic` and update the set of its active tiles.
