@@ -238,7 +238,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
     nunmasked_v = Vector{Int}()
     weight_v = Vector{Float64}()
     cover_score_v = Vector{Float64}()
-    set_score_covered_v = Vector{Float64}()
+    set_score_enriched_v = Vector{Float64}()
     set_score_overlap_v = Vector{Float64}()
 
     @inbounds for (coverix, cover) in enumerate(covers.results)
@@ -255,7 +255,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
                 push!(maskix_v, maskix)
                 push!(weight_v, set_weight)
                 push!(cover_score_v, cover.agg_total_score)
-                push!(set_score_covered_v, set_score)
+                push!(set_score_enriched_v, set_score)
                 push!(nmasked_v, nmasked_mtx[selix, maskix])
                 push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
                 push!(set_score_overlap_v, overlap_score(last(nmasked_v), selsize_v[selix],
@@ -273,6 +273,6 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
               nunmasked = nunmasked_v,
               set_relevance = mosaic.set_relevances[setix_v],
               set_weight = weight_v,
-              set_score_covered = set_score_covered_v,
+              set_score_enriched = set_score_enriched_v,
               set_score_overlap = set_score_overlap_v)
 end
