@@ -19,11 +19,11 @@ BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: MultiobjectiveProblemF
 function MultiobjectiveProblemFitnessFolding(mosaic::MaskedSetMosaic, params::CoverParams,
                                              fitfolding::Union{Symbol, Void} = nothing)
     if fitfolding === nothing || fitfolding == :auto # chose folding automatically
-        return MultiobjectiveProblemSoft12Convolute(params.setXset_factor)
+        return MultiobjectiveProblemSoft12Convolute(params)
     elseif fitfolding == :none
         return MultiobjectiveProblemNoFolding()
     elseif fitfolding == :soft_convolute_sets_and_setXset
-        return MultiobjectiveProblemSoft12Convolute(params.setXset_factor)
+        return MultiobjectiveProblemSoft12Convolute(params)
     else
         throw(ArgumentError("Unknown fitfolding $fitfolding"))
     end
@@ -48,6 +48,9 @@ end
 # sum var scores and setXset penalties (maskXmask penalties are separate)
 struct MultiobjectiveProblemSoft12Convolute <: MultiobjectiveProblemFitnessFolding{2}
     setXset_factor::Float64
+
+    MultiobjectiveProblemSoft12Convolute(params::CoverParams) =
+        new(params.setXset_factor)
 end
 
 function (f::MultiobjectiveProblemSoft12Convolute)(fitness::NTuple{2,Float64})
