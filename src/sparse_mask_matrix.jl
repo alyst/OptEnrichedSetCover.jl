@@ -150,3 +150,32 @@ function Base.convert(::Type{Matrix{Bool}}, mtx::SparseMaskMatrix)
 end
 
 Base.convert(::Type{Matrix}, mtx::SparseMaskMatrix) = convert(Matrix{Bool}, mtx)
+
+function Base.permutedims(mtx::SparseMaskMatrix, perm)
+    if perm == [1, 2]
+        return copy(mtx)
+    elseif perm != [2, 1] # only transpose
+        throw(ArgumentError("permutedims(A::SparseMaskMatrix, perm) does not support perm=$perm"))
+    end
+    trueixs = sizehint!(Vector{Tuple{Int,Int}}(), sum(mtx)) # col-row coords of trues in t(mtx)
+    for i in 1:mtx.n
+        @inbounds for j in view(mtx, :, i)
+            push!(trueixs, (j, i)) # new
+        end
+    end
+    sort!(trueixs) # sort first by the new column then row
+    # find column ranges (FIXME could use searchsorted...)
+    colptr = sizehint!(Vector{Int}(), mtx.m+1)
+    for i in eachindex(trueixs)
+        @inbounds curcol = first(trueixs[i])
+        while length(colptr) < curcol
+            push!(colptr, i)
+        end
+    end
+    while length(colptr) <= mtx.m
+        push!(colptr, length(trueixs)+1)
+    end
+    return SparseMaskMatrix(mtx.n, mtx.m, colptr, last.(trueixs))
+end
+
+Base.transpose(mtx::SparseMaskMatrix) = permutedims(mtx, [2, 1])

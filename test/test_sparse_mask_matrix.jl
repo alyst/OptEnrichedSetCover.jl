@@ -114,4 +114,19 @@
             @test sm[[2,1,2], [1]] == SparseMaskMatrix(reshape([true, false, true], 3, 1))
         end
     end
+
+    @testset "permutedims(SMS, ?)" begin
+        @test transpose(SparseMaskMatrix()) == SparseMaskMatrix()
+        @test transpose(SparseMaskMatrix(2, 3)) == SparseMaskMatrix(3, 2)
+
+        sm = SparseMaskMatrix([false false true; true false false])
+        @inferred permutedims(sm, [1, 2])
+        @test permutedims(sm, [1, 2]) == sm
+        @inferred permutedims(sm, [2, 1])
+        tsm = permutedims(sm, [2, 1])
+        @test size(tsm) == (3, 2)
+        @test tsm == SparseMaskMatrix([false true; false false; true false])
+        @test transpose(sm) == tsm
+        @test transpose(transpose(sm)) == sm
+    end
 end
