@@ -160,6 +160,10 @@ struct MultiobjectiveOptimizerParams <: AbstractOptimizerParams{MultiobjectiveCo
         TraceInterval::Real = 5.0,
         kwargs...
     )
+        if isempty(Workers) && NWorkers > nworkers()
+            warn("Requested NWorkers=$NWorkers, while only $(nworkers()) available, reducing")
+            NWorkers = nworkers()
+        end
         if isempty(Workers) && NWorkers > 1
             Workers = workers()[1:NWorkers]
         end
