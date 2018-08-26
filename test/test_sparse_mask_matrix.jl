@@ -1,5 +1,6 @@
 @testset "SparseMaskMatrix" begin
-    using OptEnrichedSetCover.SparseMaskMatrix
+    using OptEnrichedSetCover: SparseMaskMatrix
+
     @testset "empty" begin
         @inferred SparseMaskMatrix()
         mask = SparseMaskMatrix()
@@ -71,7 +72,7 @@
         @inferred convert(Matrix{Bool}, sm1)
         mtx1 = convert(Matrix{Bool}, sm1)
         @test mtx1 isa Matrix{Bool}
-        @test mtx1 == Matrix{Bool}(0, 0)
+        @test mtx1 == Matrix{Bool}(undef, 0, 0)
 
         sm2 = SparseMaskMatrix([false false true; true false false])
         mtx2 = convert(Matrix{Bool}, sm2)

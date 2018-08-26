@@ -21,16 +21,16 @@ struct QuadraticCoverProblem <: AbstractCoverProblem{Float64}
 end
 
 struct QuadraticOptimizerParams <: AbstractOptimizerParams{QuadraticCoverProblem}
-    solver::MathProgBase.SolverInterface.AbstractMathProgSolver
+    solver_factory #=::JuMP.OptimizerFactory=#
 
     QuadraticOptimizerParams(;
-        solver::MathProgBase.SolverInterface.AbstractMathProgSolver = default_quadratic_solver(),
+        solver_factory#=::JuMP.OptimizerFactory=# = with_default_quadratic_solver(),
         #iterations::Int = 100,
         #ini_weights::Vector{Float64}
-    ) = new(solver)
+    ) = new(solver_factory)
 end
 
-quadratic_solver(opt_params::QuadraticOptimizerParams) = opt_params.solver
+with_quadratic_solver(opt_params::QuadraticOptimizerParams) = opt_params.solver_factory
 
 function QuadraticCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     v2set = var2set(mosaic)
@@ -42,11 +42,11 @@ end
 """
 Construct JuMP quadratic minimization model with linear contraints for the given OESC problem.
 """
-function opt_model(problem::QuadraticCoverProblem)
-    m = JuMP.Model()
+function opt_model(problem::QuadraticCoverProblem, opt_params::QuadraticOptimizerParams)
+    m = JuMP.Model(with_quadratic_solver(opt_params))
     nw = nvars(problem)
-    @variable(m, 0.0 <= w[1:nw] <= 1.0)
-    @objective(m, :Min, dot(vec(problem.var_scores), w) - dot(w, problem.varXvar_scores * w))
+    #= @variable =# JuMP.variable(m, 0.0 <= w[1:nw] <= 1.0)
+    #= @objective =# JuMP.objective(m, :Min, dot(vec(problem.var_scores), w) - dot(w, problem.varXvar_scores * w))
     return m
 end
 
@@ -79,8 +79,7 @@ function optimize(problem::QuadraticCoverProblem,
     # Perform the optimization
     #try
     # using JuMP
-    m = opt_model(problem)
-    setsolver(m, quadratic_solver(opt_params))
+    m = opt_model(problem, opt_params)
     solve(m)
     w = copy(getvalue(getindex(m, :w)))
     # remove small non-zero probabilities due to optimization method errors
@@ -92,7 +91,7 @@ function optimize(problem::QuadraticCoverProblem,
     s = getobjectivevalue(m)
     return CoverProblemResult(problem.var2set, w, problem.var_scores .* w, s, s)
     #catch x
-    #    warn("Exception in optimize(CoverProblem): $x")
+    #    @warn("Exception in optimize(CoverProblem): $x")
     #    return nothing
     #end
 end

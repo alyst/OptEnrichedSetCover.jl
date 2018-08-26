@@ -1,5 +1,5 @@
 @testset "logpvalue(A & B)" begin
-    using OptEnrichedSetCover.logpvalue
+    using OptEnrichedSetCover: logpvalue
 
     @test_throws ArgumentError logpvalue(1, -1, 0, 1)
     @test_throws ArgumentError logpvalue(1, 1, -1, 1, :right)

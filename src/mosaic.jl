@@ -1,4 +1,4 @@
-function _encode_elements{T}(all_elms::Set{T})
+function _encode_elements(all_elms::Set{T}) where T
     ix2elm = collect(all_elms)
     sort!(ix2elm)
     # map from element to its index
@@ -10,7 +10,7 @@ function _encode_elements{T}(all_elms::Set{T})
     ix2elm, elm2ix
 end
 
-function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
+function _prepare_tiles(sets, elm2ix::Dict{T, Int}) where T
     if isempty(sets)
         # no sets -- no tiles
         return SparseMaskMatrix(0, length(elm2ix)), SparseMaskMatrix(length(elm2ix), 0),
@@ -33,7 +33,7 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
     sets2elms = Dict{Vector{Int}, Vector{Int}}()
     sizehint!(sets2elms, length(elm2ix))
     for i in 1:size(setXelm, 2)
-        @inbounds set_ixs = find(view(setXelm, :, i))
+        @inbounds set_ixs = findall(view(setXelm, :, i))
         push!(get!(() -> Vector{Int}(), sets2elms, set_ixs), i)
     end
 
@@ -67,7 +67,7 @@ function _prepare_tiles{T}(sets, elm2ix::Dict{T, Int})
 end
 
 # unlike Base.union() does not use recursion
-function _union{T}(::Type{T}, sets)
+function _union(::Type{T}, sets) where T
     res = Set{T}()
     for set in sets
         union!(res, set)

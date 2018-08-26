@@ -3,13 +3,13 @@ Parameters for `collect(mosaic::MaskedSetMosaic)`.
 """
 struct CoverEnumerationParams
     max_covers::Int
-    max_set_score::Union{Float64, Void}
-    max_cover_score_delta::Union{Float64, Void}
+    max_set_score::Union{Float64, Nothing}
+    max_cover_score_delta::Union{Float64, Nothing}
 
     CoverEnumerationParams(;
         max_covers::Int = 0,
-        max_set_score::Union{Real, Void} = -10.0,
-        max_cover_score_delta::Union{Real, Void} = nothing) =
+        max_set_score::Union{Real, Nothing} = -10.0,
+        max_cover_score_delta::Union{Real, Nothing} = nothing) =
         new(max_covers, max_set_score, max_cover_score_delta)
 end
 
@@ -129,17 +129,17 @@ function collect!(cover_coll::CoverCollection,
                   opt_params::AbstractOptimizerParams,
                   verbose::Bool=false
 )
-    verbose && info("Starting covers enumeration...")
+    verbose && @info("Starting covers enumeration...")
     # thresholds for identifying duplicate covers
-    const score_threshold = 1E-3
-    const weight_threshold = 1E-3
+    score_threshold = 1E-3
+    weight_threshold = 1E-3
     while true
-        verbose && info("Trying to find cover #$(length(cover_coll)+1)...")
+        verbose && @info("Trying to find cover #$(length(cover_coll)+1)...")
         cur_cover = optimize(cover_problem, opt_params)
-        verbose && info("New cover found (score=$(cur_cover.total_score), aggscore=$(cur_cover.agg_total_score)), processing...")
-        used_varixs = find(w -> w > cover_problem.params.min_weight, cur_cover.weights)
+        verbose && @info("New cover found (score=$(cur_cover.total_score), aggscore=$(cur_cover.agg_total_score)), processing...")
+        used_varixs = findall(w -> w > cover_problem.params.min_weight, cur_cover.weights)
         if isempty(used_varixs)
-            verbose && info("Cover is empty")
+            verbose && @info("Cover is empty")
             break
         end
         # store cover in the list maintaining sorting order
@@ -150,7 +150,7 @@ function collect!(cover_coll::CoverCollection,
                cur_cover.var2set == cover.var2set #= should never happen =# &&
                all(i -> (@inbounds return abs(cur_cover.weights[i] - cover.weights[i]) <= weight_threshold),
                    eachindex(cur_cover.weights))
-                verbose && info("Duplicate solution")
+                verbose && @info("Duplicate solution")
                 break
             end
         end
@@ -158,7 +158,7 @@ function collect!(cover_coll::CoverCollection,
             # not the best cover
             cover_score_delta = cur_cover.agg_total_score - cover_coll.results[1].agg_total_score
             if cover_score_delta > params.max_cover_score_delta
-                verbose && info("Cover score_delta=$(cover_score_delta) above threshold")
+                verbose && @info("Cover score_delta=$(cover_score_delta) above threshold")
                 break
             end
         end
@@ -166,7 +166,7 @@ function collect!(cover_coll::CoverCollection,
             max_set_score = params.max_set_score::Float64
             if all(i -> (@inbounds return all(x -> x > max_set_score, view(cover_problem.var_scores, i, :))),
                     used_varixs)
-                verbose && info("All set scores below $(max_set_score)")
+                verbose && @info("All set scores below $(max_set_score)")
                 break
             end
         end
@@ -185,12 +185,12 @@ function collect!(cover_coll::CoverCollection,
             end
         end
         if !scores_updated
-            verbose && info("No global set scores improvement")
+            verbose && @info("No global set scores improvement")
             break
         end
         # save the current cover
         insert!(cover_coll.results, cover_pos, cur_cover)
-        verbose && info("Cover collected")
+        verbose && @info("Cover collected")
         # update pointers to the best covers for the sets
         for i in eachindex(cover_coll.sel2cover)
             if cover_coll.sel2cover[i] == -1
@@ -201,18 +201,18 @@ function collect!(cover_coll::CoverCollection,
             end
         end
         if params.max_covers > 0 && length(cover_coll) >= params.max_covers
-            verbose && info("Maximal number of covers collected")
+            verbose && @info("Maximal number of covers collected")
             break
         end
         if all(x -> x > 0, cover_coll.sel2cover)
-            verbose && info("All sets assigned to covers")
+            verbose && @info("All sets assigned to covers")
             break
         end
         # exclude current solution
         cover_problem = exclude_vars(cover_problem,
                             selectvars(cover_problem, mosaic, cur_cover.weights))
     end
-    verbose && info("$(length(cover_coll)) cover(s) collected")
+    verbose && @info("$(length(cover_coll)) cover(s) collected")
     return cover_coll
 end
 
@@ -228,8 +228,8 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
     # collect all sets that are covered in at least one mask
     selsets = Set{Int}(covers.setixs)
     nmasks = size(covers.elmasks, 2)
-    selsize_v = setsize.(mosaic, covers.setixs)
-    set2sel = Dict(zip(covers.setixs, 1:length(covers.setixs)))
+    selsize_v = [setsize(mosaic, i) for i in covers.setixs]
+    set2sel = Dict(zip(covers.setixs, eachindex(covers.setixs)))
     nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2sel)
     coverix_v = Vector{Int}()
     setix_v = Vector{Int}()

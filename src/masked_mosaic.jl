@@ -1,6 +1,6 @@
 # the number of masked elements in each set of mosaic
 function nmasked_perset_mask!(nmasked::AbstractVector{Int}, mosaic::SetMosaic, elmask::AbstractVector{Bool},
-                              set2index::Union{Void,Dict{Int,Int}} = nothing)
+                              set2index::Union{Nothing,Dict{Int,Int}} = nothing)
     @inbounds for elix in eachindex(elmask)
         elmask[elix] || continue
         for setix in view(mosaic.setXelm, :, elix)
@@ -19,7 +19,7 @@ end
 
 # the number of masked elements in each set of mosaic
 function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractVector,
-                        set2index::Union{Void,Dict{Int,Int}} = nothing)
+                        set2index::Union{Nothing,Dict{Int,Int}} = nothing)
     res = zeros(Int, set2index === nothing ? nsets(mosaic) : length(set2index), length(elmasks))
     @inbounds for (maskix, elmask) in enumerate(elmasks)
         @assert length(elmask) == nelements(mosaic)
@@ -30,7 +30,7 @@ end
 
 # the number of masked elements in each set of mosaic
 function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool},
-                        set2index::Union{Void,Dict{Int,Int}} = nothing)
+                        set2index::Union{Nothing,Dict{Int,Int}} = nothing)
     @assert size(elmasks, 1) == nelements(mosaic)
     res = zeros(Int, set2index === nothing ? nsets(mosaic) : length(set2index), size(elmasks, 2))
     @inbounds for maskix in 1:size(elmasks, 2)
@@ -78,7 +78,7 @@ function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
         push!(maskixs, i)
     end
     MaskedSetMosaic(mosaic, convert(BitMatrix, elmasks),
-                    squeeze(sum(elmasks, 1), 1), maskedsets, orig2masked)
+                    dropdims(sum(elmasks, dims=1), dims=1), maskedsets, orig2masked)
 end
 
 # FIXME not optimal

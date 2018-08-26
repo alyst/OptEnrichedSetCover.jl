@@ -1,14 +1,23 @@
-@testset "CoverEnumerator problem_type=$problem_type" for problem_type in (:quadratic, :multiobjective) # FIXME use weights
+global tested_problem_types = [:multiobjective]
+if OptEnrichedSetCover.__quadratic_problem_supported__
+    push!(tested_problem_types, :quadratic)
+else
+    @warn "Quadratic problem not supported and not tested"
+end
+
+@testset "CoverEnumerator problem_type=$problem_type" for problem_type in tested_problem_types # FIXME use weights
     @testset "[:a] [:b] [:c] [:a :b :c], mask=[:a :b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
         sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
         # low penality to select sets, high probability to miss active element, so select abc
-        cover_params1 = CoverParams(sel_prob=1.0)
+        cover_params1 = CoverParams(sel_prob=0.5)
         cover_coll1a = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
-        @test length(cover_coll1a) == 1
-        cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=-1.0), problem_type=problem_type)
-        @test length(cover_coll1b) == 0
+        @test length(cover_coll1a) == 2
+        cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=0.4), problem_type=problem_type)
+        @test length(cover_coll1b) == 1
+        cover_coll1c = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=-1.0), problem_type=problem_type)
+        @test length(cover_coll1c) == 0
 
         # higher penalty to select sets, high probability to miss active element, so select abc
         cover_params2 = CoverParams(sel_prob=0.75)
@@ -22,8 +31,7 @@
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_params3 = CoverParams(sel_prob=1.0)
         cover_coll3 = collect(sm_ab, cover_params3, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
-        #@show cover_coll2
-        @test length(cover_coll3) == 1 # FIXME use a and b weights
+        @test length(cover_coll3) == 2 # FIXME use a and b weights
     end
 
     @testset "[:a] [:b] [:c] [:a :b :c] :d :e, mask=[:a :b]" begin

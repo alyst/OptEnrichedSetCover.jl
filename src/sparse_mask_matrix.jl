@@ -134,7 +134,7 @@ Base.getindex(mtx::SparseMaskMatrix, row::Integer, col::Integer) =
 
 Base.@propagate_inbounds function Base.getindex(mtx::SparseMaskMatrix, ::Colon, colmask::AbstractVector{Bool})
     length(colmask) == size(mtx, 2) || throw(ArgumentError("Column mask length should match the number of columns"))
-    mtx[:, find(colmask)]
+    mtx[:, findall(colmask)]
 end
 
 Base.view(mtx::SparseMaskMatrix, ::Colon, col::Integer) = view(mtx.rowval, _colrange(mtx, col))

@@ -65,8 +65,8 @@ function tilemaskXvar(mosaic::MaskedSetMosaic)
         end
     end
     used_tilemask_v = sort!(collect(used_tilemasks)) # sort lexicographically
-    nmasked_pertilemask = Vector{Int}(length(used_tilemask_v))
-    nunmasked_pertilemask = Vector{Int}(length(used_tilemask_v))
+    nmasked_pertilemask = fill(0, length(used_tilemask_v))
+    nunmasked_pertilemask = fill(0, length(used_tilemask_v))
     last_tileix = 0
     tile_size = 0
     tile_elms = view([], 1:0) # empty range for type stability
@@ -108,7 +108,7 @@ end
 function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
     sel_penalty = log(params.sel_prob)
-    v_scores = Vector{Float64}(length(var2set))
+    v_scores = Vector{Float64}(undef, length(var2set))
     for (varix, setix) in enumerate(var2set)
         scoresum = 0.0
         msetixs = mosaic.orig2masked[setix]
@@ -128,8 +128,8 @@ end
 
 function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
-    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2set, var2set],
-                                params, scale)
+    vXv_scores = broadcast(sXs -> varXvar_score(sXs, params, scale),
+                           mosaic.original.setXset_scores[var2set, var2set])
     for i in eachindex(var2set)
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
@@ -144,7 +144,7 @@ function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
     @inbounds for i in eachindex(vXv_scores)
         if !isfinite(vXv_scores[i])
             v1, v2 = ind2sub(size(vXv_scores), i)
-            warn("var[$v1]×var[$v2] score is $(vXv_scores[i])")
+            @warn("var[$v1]×var[$v2] score is $(vXv_scores[i])")
             if vXv_scores[i] < 0.0
                 vXv_scores[i] = vXv_subst
             end
@@ -185,23 +185,23 @@ end
 """
 Result of `optimize(AbstractCoverProblem)`.
 """
-struct CoverProblemResult{T, E}
+struct CoverProblemResult{T}
     var2set::Vector{Int}        # indices of sets in the original SetMosaic
     weights::Vector{Float64}    # solution: weights of the sets
     var_scores::Vector{Float64} # scores of the sets
     total_score::T
     agg_total_score::Float64
-    extra::E
+    extra
 
     function CoverProblemResult(
             var2set::AbstractVector{Int},
             weights::AbstractVector{Float64},
             var_scores::AbstractVector{Float64},
-            total_score::T, agg_total_score::Float64, extra::E = nothing) where {T, E}
+            total_score::T, agg_total_score::Float64, extra = nothing) where T
         length(var2set) == length(weights) == length(var_scores) ||
-            throw(ArgumentError("Lengths of cover result components do not match"))
-        new{T, E}(var2set, weights, var_scores,
-                  total_score, agg_total_score, extra)
+            throw(DimensionMismatch("Lengths of cover result components do not match"))
+        new{T}(var2set, weights, var_scores,
+               total_score, agg_total_score, extra)
     end
 end
 
@@ -219,7 +219,7 @@ function selectvars(problem::AbstractCoverProblem,
                     weights::AbstractVector{Float64}
 )
     @assert length(weights) == nvars(problem)
-    return find(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
+    return findall(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
 end
 
 abstract type AbstractOptimizerParams{P <: AbstractCoverProblem} end;

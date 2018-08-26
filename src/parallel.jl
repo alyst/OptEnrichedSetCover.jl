@@ -34,7 +34,7 @@ function pcollect(
     verbose::Bool=false,
     kwargs...
 ) where {MK, SK}
-    info("Parallel OESC ($(length(mosaics)) mosaic(s) × $(length(sets)) set(s))...")
+    @info("Parallel OESC ($(length(mosaics)) mosaic(s) × $(length(sets)) set(s))...")
     # FIXME workaround for pmap() being unable to handle callable objects +
     # unable to efficiently handle large callable objects
     collect_covers = CollectCovers(mosaics, sets, cover_params, enum_params, opt_params)
@@ -42,21 +42,21 @@ function pcollect(
     #                    length(tasks))
     mosaicXset_keys = vec([(m, s) for m in keys(mosaics), s in keys(sets)])
     if mode == :parallel
-        keyXcover_vec = @parallel (append!) for (m,s) in shuffle!(mosaicXset_keys)
+        keyXcover_vec = @distributed (append!) for (m,s) in shuffle!(mosaicXset_keys)
             res = Any[collect_covers(m, s)]
-            info("$(myid()): done mosaic=$m × set=$s")
+            @info("$(myid()): done mosaic=$m × set=$s")
             return res
         end
     elseif mode == :sequential
         keyXcover_vec = map(mosaicXset_keys) do mXs
             m, s = mXs
-            verbose && info("Calculating mosaic=$m × set=$s...")
+            verbose && @info("Calculating mosaic=$m × set=$s...")
             collect_covers(m, s, verbose=verbose)
         end
     else
         throw(ArgumentError("Unknown mode $mode"))
     end
-    verbose && info("Done covers enumeration, preparing the results...")
+    verbose && @info("Done covers enumeration, preparing the results...")
     # filter out empty covers
     keyXcover = sizehint!(Dict{Tuple{MK,SK}, CoverCollection}(), length(keyXcover_vec))
     for (mXs_key, covers_coll) in keyXcover_vec
@@ -64,7 +64,7 @@ function pcollect(
             keyXcover[mXs_key] = covers_coll
         end
     end
-    info("$(length(keyXcover)) non-trivial cover(s) collected")
+    @info("$(length(keyXcover)) non-trivial cover(s) collected")
     return keyXcover
 end
 
@@ -75,11 +75,11 @@ function pcollect(sets1_colls, sets2;
     verbose::Bool=false, pids=workers(),
     kwargs...
 )
-    verbose && info("Preparing mosaics...")
+    verbose && @info("Preparing mosaics...")
     #p = Progress(sum(length, values(entrez_clusters))*length(entrez_colls), 5.0,
     #              "Computing cluster coverings...")   # minimum update interval: 5 second
     sets1_mosaics = Dict(pmap(sets1_colls) do coll_kv
-        verbose && info("Preparing $(coll_kv[1]) mosaic...")
+        verbose && @info("Preparing $(coll_kv[1]) mosaic...")
         Pair(coll_kv[1], SetMosaic(coll_kv[2]))
     end)
     return pcollect(sets1_mosaics, sets2,

@@ -60,8 +60,8 @@
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
-        @test_broken tile(sm, 1) == [1]
-        @test_broken tile(sm, 2) == [2]
+        @test tile(sm, 1) == [1]
+        @test tile(sm, 2) == [2]
         @test nsets(sm) ==2
     end
 
@@ -95,9 +95,9 @@
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 3
-        @test_broken tile(sm, 1) == [1, 2]
-        @test_broken tile(sm, 2) == [3]
-        @test_broken tile(sm, 3) == [4]
+        @test tile(sm, 1) == [1, 2]
+        @test tile(sm, 2) == [3]
+        @test tile(sm, 3) == [4]
         @test nsets(sm) == 3
     end
 

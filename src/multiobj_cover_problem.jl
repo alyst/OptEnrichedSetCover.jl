@@ -17,7 +17,7 @@ BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: MultiobjectiveProblemF
     ParetoFitnessScheme{N, Float64, true, MultiobjectiveCoverProblemScoreAggregator{FF}}
 
 function MultiobjectiveProblemFitnessFolding(mosaic::MaskedSetMosaic, params::CoverParams,
-                                             fitfolding::Union{Symbol, Void} = nothing)
+                                             fitfolding::Union{Symbol, Nothing} = nothing)
     if fitfolding === nothing || fitfolding == :auto # chose folding automatically
         return MultiobjectiveProblemSoft12Convolute(params)
     elseif fitfolding == :none
@@ -161,7 +161,7 @@ struct MultiobjectiveOptimizerParams <: AbstractOptimizerParams{MultiobjectiveCo
         kwargs...
     )
         if isempty(Workers) && NWorkers > nworkers()
-            warn("Requested NWorkers=$NWorkers, while only $(nworkers()) available, reducing")
+            @warn("Requested NWorkers=$NWorkers, while only $(nworkers()) available, reducing")
             NWorkers = nworkers()
         end
         if isempty(Workers) && NWorkers > 1
@@ -170,7 +170,7 @@ struct MultiobjectiveOptimizerParams <: AbstractOptimizerParams{MultiobjectiveCo
         new(PopulationSize, MaxSteps, MaxStepsWithoutProgress,
             FitnessTolerance, MinDeltaFitnessTolerance, TraceInterval,
             Workers,
-            BlackBoxOptim.kwargs2dict(kwargs))
+            BlackBoxOptim.kwargs2dict(kwargs...))
     end
 end
 
@@ -203,7 +203,7 @@ genop_params(opt_params::MultiobjectiveOptimizerParams) =
     BlackBoxOptim.ParamsDict()
 
 function MultiobjectiveCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams();
-                                    fitfolding::Union{Symbol, Void} = nothing)
+                                    fitfolding::Union{Symbol, Nothing} = nothing)
     v2set = var2set(mosaic)
     v_scores = var_scores(mosaic, v2set, params)
     vXv_scores = varXvar_scores(mosaic, v2set, params, false)
@@ -221,15 +221,15 @@ function minplus_quad(A::AbstractMatrix{T},
     isempty(w) && return zero(T)
     res = zero(T)
     @inbounds for i in eachindex(w)
-        const wi = w[i]
-        const ioffset = (i-1)*size(A, 1)
+        wi = w[i]
+        ioffset = (i-1)*size(A, 1)
         resi = zero(T)
         if zero(T) < wi < one(T)
-            @simd for j in eachindex(w)
+            for j in eachindex(w)
                 resi += A[ioffset+j]*min(wi, w[j])
             end
         elseif wi == one(T) # wi >= maxw
-            @simd for j in eachindex(w)
+            for j in eachindex(w)
                 resi += A[ioffset+j] * w[j] # FIXME dotprod() faster?
             end
         end
@@ -250,15 +250,15 @@ function minplus_bilinear!(foldl::Function,
         throw(DimensionMismatch("v ($(length(v))) and A $(size(A)) size mismatch"))
     n = length(res)
     @inbounds for i in 1:size(A, 2)
-        const ui = u[i]
-        const ioffset = (i-1)*size(A, 1)
+        ui = u[i]
+        ioffset = (i-1)*size(A, 1)
         x = zero(T)
         if zero(T) < ui < one(T)
-            @simd for j in eachindex(v)
+            for j in eachindex(v)
                 x += A[ioffset+j] * min(ui, v[j])
             end
         elseif ui == one(T)
-            @simd for j in eachindex(v)
+            for j in eachindex(v)
                 x += A[ioffset+j] * v[j] # FIXME dotprod() faster?
             end
         end
@@ -273,12 +273,12 @@ function exclude_vars(problem::MultiobjectiveCoverProblem,
                       vars::AbstractVector{Int};
                       penalize_overlaps::Bool = true)
     varmask = fill(true, nvars(problem))
-    varmask[vars] = false
+    varmask[vars] .= false
     v_scores = problem.var_scores[varmask]
     if penalize_overlaps
         # penalize overlapping sets
         pweights = fill(0.0, nvars(problem))
-        pweights[vars] = 1.0
+        pweights[vars] .= 1.0
         varscore_penalties = similar(pweights)
         minplus_bilinear!(take2, varscore_penalties,
                           problem.varXvar_scores,
@@ -301,7 +301,7 @@ function miscover_score(problem::MultiobjectiveCoverProblem, w::AbstractVector{F
     wtile = fill(0.0, ntiles(problem))
     @inbounds for (varix, wvar) in enumerate(w)
         if wvar == 1.0
-            wtile[view(problem.tileXvar, :, varix)] = 1.0
+            wtile[view(problem.tileXvar, :, varix)] .= 1.0
         elseif wvar > 0.0
             for tileix in view(problem.tileXvar, :, varix)
                 wtile[tileix] = max(wtile[tileix], wvar)
@@ -367,7 +367,7 @@ struct MultiobjectiveCoverProblemBBOWrapper{FF <: MultiobjectiveProblemFitnessFo
 end
 
 Base.copy(problem::MultiobjectiveCoverProblemBBOWrapper) =
-    MultiobjectiveCoverProblemBBOWrapper(problem.orig; digits=first(digits(search_space(problem))))
+    MultiobjectiveCoverProblemBBOWrapper(problem.orig; digits=dimdigits(search_space(problem), 1))
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjectiveCoverProblemBBOWrapper{MultiobjectiveProblemNoFolding}) =
@@ -417,19 +417,19 @@ function optimize(problem::MultiobjectiveCoverProblem,
     end
 
     bbowrapper = MultiobjectiveCoverProblemBBOWrapper(problem)
-    popmatrix = BlackBoxOptim.rand_individuals_lhs(search_space(bbowrapper), opt_params.pop_size)
+    popmatrix = BlackBoxOptim.rand_individuals(search_space(bbowrapper), opt_params.pop_size, method=:latin_hypercube)
     # two extreme solutions and one totally neutral
-    size(popmatrix, 2) > 0 && (popmatrix[:, 1] = 0.0)
-    size(popmatrix, 2) > 1 && (popmatrix[:, 2] = 1.0)
-    size(popmatrix, 2) > 2 && (popmatrix[:, 3] = 0.5)
-    size(popmatrix, 2) > 3 && (popmatrix[:, 4] = sortperm(problem.var_scores, rev=true)./length(problem.var_scores))
+    size(popmatrix, 2) > 0 && (popmatrix[:, 1] .= 0.0)
+    size(popmatrix, 2) > 1 && (popmatrix[:, 2] .= 1.0)
+    size(popmatrix, 2) > 2 && (popmatrix[:, 3] .= 0.5)
+    size(popmatrix, 2) > 3 && (popmatrix[:, 4] .= sortperm(problem.var_scores, rev=true)./length(problem.var_scores))
     # solutions that select topN most significant sets
-    score_qtls = quantile(problem.var_scores, linspace(0.0, 1.0, 10))
+    score_qtls = quantile(problem.var_scores, range(0.0, stop=1.0, length=10))
     for i in 1:10
         (size(popmatrix, 2) < i + 4) && break
-        popmatrix[:, i+4] = ifelse.(problem.var_scores .<= score_qtls[i], 1.0, 0.0)
+        popmatrix[:, i+4] .= ifelse.(problem.var_scores .<= score_qtls[i], 1.0, 0.0)
     end
-    const N = numobjectives(typeof(problem))
+    N = numobjectives(typeof(problem))
     population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{N,Float64}), ntransient=1)
 
     go_params = genop_params(opt_params)
@@ -442,13 +442,13 @@ function optimize(problem::MultiobjectiveCoverProblem,
     bboctrl = BlackBoxOptim.OptController(bboptimizer, bbowrapper,
                  bbo_ctrl_params(opt_params))
     bbores = bboptimize(bboctrl)
-    isinterrupted(bbores) && throw(InterruptException())
+    BlackBoxOptim.isinterrupted(bbores) && throw(InterruptException())
     w = best_candidate(bbores)
     s = best_fitness(bbores)
 
     # remove small non-zero probabilities due to optimization method errors
-    const minw = problem.params.min_weight
-    const maxw = 1.0 - problem.params.min_weight
+    minw = problem.params.min_weight
+    maxw = 1.0 - problem.params.min_weight
     @inbounds for i in eachindex(w)
         if w[i] <= minw
             w[i] = 0.0

@@ -22,14 +22,14 @@
         empty_problem = QuadraticCoverProblem(mask(SetMosaic([Set([:a])]), [Set{Symbol}()]))
         @test nvars(empty_problem) == 0
         empty_res = optimize(empty_problem)
-        @test empty_res.weights == Vector{Float64}(0)
+        @test empty_res.weights == Vector{Float64}()
         @test empty_res.total_score == 0.0
 
         # disabled because :a is all elements
         dis_problem = QuadraticCoverProblem(mask(SetMosaic([Set([:a])], Set([:a])), [Set{Symbol}([:a])], min_nmasked=1))
         @test nvars(dis_problem) == 1
         dis_res = optimize(dis_problem)
-        @test dis_res.weights == zeros(Float64, 1)
+        @test dis_res.weights == fill(0.0, 1)
 
         # enabled because there is :a and :b
         en_problem = QuadraticCoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])),
@@ -37,7 +37,7 @@
                                            CoverParams(sel_prob=0.9))
         @test nvars(en_problem) == 1
         en_res = optimize(en_problem)
-        @test en_res.weights == ones(Float64, 1)
+        @test en_res.weights == fill(1.0, 1)
     end
 
     @testset "[a b] [c d] [a b c d], mask=[a b]" begin # FIXME take weights into account
@@ -89,7 +89,7 @@
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [1.0, 1.0, 0.0, 0.0, 0.0])
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [0.0, 0.0, 0.0, 1.0, 0.0])
         res_low_penalty = optimize(problem_low_penalty)
-        @test find(res_low_penalty.weights) == [1, 3]
+        @test findall(res_low_penalty.weights) == [1, 3]
     end
 
     @testset "multimask: [a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[[a b c] [b e]]" begin # FIXME take weights into account
@@ -109,6 +109,6 @@
         problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=0.05, sel_prob=0.9))
         res_low_penalty = optimize(problem_low_penalty)
         #@show res_low_penalty.weights
-        @test find(res_low_penalty.weights) == [3]# [1, 3, 4]
+        @test findall(res_low_penalty.weights) == [3]# [1, 3, 4]
     end
 end

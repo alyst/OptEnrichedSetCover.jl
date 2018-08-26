@@ -17,7 +17,7 @@
         empty_problem = MultiobjectiveCoverProblem(mask(SetMosaic([Set([:a])]), [Set{Symbol}()]))
         @test nvars(empty_problem) == 0
         empty_res = optimize(empty_problem)
-        @test empty_res.weights == Vector{Float64}(0)
+        @test empty_res.weights == Vector{Float64}()
         @test empty_res.agg_total_score == 0.0
 
         # enabled because sel prob is high, and although :a is all elements it needs to be covered
