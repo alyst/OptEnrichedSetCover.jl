@@ -77,6 +77,11 @@ function _isect_size(set1_tiles::AbstractVector{Int},
     return res
 end
 
+# returns set×set score matrix
+# a×b score is the Fisher's test P-value of their intersection
+# a×a self-intersections are processed in the same way
+# (might be used later in cover problem construction to penalize the use of
+# multiple variables referencing the same set)
 function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
                          set_sizes::AbstractVector{Int},
                          tile_sizes::AbstractVector{Int},

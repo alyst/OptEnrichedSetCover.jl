@@ -238,7 +238,7 @@ function minplus_quad(A::AbstractMatrix{T},
     return res
 end
 
-# calculate r_i = fold(r_i, \sum_{j = 1} A_{i, j} min(u_i, v_j)), i = 1..N
+# calculate res_i = fold(res_i, \sum_{j = 1} A_{i, j} min(u_i, v_j)), i = 1..N
 function minplus_bilinear!(foldl::Function,
                            res::AbstractVector{T},
                            A::AbstractMatrix{T},
@@ -253,7 +253,7 @@ function minplus_bilinear!(foldl::Function,
         ui = u[i]
         ioffset = (i-1)*size(A, 1)
         x = zero(T)
-        if zero(T) < ui < one(T)
+        if zero(T) < ui < one(T) # if ui == 0, nothing is done
             for j in eachindex(v)
                 x += A[ioffset+j] * min(ui, v[j])
             end
@@ -292,8 +292,9 @@ function exclude_vars(problem::MultiobjCoverProblem,
                 problem.nmasked_pertile, problem.nunmasked_pertile)
 end
 
-# the total number of covered masked elements (in all masks overlapping with the cover)
-# the total number of unconvered masked elements (in all masks overlapping with the cover) minus
+# the tuple of:
+# - total number of uncovered masked elements (in all masks overlapping with the cover)
+# -`` total number of covered unmasked elements (in all masks overlapping with the cover)
 function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
     @assert length(w) == nvars(problem)
     isempty(problem.nmasked_pertile) && return (0.0, 0.0)

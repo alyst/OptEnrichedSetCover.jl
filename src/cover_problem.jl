@@ -105,6 +105,10 @@ function tilemaskXvar(mosaic::MaskedSetMosaic)
     return tileXvar, nmasked_pertilegroup, nunmasked_pertilegroup
 end
 
+# var score is:
+# the sum of overlap scores with all masked sets
+# minus the log(var selection probability)
+# plus nets*log(nsets), where nsets arr all masked sets overlapping with var
 function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
     sel_penalty = log(params.sel_prob)
@@ -130,7 +134,7 @@ function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
     vXv_scores = broadcast(sXs -> varXvar_score(sXs, params, scale),
                            mosaic.original.setXset_scores[var2set, var2set])
-    for i in eachindex(var2set)
+    for i in eachindex(var2set) # don't consider self-intersections
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
     vXv_min = Inf # minimum finite varXvar_scores element
