@@ -181,7 +181,7 @@ function borg_params(opt_params::MultiobjOptimizerParams,
     else
         #eps_scale = get(opt_params.borg_params, :ϵ_scale, [0.2, 0.1, 0.1])
         #eps = eps_scale .* [score_scales(problem)...]
-        eps = [0.1, 0.1]
+        eps = 0.01
     end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
