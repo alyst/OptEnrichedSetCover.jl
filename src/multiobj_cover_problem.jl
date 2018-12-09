@@ -296,7 +296,7 @@ end
 # - total number of uncovered masked elements (in all masks overlapping with the cover)
 # -`` total number of covered unmasked elements (in all masks overlapping with the cover)
 function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
-    @assert length(w) == nvars(problem)
+    __check_vars(w, problem)
     isempty(problem.nmasked_pertile) && return (0.0, 0.0)
     # calculate the tile coverage weights
     wtile = fill(0.0, ntiles(problem))
@@ -319,7 +319,7 @@ Unfolded multiobjective score (fitness) of the OESC coverage.
 * `w` probabilities of the sets being covered
 """
 function rawscore(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
-    @assert length(w) == nvars(problem)
+    __check_vars(w, problem)
     a = dot(problem.var_scores, w)
     if problem.params.setXset_factor == 0.0
         b = 0.0

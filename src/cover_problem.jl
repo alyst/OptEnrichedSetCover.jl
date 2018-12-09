@@ -186,6 +186,10 @@ function fix_cover_weights!(weights::Matrix{Float64})
     return pen
 end
 
+__check_vars(w::AbstractVector{Float64}, problem::AbstractCoverProblem) =
+    length(w) == nvars(problem) ||
+        throw(DimensionMismatch("Incorrect length of parameters vector: $(length(w)) ($(nvars(problem)) expected)"))
+
 """
 Result of `optimize(AbstractCoverProblem)`.
 """

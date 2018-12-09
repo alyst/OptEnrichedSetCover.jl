@@ -5,6 +5,7 @@
         problem = MultiobjCoverProblem(msm)
         @test nvars(problem) == 0
         @test_skip nmasks(problem) == 1
+        @test_throws DimensionMismatch rawscore(problem, [1.0])
         @test score(problem, Float64[]) == (0.0, 0.0)
 
         res = optimize(problem)
@@ -24,6 +25,7 @@
         prob1_mosaic = mask(SetMosaic([Set([:a])], Set([:a])), [Set([:a])], min_nmasked=1)
         en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.5, uncovered_factor=1.0))
         @test nvars(en1_prob) == 1
+        @test_throws DimensionMismatch rawscore(en1_prob, Float64[])
         en1_res = optimize(en1_prob)
         @test_broken en1_res.weights == ones(Float64, 1)
 
