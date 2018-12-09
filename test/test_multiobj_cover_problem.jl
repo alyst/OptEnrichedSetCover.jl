@@ -6,6 +6,8 @@
         @test nvars(problem) == 0
         @test_skip nmasks(problem) == 1
         @test_throws DimensionMismatch rawscore(problem, [1.0])
+        @test OESC.miscover_score(problem, Float64[]) == (0.0, 0.0)
+        @test rawscore(problem, Float64[]) == (0.0, 0.0, 0.0, 0.0)
         @test score(problem, Float64[]) == (0.0, 0.0)
 
         res = optimize(problem)
@@ -15,9 +17,12 @@
 
     @testset "[a]" begin # FIXME take element detection probability into account
         # empty mask problem
-        empty_problem = MultiobjCoverProblem(mask(SetMosaic([Set([:a])]), [Set{Symbol}()]))
-        @test nvars(empty_problem) == 0
-        empty_res = optimize(empty_problem)
+        empty_prob = MultiobjCoverProblem(mask(SetMosaic([Set([:a])]), [Set{Symbol}()]))
+        @test nvars(empty_prob) == 0
+        @test OESC.miscover_score(empty_prob, Float64[]) == (0.0, 0.0)
+        @test rawscore(empty_prob, Float64[]) == (0.0, 0.0, 0.0, 0.0)
+        @test score(empty_prob, Float64[]) == (0.0, 0.0)
+        empty_res = optimize(empty_prob)
         @test empty_res.weights == Vector{Float64}()
         @test empty_res.agg_total_score == 0.0
 
@@ -26,12 +31,26 @@
         en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.5, uncovered_factor=1.0))
         @test nvars(en1_prob) == 1
         @test_throws DimensionMismatch rawscore(en1_prob, Float64[])
-        en1_res = optimize(en1_prob)
-        @test_broken en1_res.weights == ones(Float64, 1)
+        @test OESC.miscover_score(en1_prob, [0.0]) == (1.0, 0.0)
+        @test OESC.miscover_score(en1_prob, [1.0]) == (0.0, 0.0)
+        en1_rawscore = rawscore(en1_prob, [1.0])
+        @test en1_rawscore == (en1_prob.var_scores[1], 0.0, 0.0, 0.0)
+        @test rawscore(en1_prob, [0.0]) == (0.0, 0.0, 1.0, 0.0)
+        @test en1_rawscore[1] < 1.0 # rawscore[3] at [0.0], required for enabling
+        @test rawscore(en1_prob, [0.5]) == (0.5*en1_prob.var_scores[1], 0.0, 0.5, 0.0)
+        @test aggscore(en1_prob, [1.0]) < aggscore(en1_prob, [0.9]) < aggscore(en1_prob, [0.5]) < aggscore(en1_prob, [0.0])
+        en1_res = optimize(en1_prob, MultiobjOptimizerParams(ϵ=0.01))
+        @test en1_res.weights == ones(Float64, 1)
 
         # disabled because :a is all elements and selection probability low
         dis1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.01, uncovered_factor=1.0))
         @test nvars(dis1_prob) == 1
+        @test dis1_prob.var_scores[1] > en1_prob.var_scores[1]
+        dis1_rawscore = rawscore(dis1_prob, [1.0])
+        @test dis1_rawscore == (dis1_prob.var_scores[1], 0.0, 0.0, 0.0)
+        @test rawscore(dis1_prob, [0.0]) == (0.0, 0.0, 1.0, 0.0)
+        @test dis1_rawscore[1] > 1.0 # rawscore[3] at [0.0], required for disabling
+        @test aggscore(dis1_prob, [1.0]) > aggscore(dis1_prob, [0.5]) > aggscore(dis1_prob, [0.0])
         dis1_res = optimize(dis1_prob)
         @test dis1_res.weights == zeros(Float64, 1)
 
@@ -65,7 +84,7 @@
 
         prob_hi_sXs = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_prob=1E-25))
         @test nvars(prob_hi_sXs) == 3
-        res_ignore_overlap = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
+        res_ignore_overlap = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=0.001))
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0] atol=0.01
 
         problem_b = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_prob=0.5))

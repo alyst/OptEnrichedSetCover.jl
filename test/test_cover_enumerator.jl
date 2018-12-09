@@ -10,8 +10,14 @@ end
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
         sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
-        # low penality to select sets, high probability to miss active element, so select abc
-        cover_params1 = CoverParams(sel_prob=0.5)
+        # low penality to select sets, high probability to miss active element, so select a and b, and abc
+        cover_params1 = CoverParams(sel_prob=0.5, uncovered_factor=0.5)
+        cover_problem = MultiobjCoverProblem(sm_ab, cover_params1)
+        @test nvars(cover_problem) == 3
+        @test aggscore(cover_problem, [1.0, 1.0, 0.0]) < aggscore(cover_problem, [0.0, 0.0, 0.0])
+        @test aggscore(cover_problem, [0.0, 0.0, 1.0]) < aggscore(cover_problem, [0.0, 0.0, 0.0])
+        @test aggscore(cover_problem, [1.0, 1.0, 0.0]) < aggscore(cover_problem, [1.0, 1.0, 1.0])
+        @test aggscore(cover_problem, [0.0, 0.0, 1.0]) < aggscore(cover_problem, [1.0, 1.0, 1.0])
         cover_coll1a = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll1a) == 2
         cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=0.4), problem_type=problem_type)
@@ -40,7 +46,7 @@ end
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
         cover_coll = collect(mask(sm, [Set([:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
-                             CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
+                             CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type, ϵ=0.01)
         @test length(cover_coll) == 2
         @test cover_coll.results[1].agg_total_score <= cover_coll.results[2].agg_total_score
     end
@@ -53,7 +59,7 @@ end
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=10.0),
-                             problem_type=problem_type)
+                             problem_type=problem_type, ϵ=0.01)
 
         df = DataFrame(cover_coll, sm)
         @test size(df, 1) == 3
