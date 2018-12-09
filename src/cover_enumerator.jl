@@ -118,16 +118,17 @@ function Base.collect(mosaic::MaskedSetMosaic,
                       opt_params::AbstractOptimizerParams,
                       verbose::Bool)
     cover_problem = problemtype(opt_params)(mosaic, cover_params)
-    collect!(CoverCollection(cover_problem, mosaic, enum_params),
-             cover_problem, mosaic, enum_params, opt_params, verbose)
+    append!(CoverCollection(cover_problem, mosaic, enum_params),
+            cover_problem, mosaic, enum_params, opt_params, verbose)
 end
 
-function collect!(cover_coll::CoverCollection,
-                  cover_problem::AbstractCoverProblem,
-                  mosaic::MaskedSetMosaic,
-                  params::CoverEnumerationParams,
-                  opt_params::AbstractOptimizerParams,
-                  verbose::Bool=false
+# append the optimal covers of `cover_problem` into `cover_coll`
+function Base.append!(cover_coll::CoverCollection,
+                      cover_problem::AbstractCoverProblem,
+                      mosaic::MaskedSetMosaic,
+                      params::CoverEnumerationParams,
+                      opt_params::AbstractOptimizerParams,
+                      verbose::Bool=false
 )
     verbose && @info("Starting covers enumeration...")
     # thresholds for identifying duplicate covers
