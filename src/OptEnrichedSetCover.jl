@@ -13,7 +13,7 @@ export SetMosaic, CoverParams,
     nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
     unmask, mask,
-    aggscore, score, # any conflicts
+    rawscore, aggscore, score, # any conflicts
     optimize # conflicts with Optim.jl
 
 global __quadratic_problem_supported__ = false
