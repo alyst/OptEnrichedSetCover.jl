@@ -39,7 +39,7 @@ end
                        Set([:a, :b, :c, :d, :e]))
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then abc
-        cover_coll = collect(mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
+        cover_coll = collect(mask(sm, [Set([:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll) == 2
         @test cover_coll.results[1].agg_total_score <= cover_coll.results[2].agg_total_score
@@ -48,7 +48,7 @@ end
     @testset "DataFrame(CoverCollection)" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                        Set([:a, :b, :c, :d, :e]))
-        sm_ab = mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1)
+        sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_prob=1.0),

@@ -21,7 +21,7 @@
         @test empty_res.agg_total_score == 0.0
 
         # enabled because sel prob is high, and although :a is all elements it needs to be covered
-        prob1_mosaic = mask(SetMosaic([Set([:a])], Set([:a])), [Set{Symbol}([:a])], min_nmasked=1)
+        prob1_mosaic = mask(SetMosaic([Set([:a])], Set([:a])), [Set([:a])], min_nmasked=1)
         en1_prob = MultiobjectiveCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.5, uncovered_factor=1.0))
         @test nvars(en1_prob) == 1
         en1_res = optimize(en1_prob)
@@ -35,7 +35,7 @@
 
         # enabled because there is :a and :b
         en2_prob = MultiobjectiveCoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])),
-                                                   [Set{Symbol}([:a])], min_nmasked=1),
+                                                   [Set([:a])], min_nmasked=1),
                                               CoverParams(sel_prob=0.9))
         @test nvars(en2_prob) == 1
         en2_res = optimize(en2_prob)
@@ -44,7 +44,7 @@
 
     @testset "[a b] [c d] [a b c d], mask=[a b]" begin # FIXME take weights into account
         sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c])]);
-        sm_ab = mask(sm, [Set(Symbol[:a, :b])], min_nmasked=1)
+        sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
         problem_def = MultiobjectiveCoverProblem(sm_ab)
         res_def = optimize(problem_def)
