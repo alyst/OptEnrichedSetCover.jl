@@ -87,7 +87,7 @@ function OptimizerParams(problem_type::Symbol, params::ParamsDict)
     if problem_type == :quadratic
         return QuadraticOptimizerParams(;params...)
     elseif problem_type == :multiobjective
-        return MultiobjectiveOptimizerParams(;params...)
+        return MultiobjOptimizerParams(;params...)
     else
         throw(ArgumentError("Unsupported cover problem type $problem_type"))
     end

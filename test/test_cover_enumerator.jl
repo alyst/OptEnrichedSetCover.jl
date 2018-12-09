@@ -78,7 +78,7 @@ end
                              CoverEnumerationParams(max_set_score=0.0),
                              problem_type==:quadratic ?
                                 OptEnrichedSetCover.QuadraticOptimizerParams() :
-                                OptEnrichedSetCover.MultiobjectiveOptimizerParams(ϵ=0.01),
+                                OptEnrichedSetCover.MultiobjOptimizerParams(ϵ=0.01),
                              false)
 
         df = DataFrame(cover_coll, sm, best_only=true)

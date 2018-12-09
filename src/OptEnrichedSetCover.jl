@@ -6,8 +6,8 @@ using LinearAlgebra, Distributed
 using Printf: @printf
 
 export SetMosaic, CoverParams,
-    AbstractCoverProblem, QuadraticCoverProblem, MultiobjectiveCoverProblem,
-    AbstractOptimizerParams, QuadraticOptimizerParams, MultiobjectiveOptimizerParams,
+    AbstractCoverProblem, QuadraticCoverProblem, MultiobjCoverProblem,
+    AbstractOptimizerParams, QuadraticOptimizerParams, MultiobjOptimizerParams,
     CoverEnumerationParams, CoverCollection, CoverProblemResult,
     nelements, ntiles, nsets, nmaskedsets, nmasks, nvars,
     nmasked, nunmasked, maskedset,

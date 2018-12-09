@@ -1,4 +1,4 @@
-global pcollect_opt_methods = [MultiobjectiveOptimizerParams()]
+global pcollect_opt_methods = [MultiobjOptimizerParams()]
 if OptEnrichedSetCover.__quadratic_problem_supported__
     push!(pcollect_opt_methods, QuadraticOptimizerParams())
 else
