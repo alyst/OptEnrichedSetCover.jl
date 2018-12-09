@@ -228,7 +228,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
     # collect all sets that are covered in at least one mask
     selsets = Set{Int}(covers.setixs)
     nmasks = size(covers.elmasks, 2)
-    selsize_v = [setsize(mosaic, i) for i in covers.setixs]
+    selsize_v = setsize.(Ref(mosaic), covers.setixs)
     set2sel = Dict(zip(covers.setixs, eachindex(covers.setixs)))
     nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2sel)
     coverix_v = Vector{Int}()
