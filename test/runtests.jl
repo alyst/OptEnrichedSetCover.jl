@@ -1,6 +1,8 @@
 using OptEnrichedSetCover
 using Test, LinearAlgebra, DataFrames
 
+const OESC = OptEnrichedSetCover
+
 # run the tests from jlfile
 macro testfile(jlfile)
     quote
@@ -14,7 +16,7 @@ end
 @testfile "test_sparse_mask_matrix.jl"
 @testfile "test_mosaic.jl"
 @testfile "test_masked_mosaic.jl"
-if OptEnrichedSetCover.__quadratic_problem_supported__
+if OESC.__quadratic_problem_supported__
     @testfile "test_quadratic_cover_problem.jl"
 else
     @warn "test_quadratic_cover_problem.jl tests skipped"

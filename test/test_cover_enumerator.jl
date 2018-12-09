@@ -1,5 +1,5 @@
 global tested_problem_types = [:multiobjective]
-if OptEnrichedSetCover.__quadratic_problem_supported__
+if OESC.__quadratic_problem_supported__
     push!(tested_problem_types, :quadratic)
 else
     @warn "Quadratic problem not supported and not tested"
@@ -77,8 +77,8 @@ end
         cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, covered_factor=0.0, uncovered_factor=0.0, sel_prob=0.9),
                              CoverEnumerationParams(max_set_score=0.0),
                              problem_type==:quadratic ?
-                                OptEnrichedSetCover.QuadraticOptimizerParams() :
-                                OptEnrichedSetCover.MultiobjOptimizerParams(ϵ=0.01),
+                                OESC.QuadraticOptimizerParams() :
+                                OESC.MultiobjOptimizerParams(ϵ=0.01),
                              false)
 
         df = DataFrame(cover_coll, sm, best_only=true)
