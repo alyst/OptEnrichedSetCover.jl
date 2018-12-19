@@ -363,7 +363,7 @@ struct MultiobjCoverProblemBBOWrapper{FF <: MultiobjProblemFitnessFolding, FS <:
     ) where {FF, F}
         FS = fitness_scheme_type(FF)
         fitscheme = FS(aggregator=MultiobjCoverProblemScoreAggregator{FF}(orig.params))
-        new{FF, FS, F}(orig, fitscheme, symmetric_search_space(nvars(orig), (0.0, 1.0)))
+        new{FF, FS, F}(orig, fitscheme, RangePerDimSearchSpace(nvars(orig), (0.0, 1.0), digits=digits))
     end
 end
 
