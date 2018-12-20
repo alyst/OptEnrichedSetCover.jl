@@ -101,6 +101,9 @@ struct MultiobjCoverProblem{FF<:MultiobjProblemFitnessFolding, F} <: AbstractCov
     nmasked_pertile::Vector{Int}    # number of masked elements for each tile
     nunmasked_pertile::Vector{Int}  # number of unmasked elements for each tile
 
+    tilepool::Vector{Vector{Float64}}   # pool of tile-sized vectors FIXME move to evaluator
+    varpool::Vector{Vector{Float64}}    # pool of var-sized vectors FIXME move to evaluator
+
     function MultiobjCoverProblem(params::CoverParams,
                         fitfolding::FF,
                         var2set::AbstractVector{Int},
@@ -119,7 +122,8 @@ struct MultiobjCoverProblem{FF<:MultiobjProblemFitnessFolding, F} <: AbstractCov
         F = fitness_type(FF)
         new{FF, F}(params, fitfolding, var2set,
                    var_scores, varXvar_scores,
-                   tileXvar, nmasked_pertile, nunmasked_pertile)
+                   tileXvar, nmasked_pertile, nunmasked_pertile,
+                   Vector{Vector{Float64}}(), Vector{Vector{Float64}}())
     end
 end
 
@@ -301,7 +305,10 @@ function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64
     __check_vars(w, problem)
     isempty(problem.nmasked_pertile) && return (0.0, 0.0)
     # calculate the tile coverage weights
-    wtile = fill(0.0, ntiles(problem))
+    wtile = isempty(problem.tilepool) ?
+            Vector{Float64}(undef, ntiles(problem)) :
+            pop!(problem.tilepool)
+    fill!(wtile, 0.0)
     @inbounds for (varix, wvar) in enumerate(w)
         if wvar == 1.0
             wtile[view(problem.tileXvar, :, varix)] .= 1.0
@@ -311,8 +318,10 @@ function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64
             end
         end
     end
-    return sum(problem.nmasked_pertile) - dot(problem.nmasked_pertile, wtile),
-           dot(problem.nunmasked_pertile, wtile)
+    res = sum(problem.nmasked_pertile) - dot(problem.nmasked_pertile, wtile),
+          dot(problem.nunmasked_pertile, wtile)
+    push!(problem.tilepool, wtile) # release to the pool
+    return res
 end
 
 """
@@ -327,9 +336,11 @@ function rawscore(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
         b = 0.0
     else
         # skip set interactions as it would be aggregated to zero
-        setXset = fill!(similar(w), 0.0)
+        setXset = isempty(problem.varpool) ? similar(w) : pop!(problem.varpool)
+        fill!(setXset, 0.0)
         minplus_bilinear!(min, setXset, problem.varXvar_scores, w, w)
         b = -sum(setXset)
+        push!(problem.varpool, setXset)
     end
     if problem.params.covered_factor == 0.0 &&
        problem.params.uncovered_factor == 0.0
