@@ -73,7 +73,7 @@
 
         problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_prob=1.0))
         @test nvars(problem_no_penalty) == 2
-        res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.01, 0.01]))
+        res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.01, 0.01], WeightDigits=nothing))
         @show res_no_penalty.total_score
         @test res_no_penalty.weights ≈ [1.0, 1.0] atol=0.01
     end

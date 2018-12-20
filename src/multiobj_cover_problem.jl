@@ -141,6 +141,7 @@ end
 
 struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     pop_size::Int
+    weight_digits::Union{Int, Nothing}
     max_steps::Int
     max_steps_without_progress::Int
     fitness_tolerance::Float64
@@ -153,6 +154,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         # default Borg/BBO Opt.Controller parameter overrides
         NWorkers::Integer = 1, Workers::AbstractVector{Int} = Vector{Int}(),
         PopulationSize::Integer = 100,
+        WeightDigits::Union{Integer, Nothing} = 2, # precision digits for set weights
         MaxSteps::Integer = 10_000_000,
         MaxStepsWithoutProgress::Integer = 10_000,
         FitnessTolerance::Real = 0.1,
@@ -167,7 +169,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         if isempty(Workers) && NWorkers > 1
             Workers = workers()[1:NWorkers]
         end
-        new(PopulationSize, MaxSteps, MaxStepsWithoutProgress,
+        new(PopulationSize, WeightDigits, MaxSteps, MaxStepsWithoutProgress,
             FitnessTolerance, MinDeltaFitnessTolerance, TraceInterval,
             Workers,
             BlackBoxOptim.kwargs2dict(kwargs...))
@@ -359,7 +361,7 @@ struct MultiobjCoverProblemBBOWrapper{FF <: MultiobjProblemFitnessFolding, FS <:
     search_space::SearchSpace
 
     function MultiobjCoverProblemBBOWrapper(
-        orig::MultiobjCoverProblem{FF, F}; digits::Integer=2
+        orig::MultiobjCoverProblem{FF, F}; digits::Union{Integer,Nothing}=2
     ) where {FF, F}
         FS = fitness_scheme_type(FF)
         fitscheme = FS(aggregator=MultiobjCoverProblemScoreAggregator{FF}(orig.params))
@@ -417,7 +419,7 @@ function optimize(problem::MultiobjCoverProblem,
                                   score(problem, w), 0.0, nothing)
     end
 
-    bbowrapper = MultiobjCoverProblemBBOWrapper(problem)
+    bbowrapper = MultiobjCoverProblemBBOWrapper(problem, digits=opt_params.weight_digits)
     popmatrix = BlackBoxOptim.rand_individuals(search_space(bbowrapper), opt_params.pop_size, method=:latin_hypercube)
     # two extreme solutions and one totally neutral
     size(popmatrix, 2) > 0 && (popmatrix[:, 1] .= 0.0)
