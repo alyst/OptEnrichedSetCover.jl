@@ -402,7 +402,7 @@ BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::Multiobj
 BlackBoxOptim.fitness(x::BlackBoxOptim.AbstractIndividual,
                       p::MultiobjCoverProblemBBOWrapper) = score(p.orig, x)
 
-generate_recombinators(problem::OptimizationProblem, params) =
+generate_recombinators(problem::MultiobjCoverProblemBBOWrapper, params) =
     CrossoverOperator[BlackBoxOptim.DiffEvoRandBin1(chain(BlackBoxOptim.DE_DefaultOptions, params)),
                     SimplexCrossover{3}(1.05),
                     SimplexCrossover{2}(1.1),
@@ -416,11 +416,61 @@ generate_recombinators(problem::OptimizationProblem, params) =
                     ParentCentricCrossover{3}(chain(BlackBoxOptim.PCX_DefaultOptions, params)),
 ]
 
-generate_modifier(problem::OptimizationProblem, params) =
+"""
+Switch from one activated var to another one that is connected to it
+by the set overlap.
+"""
+struct VarSwitchMutation <: BlackBoxOptim.MutationOperator
+    varXvar_probs::Vector{Tuple{Vector{Int}, Weights{Float64}}} # var -> var switching probabilities
+end
+
+function VarSwitchMutation(problem::MultiobjCoverProblem;
+                           score_shape::Real = 0.25, prob_cutoff::Real = 0.01)
+    varXvar_probs = Vector{Tuple{Vector{Int}, Weights{Float64}}}()
+    score_cutoff = log(1 - prob_cutoff)/score_shape
+    for j in axes(problem.varXvar_scores, 2)
+        vixs = Vector{Int}()
+        w = Vector{Float64}()
+        for i in axes(problem.varXvar_scores, 1)
+            i == j && continue
+            @inbounds vXv = problem.varXvar_scores[i, j]
+            x = vXv * score_shape
+            @assert x <= 0
+            if x < score_cutoff
+                push!(vixs, i)
+                push!(w, 1 - exp(x))
+            end
+        end
+        push!(varXvar_probs, (vixs, weights(w)))
+    end
+    return VarSwitchMutation(varXvar_probs)
+end
+
+function BlackBoxOptim.apply!(m::VarSwitchMutation, v::AbstractVector{Float64}, index::Int)
+    nnz = length(v) - sum(iszero, v)
+    (nnz == 0) && return v
+    # select a random vertex ix with non-zero weight to switch
+    nzix = sample(1:nnz)
+    ix = findfirst(!iszero, v)
+    for _ in 1:(nzix-1)
+        ix = findnext(!iszero, v, ix)
+    end
+    # select the neighbouring vertex to switch to
+    jixs, jws = m.varXvar_probs[ix]
+    isempty(jixs) && return v # nowhere to switch to
+    jx = sample(jixs, jws)
+    # do the switch
+    v[jx] = max(v[jx], v[ix])
+    v[ix] = 0.0
+    return v
+end
+
+generate_modifier(problem::MultiobjCoverProblemBBOWrapper, params) =
     FixedGeneticOperatorsMixture(GeneticOperator[
+                                 VarSwitchMutation(problem.orig),
                                  MutationClock(PolynomialMutation(search_space(problem), 30.0), 1/numdims(problem)),
                                  MutationClock(UniformMutation(search_space(problem)), 1/numdims(problem))],
-                                 [0.75, 0.25])
+                                 [0.5, 0.3, 0.2])
 
 function optimize(problem::MultiobjCoverProblem,
                   opt_params::MultiobjOptimizerParams = MultiobjOptimizerParams())
