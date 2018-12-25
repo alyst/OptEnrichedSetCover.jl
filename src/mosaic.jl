@@ -7,10 +7,10 @@ function _encode_elements(all_elms::Set{T}) where T
     for i in 1:length(ix2elm)
         elm2ix[ix2elm[i]] = i
     end
-    ix2elm, elm2ix
+    return ix2elm, elm2ix
 end
 
-function _prepare_tiles(sets, elm2ix::Dict{T, Int}) where T
+function _prepare_tiles(sets, elm2ix::Dict{<:Any, Int})
     if isempty(sets)
         # no sets -- no tiles
         return SparseMaskMatrix(0, length(elm2ix)), SparseMaskMatrix(length(elm2ix), 0),
@@ -60,18 +60,22 @@ function _prepare_tiles(sets, elm2ix::Dict{T, Int}) where T
     end
     push!(set_tile_ranges, length(tile_ixs)+1)
 
-    SparseMaskMatrix(setXelm),
-    SparseMaskMatrix(elmXset),
-    SparseMaskMatrix(length(elm2ix), length(tile_elm_ranges)-1, tile_elm_ranges, elm_ixs), # elmXtile
-    SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
+    return SparseMaskMatrix(setXelm), SparseMaskMatrix(elmXset),
+        SparseMaskMatrix(length(elm2ix), length(tile_elm_ranges)-1,
+                         tile_elm_ranges, elm_ixs), # elmXtile
+        SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets),
+                         set_tile_ranges, tile_ixs) # tileXset
 end
 
-function _set_sizes(tileXset::SparseMaskMatrix, tile_sizes::Vector{Int})
+# calculate the sizes of sets given the sizes of tiles
+function _set_sizes(tileXset::SparseMaskMatrix,
+                    tile_sizes::AbstractVector{Int})
+    @assert length(tile_sizes) == size(tileXset, 1)
     set_sizes = zeros(Int, size(tileXset, 2))
     for six in eachindex(set_sizes)
         tile_ixs = view(tileXset, :, six)
         isempty(tile_ixs) && continue
-        @inbounds set_sizes[six] = sum(tix -> tile_sizes[tix], view(tileXset, :, six))
+        @inbounds set_sizes[six] = sum(tix -> tile_sizes[tix], tile_ixs)
     end
     return set_sizes
 end
