@@ -18,29 +18,32 @@ they have `nisect` elements in common, and there are
 """
 function logpvalue(nisect::Integer, na::Integer, nb::Integer, ntotal::Integer,
                    tail::Symbol = :right)
-    ((na >= 0) && (nb >= 0) && (ntotal >= 0)) || throw(ArgumentError("Sets with negative number of elements"))
-    ((na <= ntotal) && (nb <= ntotal)) || throw(ArgumentError("Sets bigger than total number of elements"))
+    ((na >= 0) && (nb >= 0) && (ntotal >= 0)) ||
+        throw(ArgumentError("Sets with negative number of elements"))
+    ((na <= ntotal) && (nb <= ntotal)) ||
+        throw(ArgumentError("Sets bigger than total number of elements"))
     # corner cases
-    if nisect > min(na, nb)
-        checktail(tail)
-        return tail == :left ? 0.0 : -Inf
-    elseif nisect < min(0, na + nb - ntotal)
-        checktail(tail)
-        return tail == :right ? 0.0 : -Inf
-    elseif ntotal==max(na,nb) && nisect==min(na,nb) # FIXME remove this corner case when Rmath-julia (and R upstream would be fixed)
-        checktail(tail)
-        return 0.0
+    isect_max = min(na, nb)
+    isect_min = max(0, na + nb - ntotal)
+    if tail == :right
+        (nisect > isect_max) && return -Inf
+        (nisect <= isect_min) && return 0.0
+    elseif tail == :left
+        (nisect >= isect_max) && return 0.0
+        (nisect < isect_min) && return -Inf
+    elseif tail != :both
+        # FIXME corner cases when tail == :both
+        throw(ArgumentError("Unsupported tail specifier ($tail)"))
     end
     # normal cases
     distr = Distributions.Hypergeometric(na, ntotal - na, nb)
     if tail == :right
-        return logccdf(distr, nisect-1)
+        return nisect < isect_max ? logccdf(distr, nisect-1) : logpdf(distr, nisect)
     elseif tail == :left
-        return logcdf(distr, nisect)
+        return nisect > isect_min ? logcdf(distr, nisect) : logpdf(distr, nisect)
     elseif tail == :both
         return log(2.0) + min(logcdf(distr, nisect), logccdf(distr, nisect-1), log(0.5))
     else
-        checktail(tail)
         return NaN # noop
     end
 end

@@ -40,6 +40,9 @@
     @test logpvalue(22837-4, 22837, 22837-4, 22837, :left) == 0.0
     @test logpvalue(22837-4, 22837, 22837-4, 22837, :right) == 0.0
 
+    @test logpvalue(42, 43, 46, 47, :right) == 0.0
+    @test logpvalue(41, 43, 46, 47, :left) == -Inf
+
     @test logpvalue(5, 10, 10, 20, :left) ≈ log(0.6718591)
     @test logpvalue(5, 10, 10, 20, :right) ≈ log(0.6718591)
     @test logpvalue(5, 10, 10, 20, :both) ≈ 0.0
