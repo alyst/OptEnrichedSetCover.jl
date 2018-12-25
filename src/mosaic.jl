@@ -66,15 +66,6 @@ function _prepare_tiles(sets, elm2ix::Dict{T, Int}) where T
     SparseMaskMatrix(length(tile_elm_ranges)-1, length(sets), set_tile_ranges, tile_ixs) # tileXset
 end
 
-# unlike Base.union() does not use recursion
-function _union(::Type{T}, sets) where T
-    res = Set{T}()
-    for set in sets
-        union!(res, set)
-    end
-    return res
-end
-
 function _set_sizes(tileXset::SparseMaskMatrix, tile_sizes::Vector{Int})
     set_sizes = zeros(Int, size(tileXset, 2))
     for six in eachindex(set_sizes)
@@ -171,14 +162,14 @@ end
 """
 Construct `SetMosaic` for a given nameless sets collection.
 """
-SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = _union(T, sets),
+SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = foldl(union!, sets, init=Set{T}()),
           set_relevances::AbstractVector{Float64} = fill(1.0, length(sets))) where {T} =
     SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances)
 
 """
 Constructs `SetMosaic` for a given named sets collection.
 """
-SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = _union(T, values(sets)),
+SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = foldl(union!, values(sets), init=Set{T}()),
           set_relevances::Dict{S, Float64} = Dict(k => 1.0 for k in keys(sets))) where {S, T} =
     SetMosaic(collect(keys(sets)), collect(values(sets)), all_elms,
               [set_relevances[k] for k in keys(sets)])
