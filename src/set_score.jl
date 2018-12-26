@@ -88,6 +88,7 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
                          used_sets = Base.OneTo(size(tileXset, 2)))
     nsets = length(used_sets)
     res = zeros(Float64, nsets, nsets)
+    # fill upper triangle
     @inbounds for i in 1:nsets
         set1_ix = used_sets[i]
         set1_size = set_sizes[set1_ix]
@@ -99,12 +100,12 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
             set2_size == 0 && continue # skip empty sets
             set2_tiles = view(tileXset, :, set2_ix)
             # one-sided Fisher's P-value, right tail
-            res[i, j] =
-                logpvalue(_isect_size(set1_tiles, set2_tiles, tile_sizes),
-                          set1_size, set2_size, total_size)
+            isect_size = _isect_size(set1_tiles, set2_tiles, tile_sizes)
+            res[i, j] = min(logpvalue(isect_size, set1_size, set1_size + set2_size - isect_size, total_size),
+                            logpvalue(isect_size, set2_size, set1_size + set2_size - isect_size, total_size))
         end
     end
-    # symmetrize
+    # symmetrize: copy upper triangle to lower
     @inbounds for i in 1:nsets
         for j in (i+1):nsets
             res[j, i] = res[i, j]
