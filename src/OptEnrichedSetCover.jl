@@ -13,6 +13,7 @@ export SetMosaic, CoverParams,
     nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
     unmask, mask,
+    set_relevance,
     rawscore, aggscore, score, # any conflicts
     optimize # conflicts with Optim.jl
 

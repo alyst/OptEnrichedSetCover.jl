@@ -119,3 +119,28 @@ function _setXset_scores(tileXset::SparseMaskMatrix, total_size::Int,
     end
     return res
 end
+
+"""
+    set_relevance(nset_observed::Integer, nset::Integer,
+                  nobserved::Integer, ntotal::Integer)
+
+Calculates the relevance weight of the set that contains `nset` elements,
+`nset_observed` of which were present (not necessarily enriched) in the data
+that identified `nobserved` of `ntotal` all known elements.
+It is used by `SetMosaic` to penalize the sets,
+which could not be observed in the data (e.g. biological processes or pathways
+that involve proteins not expressed by the cells used in the experiments).
+
+While for `MaskedSetMosaic` it's recommended to use the IDs of data entities
+(e.g. protein group IDs for proteomic data) to correctly count the set sizes
+and estimate enrichment; `set_relevance()` should use the counts derived from
+the original IDs of the annotation database (e.g. UniProt accession codes).
+Otherwise it's not possible to correctly estimate the number of elements that
+belong to the given annotated set, but were not observed in the data.
+
+The returned value is the probability that no more than `nset_observed`
+elements were observed at random.
+"""
+set_relevance(nset_observed::Integer, nset::Integer,
+              nobserved::Integer, ntotal::Integer) =
+    cdf(Hypergeometric(nset, ntotal - nset, nobserved), nset_observed)
