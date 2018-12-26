@@ -160,7 +160,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         PopulationSize::Integer = 100,
         WeightDigits::Union{Integer, Nothing} = 2, # precision digits for set weights
         MaxSteps::Integer = 10_000_000,
-        MaxStepsWithoutProgress::Integer = 10_000,
+        MaxStepsWithoutProgress::Integer = 50_000,
         FitnessTolerance::Real = 0.1,
         MinDeltaFitnessTolerance::Real = 1E-5,
         TraceInterval::Real = 5.0,
