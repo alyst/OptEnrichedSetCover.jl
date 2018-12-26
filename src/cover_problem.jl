@@ -132,8 +132,7 @@ end
 
 function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
-    vXv_scores = broadcast(sXs -> varXvar_score(sXs, params, scale),
-                           mosaic.original.setXset_scores[var2set, var2set])
+    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2set, var2set], Ref(params), scale)
     for i in eachindex(var2set) # don't consider self-intersections
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
