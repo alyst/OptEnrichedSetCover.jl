@@ -5,6 +5,9 @@
 end
 
 """
+    logpvalue(nisect::Integer, na::Integer, nb::Integer, ntotal::Integer,
+              [tail::Symbol = :right])
+
 Log P-value for the two sets intersection.
 
 `A` has `na` elemnts, B has `nb` elements,
