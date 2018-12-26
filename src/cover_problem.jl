@@ -144,9 +144,10 @@ function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
     end
     # replace infinite varXvar score with the minimal finite setXset score
     vXv_subst = varXvar_score(1.25*vXv_min, params, true)
+    vXv_cartixs = CartesianIndices(vXv_scores)
     @inbounds for i in eachindex(vXv_scores)
         if !isfinite(vXv_scores[i])
-            v1, v2 = ind2sub(size(vXv_scores), i)
+            v1, v2 = Tuple(vXv_cartixs[i])
             @warn("var[$v1]×var[$v2] score is $(vXv_scores[i])")
             if vXv_scores[i] < 0.0
                 vXv_scores[i] = vXv_subst
