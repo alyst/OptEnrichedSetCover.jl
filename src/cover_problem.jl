@@ -6,23 +6,20 @@ struct CoverParams
     min_weight::Float64         # minimal non-zero set probability
     set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
-    setXset_shape::Float64      # how much set-set overlaps are penalized (setXset_score shape), 0 = no penalty
     uncovered_factor::Float64   # how much masked uncovered elements penalize the score
     covered_factor::Float64     # how much unmasked covered elements penalize the score
 
     function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
                          set_relevance_shape::Number=1.0,
-                         setXset_factor::Number=1.0, setXset_shape::Number=1.0,
+                         setXset_factor::Number=1.0,
                          uncovered_factor::Number=0.1, covered_factor::Number=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
-        (0.0 <= setXset_shape) || throw(ArgumentError("`setXset_shape` must be ≥0"))
         (0.0 <= uncovered_factor) || throw(ArgumentError("`uncovered_factor` must be ≥0"))
         (0.0 <= covered_factor) || throw(ArgumentError("`covered_factor` must be ≥0"))
-        new(sel_prob, min_weight, set_relevance_shape,
-            setXset_factor, setXset_shape,
+        new(sel_prob, min_weight, set_relevance_shape, setXset_factor,
             uncovered_factor, covered_factor)
     end
 end
@@ -124,11 +121,8 @@ function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, param
     return v_scores
 end
 
-function varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false)
-    vXv = 1.0-(1.0-setXset)^params.setXset_shape
-    scale && (vXv *= params.setXset_factor)
-    return vXv
-end
+varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
+    ifelse(scale, setXset * params.setXset_factor, setXset)
 
 function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
