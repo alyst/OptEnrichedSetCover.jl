@@ -10,7 +10,7 @@ struct CoverParams
     covered_factor::Float64     # how much unmasked covered elements penalize the score
 
     function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
-                         set_relevance_shape::Number=1.0,
+                         set_relevance_shape::Number=0.5,
                          setXset_factor::Number=1.0,
                          uncovered_factor::Number=0.1, covered_factor::Number=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
