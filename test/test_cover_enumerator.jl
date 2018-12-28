@@ -6,7 +6,7 @@ else
 end
 
 @testset "CoverEnumerator problem_type=$problem_type" for problem_type in tested_problem_types # FIXME use weights
-    @testset "[:a] [:b] [:c] [:a :b :c], mask=[:a :b]" begin
+    @testset "[a b c abc], mask=[a b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])])
         sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
@@ -40,7 +40,7 @@ end
         @test length(cover_coll3) == 2 # FIXME use a and b weights
     end
 
-    @testset "[:a] [:b] [:c] [:a :b :c] :d :e, mask=[:a :b]" begin
+    @testset "[a b c abc de], mask=[a b]" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                        Set([:a, :b, :c, :d, :e]))
 
@@ -73,7 +73,7 @@ end
         @test df2[:set_id] == [1, 2, 4]
     end
 
-    @testset "multimask: [a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[[a b c] [b e]]" begin # FIXME take weights into account
+    @testset "multimask: [abd bcd c d abcde cde], mask=[abc be]" begin # FIXME take weights into account
         sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
                         Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
                         Set([:a, :b, :c, :d, :e, :f]))
