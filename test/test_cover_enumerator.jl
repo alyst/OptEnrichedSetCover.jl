@@ -74,13 +74,16 @@ end
     end
 
     @testset "multimask: [abd bcd c d abcde cde], mask=[abc be]" begin # FIXME take weights into account
-        sm = SetMosaic([Set([:a, :b, :d]), Set([:b, :c, :d]), Set([:c]), Set([:d]),
-                        Set([:a, :b, :c, :d, :e]), Set([:c, :d, :e, :f])],
+        sm = SetMosaic(Dict("abd" => Set([:a, :b, :d]), "bcd" => Set([:b, :c, :d]),
+                            "c" => Set([:c]), "d" => Set([:d]),
+                            "abcde" => Set([:a, :b, :c, :d, :e]),
+                            "cdef" => Set([:c, :d, :e, :f])),
                         Set([:a, :b, :c, :d, :e, :f]))
         sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
-        # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
-        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.05, covered_factor=0.0, uncovered_factor=0.0, sel_prob=0.9),
+        # higher prior probability to select sets, mild overlap penalty,
+        # high penalty for covering unmasked, so select [abd c], [bcd] and [abcde]
+        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.75, covered_factor=0.2, uncovered_factor=0.1, sel_prob=0.9),
                              CoverEnumerationParams(max_set_score=0.0),
                              problem_type==:quadratic ?
                                 OESC.QuadraticOptimizerParams() :
@@ -88,16 +91,9 @@ end
                              false)
 
         df = DataFrame(cover_coll, sm, best_only=true)
-        @test_broken size(df, 1) == 8
-        @test_broken df[:cover_ix] == [1, 1, 1, 1, 1, 1, 2, 2]
-        @test_broken df[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
-        @test_broken df[:set_id] == [1, 1, 3, 3, 5, 5, 2, 2]
-
-        # FIXME real example when set covered twice
-        df2 = DataFrame(cover_coll, sm, best_only=false)
-        @test_broken size(df2, 1) == 8
-        @test_broken df2[:cover_ix] == [1, 1, 1, 1, 1, 1, 2, 2]
-        @test_broken df2[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
-        @test_broken df2[:set_id] == [1, 1, 3, 3, 5, 5, 2, 2]
+        @test size(df, 1) == 8
+        @test df[:cover_ix] == [1, 1, 1, 1, 2, 2, 3, 3]
+        @test df[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df[:set_id] == ["c", "c", "abd", "abd", "bcd", "bcd", "abcde", "abcde"]
     end
 end

@@ -138,14 +138,16 @@
         #@show problem_ab_lowp
         @test res_hi_sXs.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0] atol=1E-2
 
-        # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
+        # higher prior probability to select sets, no overlap penalty, so select abd, bcd, c and abcde + cdef
         prob_low_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=0.01, covered_factor=1E-5, uncovered_factor=1.0, sel_prob=0.9))
         @test_skip nmasks(prob_low_sXs) == 2
         @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
         @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 0.0, 0.0])
-        @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0]) > aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
+        @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
+        @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
+        @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0])
         res_low_sXs = optimize(prob_low_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
         #@show res_low_penalty.weights
-        @test res_low_sXs.weights ≈ [0.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2# [1.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2
+        @test res_low_sXs.weights ≈ [1.0, 1.0, 1.0, 1.0, 0.0] atol=1E-2# [1.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2
     end
 end

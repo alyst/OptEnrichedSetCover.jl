@@ -108,15 +108,15 @@ end
 # plus nets*log(nsets), where nsets arr all masked sets overlapping with var
 function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
-    sel_penalty = log(params.sel_prob)
+    sel_penalty = -log(params.sel_prob)
     v_scores = Vector{Float64}(undef, length(var2set))
-    for (varix, setix) in enumerate(var2set)
+    @inbounds for (varix, setix) in enumerate(var2set)
         scoresum = 0.0
         msetixs = mosaic.orig2masked[setix]
         for msetix in msetixs
             scoresum += overlap_score(mosaic.maskedsets[msetix], mosaic, params)
         end
-        v_scores[varix] = scoresum - sel_penalty + length(msetixs)*log(length(msetixs))
+        v_scores[varix] = scoresum + sel_penalty
     end
     return v_scores
 end
