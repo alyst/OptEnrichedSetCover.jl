@@ -419,20 +419,19 @@ struct VarSwitchMutation <: BlackBoxOptim.MutationOperator
 end
 
 function VarSwitchMutation(problem::MultiobjCoverProblem;
-                           score_shape::Real = 0.25, prob_cutoff::Real = 0.01)
+                           score_shape::Real = 0.1, vXv_cutoff::Real = -5.0)
+    score_shape > 0 || throw(ArgumentError("score_shape must be positive"))
     varXvar_probs = Vector{Tuple{Vector{Int}, Weights{Float64}}}()
-    score_cutoff = log(1 - prob_cutoff)/score_shape
     for j in axes(problem.varXvar_scores, 2)
         vixs = Vector{Int}()
         w = Vector{Float64}()
         for i in axes(problem.varXvar_scores, 1)
             i == j && continue
             @inbounds vXv = problem.varXvar_scores[i, j]
-            x = vXv * score_shape
-            @assert x <= 0
-            if x < score_cutoff
+            @assert vXv <= 0
+            if vXv < vXv_cutoff
                 push!(vixs, i)
-                push!(w, 1 - exp(x))
+                push!(w, 1 - exp(vXv * score_shape))
             end
         end
         push!(varXvar_probs, (vixs, weights(w)))
