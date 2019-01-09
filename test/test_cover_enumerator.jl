@@ -63,14 +63,14 @@ end
 
         df = DataFrame(cover_coll, sm)
         @test size(df, 1) == 3
-        @test df[:cover_ix] == [1, 1, 2]
-        @test df[:set_id] == [1, 2, 4]
+        @test df.cover_ix == [1, 1, 2]
+        @test df.set_id == [1, 2, 4]
         @test df == DataFrame(cover_coll, sm, min_nmasked=1)
 
         df2 = DataFrame(cover_coll, sm, min_nmasked=0)
         @test size(df2, 1) == 3
-        @test df2[:cover_ix] == [1, 1, 2]
-        @test df2[:set_id] == [1, 2, 4]
+        @test df2.cover_ix == [1, 1, 2]
+        @test df2.set_id == [1, 2, 4]
     end
 
     @testset "multimask: [abd bcd c d abcde cde], mask=[abc be]" begin # FIXME take weights into account
@@ -92,8 +92,8 @@ end
 
         df = DataFrame(cover_coll, sm, best_only=true)
         @test size(df, 1) == 8
-        @test df[:cover_ix] == [1, 1, 1, 1, 2, 2, 3, 3]
-        @test df[:mask_ix] == [1, 2, 1, 2, 1, 2, 1, 2]
-        @test df[:set_id] == ["c", "c", "abd", "abd", "bcd", "bcd", "abcde", "abcde"]
+        @test df.cover_ix == [1, 1, 1, 1, 2, 2, 3, 3]
+        @test df.mask_ix == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df.set_id == ["c", "c", "abd", "abd", "bcd", "bcd", "abcde", "abcde"]
     end
 end
