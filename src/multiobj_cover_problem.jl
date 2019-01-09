@@ -19,11 +19,11 @@ BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: MultiobjProblemFitness
 function MultiobjProblemFitnessFolding(params::CoverParams,
                                        kind::Union{Symbol, Nothing} = nothing)
     if kind === nothing || kind == :auto # chose folding automatically
-        return MultiobjProblemSoft12Convolute(params)
+        return MultiobjProblemSoftFold2d(params)
     elseif kind == :none
         return MultiobjProblemNoFolding()
-    elseif kind == :soft_convolute_sets_and_setXset
-        return MultiobjProblemSoft12Convolute(params)
+    elseif kind == :fold2d
+        return MultiobjProblemSoftFold2d(params)
     else
         throw(ArgumentError("Unknown fitness folding kind $kind"))
     end
@@ -50,18 +50,18 @@ end
     agg.uncovered_factor * score[3] + agg.covered_factor * score[4]
 
 # sum var scores and setXset penalties (maskXmask penalties are separate)
-struct MultiobjProblemSoft12Convolute <: MultiobjProblemFitnessFolding{2}
+struct MultiobjProblemSoftFold2d <: MultiobjProblemFitnessFolding{2}
     setXset_factor::Float64
     uncovered_factor::Float64
     covered_factor::Float64
 
-    MultiobjProblemSoft12Convolute(params::CoverParams) =
+    MultiobjProblemSoftFold2d(params::CoverParams) =
         new(params.setXset_factor,
             params.setXset_factor > 0.0 ? params.uncovered_factor/params.setXset_factor : 1.0,
             params.setXset_factor > 0.0 ? params.covered_factor/params.setXset_factor : 1.0)
 end
 
-function (f::MultiobjProblemSoft12Convolute)(fitness::NTuple{4,Float64})
+function (f::MultiobjProblemSoftFold2d)(fitness::NTuple{4,Float64})
     a = fitness[1]
     b = fitness[2] +
         f.uncovered_factor * fitness[3] +
@@ -72,7 +72,7 @@ function (f::MultiobjProblemSoft12Convolute)(fitness::NTuple{4,Float64})
     return (muladd(kk * f.setXset_factor, b, a), (1.0 - kk) * b)
 end
 
-(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoft12Convolute})(score::NTuple{2, Float64}) =
+(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold2d})(score::NTuple{2, Float64}) =
     score[1] + agg.setXset_factor * score[2]
 
 #=
@@ -387,8 +387,8 @@ BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
     @printf(io, "(sets=%.3f set×set=%.3f)\n", score[1], score[2]^2)
 =#
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
-                           problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemSoft12Convolute}) =
-  @printf(io, "(sets+k⋅set×set=%.3f (1.0-k)⋅set×set=%.3f)\n", score[1], score[2])
+                           problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemSoftFold2d}) =
+    @printf(io, "(sets+k·set²=%.3f set²+k·sets=%.3f)\n", score[1], score[2])
 
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
