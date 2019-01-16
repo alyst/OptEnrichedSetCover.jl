@@ -508,7 +508,7 @@ function optimize(problem::MultiobjCoverProblem,
         (size(popmatrix, 2) < i + 4) && break
         popmatrix[:, i+4] .= ifelse.(problem.var_scores .<= score_qtls[i], 1.0, 0.0)
     end
-    N = numobjectives(bbowrapper)
+    N = fieldcount(fitness_type(fitness_scheme_type(fitfolding))) # FIXME numobjectives(bbowrapper) gives wrong result, looks like Julia problem
     population = FitPopulation(popmatrix, nafitness(IndexedTupleFitness{N,Float64}), ntransient=1)
 
     go_params = genop_params(opt_params)
