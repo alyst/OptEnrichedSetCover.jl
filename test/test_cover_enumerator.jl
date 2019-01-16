@@ -81,9 +81,9 @@ end
                         Set([:a, :b, :c, :d, :e, :f]))
         sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
-        # higher prior probability to select sets, mild overlap penalty,
+        # higher prior probability to select sets, high overlap penalty,
         # high penalty for covering unmasked, so select [abd c], [bcd] and [abcde]
-        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=0.75, covered_factor=0.2, uncovered_factor=0.1, sel_prob=0.9),
+        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=1.0, covered_factor=0.5, uncovered_factor=0.1, sel_prob=0.9),
                              CoverEnumerationParams(max_set_score=0.0),
                              problem_type==:quadratic ?
                                 OESC.QuadraticOptimizerParams() :
@@ -94,6 +94,6 @@ end
         @test size(df, 1) == 8
         @test df.cover_ix == [1, 1, 1, 1, 2, 2, 3, 3]
         @test df.mask_ix == [1, 2, 1, 2, 1, 2, 1, 2]
-        @test df.set_id == ["c", "c", "abd", "abd", "bcd", "bcd", "abcde", "abcde"]
+        @test df.set_id == ["c", "c", "abd", "abd", "abcde", "abcde", "bcd", "bcd"]
     end
 end

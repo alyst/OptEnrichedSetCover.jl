@@ -37,69 +37,59 @@ function overlap_score(masked::Number, set::Number, total_masked::Number, total:
     return res
 end
 
-overlap_score(set::MaskedSet, mosaic::MaskedSetMosaic, params::CoverParams) =
-    overlap_score(set.nmasked, set.nmasked + set.nunmasked,
-                  nmasked(mosaic, set.mask), nelements(mosaic),
-                  mosaic.original.set_relevances[set.set], params)
+overlap_score(molap::MaskOverlap, setix::Int, mosaic::MaskedSetMosaic, params::CoverParams) =
+    overlap_score(molap.nmasked, molap.nmasked + molap.nunmasked,
+                  nmasked(mosaic, molap.mask), nelements(mosaic),
+                  mosaic.original.set_relevances[setix], params)
 
-var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.orig2masked)))
+var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.set2masks)))
 
 # extracts
 # 1) var-to-tile mapping (only relevant tiles are considered)
 # 2) the total number of masked elements in all masks for each tile
 # 3) the total number of unmasked elements in all active masks (overlapping with the tile) for each tile
-function tilemaskXvar(mosaic::MaskedSetMosaic)
-    setixs = var2set(mosaic)
-    nm = nmasks(mosaic)
-    used_tilemasks = Set{Tuple{Int, Int}}()
-    @inbounds for (varix, setix) in enumerate(setixs)
+function tilemaskXvar(mosaic::MaskedSetMosaic, var2setix::AbstractVector{Int} = var2set(mosaic))
+    # find relevant tiles and
+    # sum masked elements per tile in all masks and unmasked elements per tile in union mask
+    # note: in masks there could be element not covered by any set/tile, so these counts refer to coverable elements
+    tileixs = Vector{Int}()
+    tile2nmasked = Vector{Int}()
+    tile2nunmasked = Vector{Int}()
+    @inbounds for (varix, setix) in enumerate(var2setix)
         set_tiles = view(mosaic.original.tileXset, :, setix)
-        for msetix in mosaic.orig2masked[setix]
-            maskix = mosaic.maskedsets[msetix].mask
-            for tileix in set_tiles
-                push!(used_tilemasks, (tileix, maskix))
+        for tileix in set_tiles
+            tilepos = searchsortedfirst(tileixs, tileix)
+            if tilepos > length(tileixs) || tileixs[tilepos] != tileix # do this once per tile
+                tile_elms = view(mosaic.original.elmXtile, :, tileix)
+                insert!(tileixs, tilepos, tileix)
+                insert!(tile2nunmasked, tilepos, length(tile_elms) - sum(view(mosaic.elunionmask, tile_elms)))
+                nmasked = 0
+                for molap in mosaic.set2masks[setix]
+                    nmasked += sum(view(mosaic.elmasks, tile_elms, molap.mask))
+                end
+                insert!(tile2nmasked, tilepos, nmasked)
             end
         end
     end
-    used_tilemask_v = sort!(collect(used_tilemasks)) # sort lexicographically
-    nmasked_pertilemask = fill(0, length(used_tilemask_v))
-    nunmasked_pertilemask = fill(0, length(used_tilemask_v))
-    last_tileix = 0
-    tile_size = 0
-    tile_elms = view([], 1:0) # empty range for type stability
-    for (ix, (tileix, maskix)) in enumerate(used_tilemask_v)
-        if tileix != last_tileix
-            tile_elms = view(mosaic.original.elmXtile, :, tileix)
-            tile_size = length(tile_elms)
-            last_tileix = tileix
-        end
-        nmasked = sum(view(mosaic.elmasks, tile_elms, maskix))
-        nmasked_pertilemask[ix] = nmasked
-        nunmasked_pertilemask[ix] = tile_size - nmasked
-    end
-    tileXvar = mosaic.original.tileXset[first.(used_tilemask_v), setixs]
-    if isempty(tileXvar)
-        return tileXvar, nmasked_pertilemask, nunmasked_pertilemask
-    end
 
-    # find tiles that refer to the identical set of variables
-    varXtile = transpose(tileXvar)
-    vars2tileixs = Dict{Vector{Int}, Vector{Int}}()
-    for tileix in 1:size(varXtile, 2)
-        varixs = varXtile[:, tileix]
-        tileixs = get!(() -> Vector{Int}(), vars2tileixs, varixs)
-        push!(tileixs, tileix)
+    tileXvar = mosaic.original.tileXset[tileixs, var2setix]
+    if !isempty(tileXvar)
+        # find tiles that refer to the identical set of vars and merge their stats
+        varXtile = transpose(tileXvar)
+        vars2tiles = Dict{Vector{Int}, Vector{Int}}()
+        for tileix in axes(varXtile, 2)
+            varixs = varXtile[:, tileix]
+            tileixs = get!(() -> Vector{Int}(), vars2tiles, varixs)
+            push!(tileixs, tileix)
+        end
+        if length(vars2tiles) < size(tileXvar, 1) # there are tiles to merge
+            tileXvar = tileXvar[[first(tileixs) for tileixs in values(vars2tiles)], :] # take the 1st of merged tiles
+            # aggregate n[un]masked over duplicated tiles
+            tile2nmasked = [sum(i -> tile2nmasked[i], tileixs) for tileixs in values(vars2tiles)]
+            tile2nunmasked = [sum(i -> tile2nunmasked[i], tileixs) for tileixs in values(vars2tiles)]
+        end
     end
-    if length(vars2tileixs) == size(varXtile, 2) # no duplicates
-        return tileXvar, nmasked_pertilemask, nunmasked_pertilemask
-    end
-    tileXvar = tileXvar[[first(tileixs) for tileixs in values(vars2tileixs)], :] # take the 1st of duplicated tiles
-    # aggregate n[un]masked over duplicated tiles
-    nmasked_pertilegroup = [sum(i -> nmasked_pertilemask[i], tileixs)
-                            for tileixs in values(vars2tileixs)]
-    nunmasked_pertilegroup = [sum(i -> nunmasked_pertilemask[i], tileixs)
-                            for tileixs in values(vars2tileixs)]
-    return tileXvar, nmasked_pertilegroup, nunmasked_pertilegroup
+    return tileXvar, tile2nmasked, tile2nunmasked
 end
 
 # var score is:
@@ -112,9 +102,8 @@ function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, param
     v_scores = Vector{Float64}(undef, length(var2set))
     @inbounds for (varix, setix) in enumerate(var2set)
         scoresum = 0.0
-        msetixs = mosaic.orig2masked[setix]
-        for msetix in msetixs
-            scoresum += overlap_score(mosaic.maskedsets[msetix], mosaic, params)
+        for molap in mosaic.set2masks[setix]
+            scoresum = overlap_score(molap, setix, mosaic, params)
         end
         v_scores[varix] = scoresum + sel_penalty
     end
@@ -142,7 +131,7 @@ function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
     @inbounds for i in eachindex(vXv_scores)
         if !isfinite(vXv_scores[i])
             v1, v2 = Tuple(vXv_cartixs[i])
-            @warn("var[$v1]×var[$v2] score is $(vXv_scores[i])")
+            @warn "var[$v1]×var[$v2] score is $(vXv_scores[i])"
             if vXv_scores[i] < 0.0
                 vXv_scores[i] = vXv_subst
             end

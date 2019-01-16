@@ -39,15 +39,12 @@ function nmasked_perset(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool},
     return res
 end
 
-# info for the set from the MaskedSetMosaic
-struct MaskedSet
+# info for the set × mask overlap for the MaskedSetMosaic
+struct MaskOverlap
     mask::Int       # index of the mask
-    set::Int        # index of the set in the SetMosaic
     nmasked::Int    # number of masked elements
     nunmasked::Int  # number of unmasked elements
 end
-
-setsize(s::MaskedSet) = s.nmasked + s.nunmasked
 
 """
 `SetMosaic` with an elements mask (selection) on top.
@@ -59,31 +56,26 @@ for all the masked sets are squashed into a single tile.
 """
 mutable struct MaskedSetMosaic{T,S}
     original::SetMosaic{T,S}        # original mosaic
-    elmasks::BitMatrix              # elements masks
+    elmasks::BitMatrix              # elements×masks
+    elunionmask::BitVector          # all masked elements
     total_masked::Vector{Int}       # total number of masked elements for each mask
-    maskedsets::Vector{MaskedSet}   # per set mask info (only the sets intersecting with each mask included)
-    orig2masked::Dict{Int, Set{Int}}# map from the original index to the indices of masked sets
+
+    # info for all non-empty overlaps with all masks
+    # masks in MaskOverlap vector are ordered by mask indices
+    set2masks::Dict{Int, Vector{MaskOverlap}}
 end
 
 function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
-                         maskedsets::Vector{MaskedSet}) where {T,S}
+                         set2masks::Dict{Int, Vector{MaskOverlap}}) where {T,S}
     size(elmasks, 1) == nelements(mosaic) ||
         throw(ArgumentError("Elements mask length ($(length(elmasks))) should match the number of elements ($(nelements(mosaic)))"))
     nmasks = size(elmasks, 2)
-    orig2masked = Dict{Int,Set{Int}}()
-    for (i, mset) in enumerate(maskedsets)
-        1 <= mset.mask <= nmasks || throw(ArgumentError("Incorrect mask index ($(mset.mask)) for set #$i"))
-        1 <= mset.set <= nsets(mosaic) || throw(ArgumentError("Incorrect set index ($(mset.set) for set #$i"))
-        maskixs = get!(() -> Set{Int}(), orig2masked, mset.set)
-        push!(maskixs, i)
-    end
-    MaskedSetMosaic(mosaic, convert(BitMatrix, elmasks),
-                    dropdims(sum(elmasks, dims=1), dims=1), maskedsets, orig2masked)
+    bit_elmasks = convert(BitMatrix, elmasks)
+    bit_elunionmask = dropdims(any(bit_elmasks, dims=2), dims=2)
+    @assert length(bit_elunionmask) == size(bit_elmasks, 1)
+    MaskedSetMosaic(mosaic, bit_elmasks, bit_elunionmask,
+                    dropdims(sum(elmasks, dims=1), dims=1), set2masks)
 end
-
-# FIXME not optimal
-setid2ix(mosaic::MaskedSetMosaic{T,S}, set::S) where {T,S} =
-    searchsortedfirst(mosaic.setixs, mosaic.original.set2ix[set])
 
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
               min_nmasked::Integer=1,
@@ -92,25 +84,27 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
     size(elmasks, 1) == nelements(mosaic) ||
         throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
 
-    # get the sets that overlap with the mask elements and with at least max_overlap_logpvalue significance
+    # calculate overlap sizes for each set and each mask
     nmasked_orgsets = nmasked_perset(mosaic, elmasks)
-    ntotal = nelements(mosaic)
-    maskedsets = Vector{MaskedSet}()
 
-    @inbounds for maskix in 1:size(nmasked_orgsets, 2)
+    # get the sets that overlap with the masked elements and with at least max_overlap_logpvalue significance
+    set2masks = Dict{Int, Vector{MaskOverlap}}()
+    emptyoverlap = Vector{MaskOverlap}()
+    ntotal = nelements(mosaic)
+    @inbounds for maskix in axes(nmasked_orgsets, 2)
         ntotal_masked = sum(view(elmasks, :, maskix))
         orgsets_mask = view(nmasked_orgsets, :, maskix)
         for (setix, nmasked) in enumerate(orgsets_mask)
-            (nmasked < min_nmasked) && continue
-            nset = setsize(mosaic, setix)
-            @inbounds overlap_pvalue = logpvalue(nmasked, nset, ntotal_masked, ntotal)
-            if overlap_pvalue <= max_overlap_logpvalue
-                push!(maskedsets, MaskedSet(maskix, setix, nmasked, nset - nmasked))
-            end
+            (nmasked < min_nmasked) && continue # skip small overlap
+            @inbounds nset = setsize(mosaic, setix)
+            overlap_pvalue = logpvalue(nmasked, nset, ntotal_masked, ntotal)
+            (overlap_pvalue > max_overlap_logpvalue) && continue # skip non-signif overlaps
+            setmasks = get!(() -> Vector{MaskOverlap}(), set2masks, setix)
+            push!(setmasks, MaskOverlap(maskix, nmasked, setsize(mosaic, setix) - nmasked))
         end
     end
 
-    return MaskedSetMosaic(mosaic, elmasks, maskedsets)
+    return MaskedSetMosaic(mosaic, elmasks, set2masks)
 end
 
 function mask(mosaic::SetMosaic{T}, elmasks #= iterable with eltype()==Set{T} =#;
@@ -123,20 +117,15 @@ end
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
-nmaskedsets(mosaic::MaskedSetMosaic) = length(mosaic.maskedsets)
-nsets(mosaic::MaskedSetMosaic) = length(mosaic.orig2masked)
-nsets(mosaic::MaskedSetMosaic, maskix::Int) = # FIXME remove empty workaround
-    isempty(mosaic.maskedsets) ? 0 : sum(ms -> ms.mask == maskix, mosaic.maskedsets)
+nsets(mosaic::MaskedSetMosaic) = length(mosaic.set2masks) # only sets overlapping with masks
+nsets(mosaic::MaskedSetMosaic, maskix::Int) = # number of sets overlapping with given mask
+    mapreduce(olaps -> any(olap -> olap.mask == maskix), sum, values(mosaic.set2masks), init=0)
 nmasks(mosaic::MaskedSetMosaic) = length(mosaic.total_masked)
 nmasked(mosaic::MaskedSetMosaic, maskix::Int) = mosaic.total_masked[maskix]
 nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.total_masked[maskix]
-maskedset(mosaic::MaskedSetMosaic, ix::Int) = mosaic.maskedsets[ix]
-nmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
-    (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nmasked_perset[setix, maskix] : 0)
-nunmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
-    (setix = setid2ix(mosaic, set); setix > 0 ? mosaic.nunmasked_perset[setix, maskix] : setsize(mosaic.original, mosaic.original.set2ix[set]))
 
 # copy everything, except the original mosaic (leave the reference to the same object)
 Base.copy(mosaic::MaskedSetMosaic) =
-    MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.total_masked),
-                    copy(mosaic.maskedsets), copy(mosaic.orig2masked))
+    MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.elunionmask),
+                    copy(mosaic.total_masked),
+                    deepcopy(mosaic.set2masks))

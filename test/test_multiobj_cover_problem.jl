@@ -64,17 +64,24 @@
     end
 
     @testset "[a b] [c d] [a b c d], mask=[a b]" begin # FIXME take weights into account
-        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c])]);
+        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c])])
         sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
 
-        problem_def = MultiobjCoverProblem(sm_ab)
+        problem_def = MultiobjCoverProblem(sm_ab) # cd set is dropped
+
+        @test OESC.miscover_score(problem_def, [0.0, 0.0]) == (2.0, 0.0)
+        @test OESC.miscover_score(problem_def, [0.25, 0.0]) == (1.5, 0.0)
+        @test OESC.miscover_score(problem_def, [0.75, 0.0]) == (0.5, 0.0)
+        @test OESC.miscover_score(problem_def, [1.0, 0.0]) == (0.0, 0.0)
+        @test OESC.miscover_score(problem_def, [1.0, 1.0]) == (0.0, 1.0)
+        @test OESC.miscover_score(problem_def, [0.0, 1.0]) == (0.0, 1.0)
+
         res_def = optimize(problem_def)
         @test res_def.weights ≈ [1.0, 0.0] atol=0.01
 
         problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_prob=1.0))
         @test nvars(problem_no_penalty) == 2
         res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.01, 0.01], WeightDigits=nothing))
-        @show res_no_penalty.total_score
         @test res_no_penalty.weights ≈ [1.0, 1.0] atol=0.01
     end
 
@@ -95,6 +102,14 @@
         @test aggscore(problem_b, [0.0, 1.0, 0.0]) == aggscore(problem_b, [1.0, 0.0, 0.0])
         @test max(res_b.weights[1], res_b.weights[2]) ≈ 1.0 atol=0.01
         @test res_b.weights[3] ≈ 0.0 atol = 0.01
+
+        @test OESC.miscover_score(problem_b, [1.0, 0.0, 0.0]) == (0.0, 1.0)
+        @test OESC.miscover_score(problem_b, [0.0, 1.0, 0.0]) == (0.0, 1.0)
+        @test OESC.miscover_score(problem_b, [0.0, 0.5, 0.0]) == (0.5, 0.5)
+        @test OESC.miscover_score(problem_b, [0.0, 0.0, 1.0]) == (0.0, 2.0)
+        @test OESC.miscover_score(problem_b, [1.0, 0.0, 1.0]) == (0.0, 2.0)
+        @test OESC.miscover_score(problem_b, [1.0, 1.0, 1.0]) == (0.0, 2.0)
+        @test OESC.miscover_score(problem_b, [1.0, 1.0, 0.5]) == (0.0, 2.0)
     end
 
     @testset "[a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[a b c]" begin # FIXME take weights into account
@@ -106,10 +121,10 @@
         # low prior probability to select sets, high probability to miss active element, so select abc
         prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, uncovered_factor=1.0, sel_prob=0.1))
         @test nvars(prob_hi_sXs) == 5 # d is out
+
         @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
         @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 1.0, 0.0, 0.0, 0.0])
         res_ignore_overlap = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
-        #@show problem_ab_lowp
         @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [1.0, 0.0, 0.0, 0.0, 0.0])
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0]
 
@@ -130,12 +145,17 @@
         # lower prior probability to select sets, high overlap penalty, so select abd and c FIXME update desc
         prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, covered_factor=0.5, sel_prob=0.6))
         @test_skip nmasks(prob_hi_sXs) == 2
-        @test nvars(prob_hi_sXs) == 5 # d is out
+        @test nvars(prob_hi_sXs) == 5 # d is out: abd bcd c abcde cdef
+
+        @test OESC.miscover_score(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0]) == (5.0, 0.0)
+        @test OESC.miscover_score(prob_hi_sXs, [1.0, 0.0, 0.0, 0.0, 0.0]) == (2.0, 1.0)
+        @test OESC.miscover_score(prob_hi_sXs, [0.0, 1.0, 0.0, 0.0, 0.0]) == (2.0, 1.0)
+        @test OESC.miscover_score(prob_hi_sXs, [0.0, 0.0, 1.0, 0.0, 0.0]) == (4.0, 0.0)
+
         @test aggscore(prob_hi_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
         @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
         @test aggscore(prob_hi_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) > aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0])
         res_hi_sXs = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
-        #@show problem_ab_lowp
         @test res_hi_sXs.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0] atol=1E-2
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcd, c and abcde + cdef
@@ -147,7 +167,6 @@
         @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
         @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0])
         res_low_sXs = optimize(prob_low_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
-        #@show res_low_penalty.weights
         @test res_low_sXs.weights ≈ [1.0, 1.0, 1.0, 1.0, 0.0] atol=1E-2# [1.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2
     end
 end

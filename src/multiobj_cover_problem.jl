@@ -112,8 +112,8 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{NTuple{4, Float64}}
     varXvar_scores::Matrix{Float64}
 
     tileXvar::SparseMaskMatrix      # tile-in-mask X set(var)
-    nmasked_pertile::Vector{Int}    # number of masked elements for each tile
-    nunmasked_pertile::Vector{Int}  # number of unmasked elements for each tile
+    nmasked_tile::Vector{Int}       # sum of masked elements for each tile in all masks (els counted for each mask separately)
+    nunmasked_tile::Vector{Int}     # number of unmasked elements for each tile in the union of all masks (each el counted once)
 
     tilepool::Vector{Vector{Float64}}   # pool of tile-sized vectors FIXME move to evaluator
     varpool::Vector{Vector{Float64}}    # pool of var-sized vectors FIXME move to evaluator
@@ -123,23 +123,23 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{NTuple{4, Float64}}
                         var_scores::AbstractVector{Float64},
                         varXvar_scores::AbstractMatrix{Float64},
                         tileXvar::SparseMaskMatrix,
-                        nmasked_pertile::AbstractVector{Int},
-                        nunmasked_pertile::AbstractVector{Int}
+                        nmasked_tile::AbstractVector{Int},
+                        nunmasked_tile::AbstractVector{Int}
     )
         length(var2set) == length(var_scores) ==
         size(varXvar_scores, 1) == size(varXvar_scores, 2) ==
         size(tileXvar, 2) ||
             throw(ArgumentError("var2set, var_scores and varXvar_scores counts do not match"))
-        size(tileXvar, 1) == length(nmasked_pertile) == length(nunmasked_pertile) ||
-            throw(ArgumentError("tileXvar and nmasked_pertile rows count does not match"))
+        size(tileXvar, 1) == length(nmasked_tile) == length(nunmasked_tile) ||
+            throw(ArgumentError("tileXvar and nmasked_tile rows count does not match"))
         new(params, var2set,
             var_scores, varXvar_scores,
-            tileXvar, nmasked_pertile, nunmasked_pertile,
+            tileXvar, nmasked_tile, nunmasked_tile,
             Vector{Vector{Float64}}(), Vector{Vector{Float64}}())
     end
 end
 
-ntiles(problem::MultiobjCoverProblem) = length(problem.nmasked_pertile)
+ntiles(problem::MultiobjCoverProblem) = length(problem.nmasked_tile)
 
 function score_scales(problem::MultiobjCoverProblem)
     w_min, w_max = extrema(problem.var_scores)
@@ -219,10 +219,10 @@ function MultiobjCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = Cov
     v2set = var2set(mosaic)
     v_scores = var_scores(mosaic, v2set, params)
     vXv_scores = varXvar_scores(mosaic, v2set, params, false)
-    tXv, nmasked_pertile, nunmasked_pertile = tilemaskXvar(mosaic)
+    tXv, nmasked_tile, nunmasked_tile = tilemaskXvar(mosaic)
     MultiobjCoverProblem(params,
                          v2set, v_scores, vXv_scores,
-                         tXv, nmasked_pertile, nunmasked_pertile)
+                         tXv, nmasked_tile, nunmasked_tile)
 end
 
 # \sum_{i, j} A_{i, j} min(w_i, w_j)
@@ -301,7 +301,7 @@ function exclude_vars(problem::MultiobjCoverProblem,
                 problem.var2set[varmask],
                 v_scores, problem.varXvar_scores[varmask, varmask],
                 problem.tileXvar[:, varmask], # FIXME can also remove unused tiles
-                problem.nmasked_pertile, problem.nunmasked_pertile)
+                problem.nmasked_tile, problem.nunmasked_tile)
 end
 
 # the tuple of:
@@ -309,7 +309,7 @@ end
 # -`` total number of covered unmasked elements (in all masks overlapping with the cover)
 function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
     __check_vars(w, problem)
-    isempty(problem.nmasked_pertile) && return (0.0, 0.0)
+    isempty(problem.nmasked_tile) && return (0.0, 0.0)
     # calculate the tile coverage weights
     wtile = isempty(problem.tilepool) ?
             Vector{Float64}(undef, ntiles(problem)) :
@@ -324,8 +324,8 @@ function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64
             end
         end
     end
-    res = sum(problem.nmasked_pertile) - dot(problem.nmasked_pertile, wtile),
-          dot(problem.nunmasked_pertile, wtile)
+    res = sum(problem.nmasked_tile) - dot(problem.nmasked_tile, wtile),
+          dot(problem.nunmasked_tile, wtile)
     push!(problem.tilepool, wtile) # release to the pool
     return res
 end
