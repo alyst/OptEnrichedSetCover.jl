@@ -140,14 +140,3 @@ nunmasked(mosaic::MaskedSetMosaic{T,S}, set::S, maskix::Int) where {T,S} =
 Base.copy(mosaic::MaskedSetMosaic) =
     MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.total_masked),
                     copy(mosaic.maskedsets), copy(mosaic.orig2masked))
-
-"""
-Exclude `setmask` sets from the `mosaic` and update the set of its active tiles.
-"""
-function Base.filter!(mosaic::MaskedSetMosaic, setmask::AbstractVector{Bool})
-    nmaskedsets(mosaic) == length(setmask) ||
-        throw(ArgumentError("Mask length ($(length(setmask))) does not match the number of masked sets in mosaic ($(nmaskedsets(mosaic)))"))
-    mosaic.maskedsets = mosaic.maskedsets[setmask]
-    # FIXME broken: should update orig2masked and indices of masked sets
-    return mosaic
-end

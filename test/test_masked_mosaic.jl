@@ -107,29 +107,4 @@
         @test nmaskedsets(msm2) == 6
         @test nsets(msm2) == 2
     end
-
-    @testset "filter!()" begin
-        sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c, :d])])
-        msm = mask(sm, [Set([:b, :c])], min_nmasked=1)
-
-        @test nelements(msm) == 4
-        @test nmaskedsets(msm) == 3
-        @test nsets(msm) == 3
-        @test maskedset(msm, 1) == MaskedSet(1, 1, 1, 1)
-        @test maskedset(msm, 2) == MaskedSet(1, 2, 1, 1)
-        @test maskedset(msm, 3) == MaskedSet(1, 3, 2, 2)
-
-        filter!(msm, Bool[true, true, false])
-        @test nelements(msm) == 4
-        @test nmaskedsets(msm) == 2
-        @test_broken nsets(msm) == 2
-        @test maskedset(msm, 1) == MaskedSet(1, 1, 1, 1)
-        @test maskedset(msm, 2) == MaskedSet(1, 2, 1, 1)
-
-        filter!(msm, Bool[false, true])
-        @test nelements(msm) == 4
-        @test nmaskedsets(msm) == 1
-        @test_broken nsets(msm) == 1
-        @test maskedset(msm, 1) == MaskedSet(1, 2, 1, 1)
-    end
 end
