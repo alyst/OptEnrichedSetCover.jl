@@ -42,12 +42,16 @@ end
 
 # sum var scores and setXset penalties (maskXmask penalties are separate)
 struct MultiobjProblemSoftFold2d <: FitnessFolding{2}
+    k::Float64
+    k_sXs::Float64
     setXset_factor::Float64
     uncovered_factor::Float64
     covered_factor::Float64
 
-    MultiobjProblemSoftFold2d(params::CoverParams) =
-        new(params.setXset_factor,
+    MultiobjProblemSoftFold2d(params::CoverParams, k::Float64=0.1) =
+        new(params.setXset_factor > 0.0 ? k : 0.0,
+            params.setXset_factor > 0.0 ? k/params.setXset_factor : 0.0,
+            params.setXset_factor,
             params.setXset_factor > 0.0 ? params.uncovered_factor/params.setXset_factor : 1.0,
             params.setXset_factor > 0.0 ? params.covered_factor/params.setXset_factor : 1.0)
 end
@@ -57,10 +61,8 @@ function (f::MultiobjProblemSoftFold2d)(fitness::NTuple{4,Float64})
     b = fitness[2] +
         f.uncovered_factor * fitness[3] +
         f.covered_factor * fitness[4]
-    k = b/max(100.0, -a) - 1.0
-    (k <= 0.0) && return (a, b)
-    kk = 1.0 - 1.0/(1.0 + k)
-    return (muladd(kk * f.setXset_factor, b, a), (1.0 - kk) * b)
+    return (f.k * f.setXset_factor * b + (1-f.k) * a,
+            (1-f.k) * b + f.k_sXs * a)
 end
 
 (agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold2d})(score::NTuple{2, Float64}) =
