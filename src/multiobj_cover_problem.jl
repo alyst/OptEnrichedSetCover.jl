@@ -368,22 +368,22 @@ function aggscore(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
 end
 
 # wraps MultiobjCoverProblem as BlackBoxOptim OptimizationProblem
-struct MultiobjCoverProblemBBOWrapper{FF <: FitnessFolding, FS <: FitnessScheme} <:
+struct MultiobjCoverProblemBBOWrapper{FF <: FitnessFolding, FS <: FitnessScheme, SS <: SearchSpace} <:
         BlackBoxOptim.OptimizationProblem{FS}
     orig::MultiobjCoverProblem
     fitness_folding::FF
     fitness_scheme::FS
-    search_space::SearchSpace
+    search_space::SS
 
     function MultiobjCoverProblemBBOWrapper(
         orig::MultiobjCoverProblem,
         fitness_folding::FF,
-        digits::Union{Integer,Nothing}=2
+        dimdigits::Union{Integer,Nothing}=2
     ) where FF
         FS = fitness_scheme_type(FF)
         fitness_scheme = FS(aggregator=MultiobjCoverProblemScoreAggregator{FF}(orig.params))
-        new{FF, FS}(orig, fitness_folding, fitness_scheme,
-                    RangePerDimSearchSpace(nvars(orig), (0.0, 1.0), digits=digits))
+        ss = RectSearchSpace(nvars(orig), (0.0, 1.0), dimdigits=dimdigits)
+        new{FF, FS, typeof(ss)}(orig, fitness_folding, fitness_scheme, ss)
     end
 end
 
@@ -496,7 +496,7 @@ function optimize(problem::MultiobjCoverProblem,
     fitfolding = MultiobjProblemFitnessFolding(problem.params, opt_params.fitness_folding)
     bbowrapper = MultiobjCoverProblemBBOWrapper(problem, fitfolding,
                                                 opt_params.weight_digits)
-    popmatrix = BlackBoxOptim.rand_individuals(search_space(bbowrapper), opt_params.pop_size, method=:latin_hypercube)
+    popmatrix = rand_individuals(search_space(bbowrapper), opt_params.pop_size, method=:latin_hypercube)
     # two extreme solutions and one totally neutral
     size(popmatrix, 2) > 0 && (popmatrix[:, 1] .= 0.0)
     size(popmatrix, 2) > 1 && (popmatrix[:, 2] .= 1.0)
