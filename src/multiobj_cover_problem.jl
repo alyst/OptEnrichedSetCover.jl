@@ -541,6 +541,6 @@ function optimize(problem::MultiobjCoverProblem,
 
     return CoverProblemResult(problem.var2set, w, problem.var_scores .* w,
                               score(problem, w), aggscore(problem, w),
-                              (fitness_frontier[frontier_perm],
+                              (fitness(w, bbowrapper), fitness_frontier[frontier_perm],
                                raw_fitness_frontier[frontier_perm]))
 end
