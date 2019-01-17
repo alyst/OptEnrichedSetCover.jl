@@ -8,15 +8,16 @@ BlackBoxOptim.fitness_scheme_type(::Type{FF}) where FF <: FitnessFolding{N} wher
     ParetoFitnessScheme{N, Float64, true, MultiobjCoverProblemScoreAggregator{FF}}
 
 function MultiobjProblemFitnessFolding(params::CoverParams,
-                                       kind::Union{Symbol, Nothing} = nothing)
+                                       kind::Union{Symbol, Nothing} = nothing;
+                                       kwargs...)
     if kind === nothing || kind == :auto # chose folding automatically
-        return MultiobjProblemSoftFold2d(params)
+        return MultiobjProblemSoftFold2d(params; kwargs...)
     elseif kind == :none
         return MultiobjProblemNoFolding()
     elseif kind == :fold2d
-        return MultiobjProblemSoftFold2d(params)
+        return MultiobjProblemSoftFold2d(params; kwargs...)
     elseif kind == :fold3d
-        return MultiobjProblemSoftFold3d(params)
+        return MultiobjProblemSoftFold3d(params; kwargs...)
     else
         throw(ArgumentError("Unknown fitness folding kind $kind"))
     end

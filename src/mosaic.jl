@@ -167,16 +167,18 @@ end
 Construct `SetMosaic` for a given nameless sets collection.
 """
 SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = foldl(union!, sets, init=Set{T}()),
-          set_relevances::AbstractVector{Float64} = fill(1.0, length(sets))) where {T} =
-    SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances)
+          set_relevances::AbstractVector{Float64} = fill(1.0, length(sets));
+          kwargs...) where {T} =
+    SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances; kwargs...)
 
 """
 Constructs `SetMosaic` for a given named sets collection.
 """
 SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = foldl(union!, values(sets), init=Set{T}()),
-          set_relevances::Dict{S, Float64} = Dict(k => 1.0 for k in keys(sets))) where {S, T} =
+          set_relevances::Dict{S, Float64} = Dict(k => 1.0 for k in keys(sets));
+          kwargs...) where {S, T} =
     SetMosaic(collect(keys(sets)), collect(values(sets)), all_elms,
-              [set_relevances[k] for k in keys(sets)])
+              [set_relevances[k] for k in keys(sets)]; kwargs...)
 
 nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
 ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)
