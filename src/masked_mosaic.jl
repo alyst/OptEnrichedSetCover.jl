@@ -78,7 +78,7 @@ function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
 end
 
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
-              min_nmasked::Integer=1,
+              min_nmasked::Integer=1, max_setsize::Union{Integer, Nothing} = nothing,
               max_overlap_logpvalue::Float64=0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
 )
     size(elmasks, 1) == nelements(mosaic) ||
@@ -97,6 +97,7 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
         for (setix, nmasked) in enumerate(orgsets_mask)
             (nmasked < min_nmasked) && continue # skip small overlap
             @inbounds nset = setsize(mosaic, setix)
+            (max_setsize !== nothing) && (nset > max_setsize) && continue # skip very big and generic sets
             overlap_pvalue = logpvalue(nmasked, nset, ntotal_masked, ntotal)
             (overlap_pvalue > max_overlap_logpvalue) && continue # skip non-signif overlaps
             setmasks = get!(() -> Vector{MaskOverlap}(), set2masks, setix)
