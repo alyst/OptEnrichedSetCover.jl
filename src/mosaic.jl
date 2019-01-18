@@ -107,7 +107,8 @@ struct SetMosaic{T,S}
     function SetMosaic(setids::AbstractVector{S},
                        sets::AbstractVector{<:Union{AbstractVector{T},Set{T}}},
                        all_elms::Set{T},
-                       set_relevances::AbstractVector{<:Real}) where {T, S}
+                       set_relevances::AbstractVector{<:Real};
+                       setXset_nextra_elms::Integer=0) where {T, S}
         length(setids) == length(sets) ||
             throw(ArgumentError("Number of set IDs does not match the number of sets"))
         length(set_relevances) == length(sets) ||
@@ -159,7 +160,7 @@ struct SetMosaic{T,S}
                   Dict(id => ix2new[ix] for (ix, id) in enumerate(setids)),
                   set_sizes, set_relevances[new2ix],
                   setXelm[new2ix, :], elmXset[:, new2ix], elmXtile, tileXset,
-                  _setXset_scores(tileXset, length(all_elms), set_sizes, tile_sizes))
+                  _setXset_scores(tileXset, length(all_elms) + setXset_nextra_elms, set_sizes, tile_sizes))
     end
 end
 
