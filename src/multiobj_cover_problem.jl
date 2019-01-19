@@ -43,29 +43,41 @@ end
     score[1] + agg.setXset_factor * score[2] +
     agg.uncovered_factor * score[3] + agg.covered_factor * score[4]
 
-# sum var scores and setXset penalties (maskXmask penalties are separate)
+# Sums significance (1st), uncovered (3rd) and covered (4th) components of the score into a single score (`a`)
+# if `-b/a` (b = 2nd component) is below ratio_threshold, keeps the score as is (`(a, b)`)
+# otherwise, mixes in `b` into `a` and `a` into `b` (`(a + k sXs b, (1-k) b)`) with an increasing strength `k`,
+# so that when `-b/a → ∞`, `(a#, b#) → (0, a/setXset_factor + b)`
+# The transform keeps the aggregated score intact
 struct MultiobjProblemSoftFold2d <: FitnessFolding{2}
-    k::Float64
-    k_sXs::Float64
     setXset_factor::Float64
     uncovered_factor::Float64
     covered_factor::Float64
+    ratio_threshold::Float64    # at what set_score/setXset_score ratio the folding kicks in
+    shape::Float64              # controls folding smoothness (smaller are smoother)
 
-    MultiobjProblemSoftFold2d(params::CoverParams, k::Float64=0.1) =
-        new(params.setXset_factor > 0.0 ? k : 0.0,
-            params.setXset_factor > 0.0 ? k/params.setXset_factor : 0.0,
-            params.setXset_factor,
-            params.setXset_factor > 0.0 ? params.uncovered_factor/params.setXset_factor : 1.0,
-            params.setXset_factor > 0.0 ? params.covered_factor/params.setXset_factor : 1.0)
+    MultiobjProblemSoftFold2d(params::CoverParams,
+                              ratio_threshold::Float64 = 5.0,
+                              shape::Float64=0.05) =
+        new(params.setXset_factor, params.uncovered_factor, params.covered_factor,
+            ratio_threshold, shape)
 end
 
 function (f::MultiobjProblemSoftFold2d)(fitness::NTuple{4,Float64})
-    a = fitness[1]
-    b = fitness[2] +
+    a = fitness[1] +
         f.uncovered_factor * fitness[3] +
         f.covered_factor * fitness[4]
-    return (f.k * f.setXset_factor * b + (1-f.k) * a,
-            (1-f.k) * b + f.k_sXs * a)
+    b = fitness[2]
+    if f.ratio_threshold !== nothing
+        t = b/max(1, -a)
+        (t <= f.ratio_threshold) && return (a, b)
+
+        ts = f.shape * (t - f.ratio_threshold)
+        # 1/(1 + exp(1/ts - ts)) allows smooth transition from ts = 0 (f(0)=0) to f(∞)=1
+        k = 1 / (t * f.setXset_factor) / (1 + exp(1/ts - ts))
+        return (a + k * f.setXset_factor * b, (1.0 - k) * b)
+    else
+        return (a, b)
+    end
 end
 
 (agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold2d})(score::NTuple{2, Float64}) =
