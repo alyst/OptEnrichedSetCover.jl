@@ -406,11 +406,11 @@ BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
 =#
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
                            problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemSoftFold2d}) =
-    @printf(io, "(sets+k·set²=%.3f set²+k·sets=%.3f)\n", score[1], score[2])
+    @printf(io, "(sets+k·sets²=%.3f sets²+k·sets=%.3f)\n", score[1], score[2])
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
                            problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemFold3d}) =
-    @printf(io, "(sets+k(set²+uncov)=%.3f set²+k(sets+uncov)=%.3f uncov+k(sets+set²)=%.3f)\n",
+    @printf(io, "(sets+k(sets²+uncov)=%.3f sets²+k(sets+uncov)=%.3f uncov+k(sets+sets²)=%.3f)\n",
           score[1], score[2], score[3])
 
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjCoverProblemBBOWrapper) =
