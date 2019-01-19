@@ -5,22 +5,25 @@ struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
     set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
+    set_relevance_min::Float64  # if shaped relevance is below, it's set to set_relevance_min
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
     uncovered_factor::Float64   # how much masked uncovered elements penalize the score
     covered_factor::Float64     # how much unmasked covered elements penalize the score
 
     function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
                          set_relevance_shape::Number=0.5,
+                         set_relevance_min::Number=0.5,
                          setXset_factor::Number=1.0,
                          uncovered_factor::Number=0.1, covered_factor::Number=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
+        (0.0 <= set_relevance_min <= 1) || throw(ArgumentError("`set_relevance_min` must be within [0, 1] range"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= uncovered_factor) || throw(ArgumentError("`uncovered_factor` must be ≥0"))
         (0.0 <= covered_factor) || throw(ArgumentError("`covered_factor` must be ≥0"))
-        new(sel_prob, min_weight, set_relevance_shape, setXset_factor,
-            uncovered_factor, covered_factor)
+        new(sel_prob, min_weight, set_relevance_shape, set_relevance_min,
+            setXset_factor, uncovered_factor, covered_factor)
     end
 end
 
@@ -31,7 +34,7 @@ Doesn't take into account the overlap with the other selected sets.
 function overlap_score(masked::Number, set::Number, total_masked::Number, total::Number,
                        relevance::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
-    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*(relevance^params.set_relevance_shape) #-
+    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*max(relevance^params.set_relevance_shape, params.set_relevance_min) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
     @assert !isnan(res) "masked=$masked set=$set total_masked=$total_masked total=$total relevance=$relevance res=NaN"
     return res
