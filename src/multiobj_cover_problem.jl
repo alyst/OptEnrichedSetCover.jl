@@ -17,7 +17,7 @@ function MultiobjProblemFitnessFolding(params::CoverParams,
     elseif kind == :fold2d
         return MultiobjProblemSoftFold2d(params; kwargs...)
     elseif kind == :fold3d
-        return MultiobjProblemSoftFold3d(params; kwargs...)
+        return MultiobjProblemFold3d(params; kwargs...)
     else
         throw(ArgumentError("Unknown fitness folding kind $kind"))
     end
@@ -71,8 +71,10 @@ end
 (agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold2d})(score::NTuple{2, Float64}) =
     score[1] + agg.setXset_factor * score[2]
 
-# sum var scores and setXset penalties (maskXmask penalties are separate)
-struct MultiobjProblemSoftFold3d <: FitnessFolding{3}
+# Sums uncovered (3rd) and covered (4th) components of the score into a single score
+# that to every score component mixes in the other 2 components with the weight k
+# The transform keeps the aggregated score intact
+struct MultiobjProblemFold3d <: FitnessFolding{3}
     k::Float64
     k_sXs::Float64
     k_u::Float64
@@ -80,7 +82,7 @@ struct MultiobjProblemSoftFold3d <: FitnessFolding{3}
     uncovered_factor::Float64
     covered_factor::Float64
 
-    MultiobjProblemSoftFold3d(params::CoverParams, k::Float64=0.1) =
+    MultiobjProblemFold3d(params::CoverParams, k::Float64=0.1) =
         new(params.setXset_factor > 0.0 ? k : 0.0,
             params.setXset_factor > 0.0 ? k/params.setXset_factor : 0.0,
             params.uncovered_factor > 0.0 ? k/params.uncovered_factor : 0.0,
@@ -89,7 +91,7 @@ struct MultiobjProblemSoftFold3d <: FitnessFolding{3}
             params.uncovered_factor > 0.0 ? params.covered_factor/params.uncovered_factor : 1.0)
 end
 
-function (f::MultiobjProblemSoftFold3d)(fitness::NTuple{4,Float64})
+function (f::MultiobjProblemFold3d)(fitness::NTuple{4,Float64})
     a = fitness[1]
     b = fitness[2]
     c = fitness[3] + f.covered_factor * fitness[4]
@@ -98,7 +100,7 @@ function (f::MultiobjProblemSoftFold3d)(fitness::NTuple{4,Float64})
             0.5 * f.k_u * (a + f.setXset_factor * b) + (1-f.k) * c)
 end
 
-(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold3d})(score::NTuple{3, Float64}) =
+(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemFold3d})(score::NTuple{3, Float64}) =
     score[1] + agg.setXset_factor * score[2] + agg.uncovered_factor * score[3]
 
 """
@@ -407,7 +409,7 @@ BlackBoxOptim.show_fitness(io::IO, score::NTuple{2,Float64},
     @printf(io, "(sets+k·set²=%.3f set²+k·sets=%.3f)\n", score[1], score[2])
 
 BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
-                           problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemSoftFold3d}) =
+                           problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemFold3d}) =
     @printf(io, "(sets+k(set²+uncov)=%.3f set²+k(sets+uncov)=%.3f uncov+k(sets+set²)=%.3f)\n",
           score[1], score[2], score[3])
 
