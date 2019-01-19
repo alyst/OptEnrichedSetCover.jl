@@ -193,7 +193,7 @@ struct CoverProblemResult{T}
             var_scores::AbstractVector{Float64},
             total_score::T, agg_total_score::Float64, extra = nothing) where T
         length(var2set) == length(weights) == length(var_scores) ||
-            throw(DimensionMismatch("Lengths of cover result components do not match"))
+            throw(DimensionMismatch("Lengths of CoverProblemResult components do not match"))
         new{T}(var2set, weights, var_scores,
                total_score, agg_total_score, extra)
     end
