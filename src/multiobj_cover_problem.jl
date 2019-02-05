@@ -322,7 +322,7 @@ end
 # the tuple of:
 # - total number of uncovered masked elements (in all masks overlapping with the cover)
 # -`` total number of covered unmasked elements (in all masks overlapping with the cover)
-function miscover_score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
+function miscover_score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     __check_vars(w, problem)
     isempty(problem.nmasked_tile) && return (0.0, 0.0)
     # calculate the tile coverage weights
@@ -350,7 +350,7 @@ Unfolded multiobjective score (fitness) of the OESC coverage.
 
 * `w` probabilities of the sets being covered
 """
-function score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
+function score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     __check_vars(w, problem)
     a = dot(problem.var_scores, w)
     if problem.params.setXset_factor == 0.0
@@ -369,13 +369,13 @@ function score(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
         c = 0.0
         d = 0.0
     else
-        c, d = miscover_score(problem, w)
+        c, d = miscover_score(w, problem)
     end
     return (a, b, c, d)
 end
 
-function aggscore(problem::MultiobjCoverProblem, w::AbstractVector{Float64})
-    s = score(problem, w)
+function aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
+    s = score(w, problem)
     s[1] +
     problem.params.setXset_factor * s[2] +
     problem.params.uncovered_factor * s[3] +
@@ -429,7 +429,7 @@ BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::Multiobj
     BlackBoxOptim.show_fitness(io, score.orig, problem)
 
 BlackBoxOptim.fitness(x::BlackBoxOptim.AbstractIndividual,
-                      p::MultiobjCoverProblemBBOWrapper) = p.fitness_folding(score(p.orig, x))
+                      p::MultiobjCoverProblemBBOWrapper) = p.fitness_folding(score(x, p.orig))
 
 generate_recombinators(problem::MultiobjCoverProblemBBOWrapper, params) =
     CrossoverOperator[BlackBoxOptim.DiffEvoRandBin1(chain(BlackBoxOptim.DE_DefaultOptions, params)),
@@ -551,11 +551,11 @@ function optimize(problem::MultiobjCoverProblem,
     end
 
     fitness_frontier = [archived_fitness(af).orig for af in pareto_frontier(bbores)]
-    raw_fitness_frontier = score.(Ref(problem), BlackBoxOptim.params.(pareto_frontier(bbores)))
+    raw_fitness_frontier = score.(BlackBoxOptim.params.(pareto_frontier(bbores)), Ref(problem))
     frontier_perm = sortperm(raw_fitness_frontier)
 
     return CoverProblemResult(problem.var2set, w, problem.var_scores .* w,
-                              score(problem, w), aggscore(problem, w),
+                              score(w, problem), aggscore(w, problem),
                               (fitness(w, bbowrapper), fitness_frontier[frontier_perm],
                                raw_fitness_frontier[frontier_perm]))
 end

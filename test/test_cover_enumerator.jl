@@ -9,10 +9,10 @@ global tested_problem_types = [:multiobjective]
         cover_params1 = CoverParams(sel_prob=0.5, uncovered_factor=0.5)
         cover_problem = MultiobjCoverProblem(sm_ab, cover_params1)
         @test nvars(cover_problem) == 3
-        @test aggscore(cover_problem, [1.0, 1.0, 0.0]) < aggscore(cover_problem, [0.0, 0.0, 0.0])
-        @test aggscore(cover_problem, [0.0, 0.0, 1.0]) < aggscore(cover_problem, [0.0, 0.0, 0.0])
-        @test aggscore(cover_problem, [1.0, 1.0, 0.0]) < aggscore(cover_problem, [1.0, 1.0, 1.0])
-        @test aggscore(cover_problem, [0.0, 0.0, 1.0]) < aggscore(cover_problem, [1.0, 1.0, 1.0])
+        @test aggscore([1.0, 1.0, 0.0], cover_problem) < aggscore([0.0, 0.0, 0.0], cover_problem)
+        @test aggscore([0.0, 0.0, 1.0], cover_problem) < aggscore([0.0, 0.0, 0.0], cover_problem)
+        @test aggscore([1.0, 1.0, 0.0], cover_problem) < aggscore([1.0, 1.0, 1.0], cover_problem)
+        @test aggscore([0.0, 0.0, 1.0], cover_problem) < aggscore([1.0, 1.0, 1.0], cover_problem)
         cover_coll1a = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type)
         @test length(cover_coll1a) == 2
         cover_coll1b = collect(sm_ab, cover_params1, CoverEnumerationParams(max_set_score=0.4), problem_type=problem_type)

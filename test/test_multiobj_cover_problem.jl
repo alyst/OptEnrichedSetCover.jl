@@ -5,10 +5,10 @@
         problem = MultiobjCoverProblem(msm)
         @test nvars(problem) == 0
         @test_skip nmasks(problem) == 1
-        @test_throws DimensionMismatch score(problem, [1.0])
-        @test OESC.miscover_score(problem, Float64[]) == (0.0, 0.0)
-        @test score(problem, Float64[]) == (0.0, 0.0, 0.0, 0.0)
-        @test aggscore(problem, Float64[]) == 0.0
+        @test_throws DimensionMismatch score([1.0], problem)
+        @test OESC.miscover_score(Float64[], problem) == (0.0, 0.0)
+        @test score(Float64[], problem) == (0.0, 0.0, 0.0, 0.0)
+        @test aggscore(Float64[], problem) == 0.0
 
         res = optimize(problem)
         @test res.weights == Vector{Float64}()
@@ -19,9 +19,9 @@
         # empty mask problem
         empty_prob = MultiobjCoverProblem(mask(SetMosaic([Set([:a])]), [Set{Symbol}()]))
         @test nvars(empty_prob) == 0
-        @test OESC.miscover_score(empty_prob, Float64[]) == (0.0, 0.0)
-        @test score(empty_prob, Float64[]) == (0.0, 0.0, 0.0, 0.0)
-        @test aggscore(empty_prob, Float64[]) == 0.0
+        @test OESC.miscover_score(Float64[], empty_prob) == (0.0, 0.0)
+        @test score(Float64[], empty_prob) == (0.0, 0.0, 0.0, 0.0)
+        @test aggscore(Float64[], empty_prob) == 0.0
         empty_res = optimize(empty_prob)
         @test empty_res.weights == Vector{Float64}()
         @test empty_res.agg_total_score == 0.0
@@ -30,15 +30,15 @@
         prob1_mosaic = mask(SetMosaic([Set([:a])], Set([:a])), [Set([:a])], min_nmasked=1)
         en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.5, uncovered_factor=1.0))
         @test nvars(en1_prob) == 1
-        @test_throws DimensionMismatch score(en1_prob, Float64[])
-        @test OESC.miscover_score(en1_prob, [0.0]) == (1.0, 0.0)
-        @test OESC.miscover_score(en1_prob, [1.0]) == (0.0, 0.0)
-        en1_score = score(en1_prob, [1.0])
+        @test_throws DimensionMismatch score(Float64[], en1_prob)
+        @test OESC.miscover_score([0.0], en1_prob) == (1.0, 0.0)
+        @test OESC.miscover_score([1.0], en1_prob) == (0.0, 0.0)
+        en1_score = score([1.0], en1_prob)
         @test en1_score == (en1_prob.var_scores[1], 0.0, 0.0, 0.0)
-        @test score(en1_prob, [0.0]) == (0.0, 0.0, 1.0, 0.0)
+        @test score([0.0], en1_prob) == (0.0, 0.0, 1.0, 0.0)
         @test en1_score[1] < 1.0 # score[3] at [0.0], required for enabling
-        @test score(en1_prob, [0.5]) == (0.5*en1_prob.var_scores[1], 0.0, 0.5, 0.0)
-        @test aggscore(en1_prob, [1.0]) < aggscore(en1_prob, [0.9]) < aggscore(en1_prob, [0.5]) < aggscore(en1_prob, [0.0])
+        @test score([0.5], en1_prob) == (0.5*en1_prob.var_scores[1], 0.0, 0.5, 0.0)
+        @test aggscore([1.0], en1_prob) < aggscore([0.9], en1_prob) < aggscore([0.5], en1_prob) < aggscore([0.0], en1_prob)
         en1_res = optimize(en1_prob, MultiobjOptimizerParams(ϵ=0.01))
         @test en1_res.weights == ones(Float64, 1)
 
@@ -46,11 +46,11 @@
         dis1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.01, uncovered_factor=1.0))
         @test nvars(dis1_prob) == 1
         @test dis1_prob.var_scores[1] > en1_prob.var_scores[1]
-        dis1_score = score(dis1_prob, [1.0])
+        dis1_score = score([1.0], dis1_prob)
         @test dis1_score == (dis1_prob.var_scores[1], 0.0, 0.0, 0.0)
-        @test score(dis1_prob, [0.0]) == (0.0, 0.0, 1.0, 0.0)
+        @test score([0.0], dis1_prob) == (0.0, 0.0, 1.0, 0.0)
         @test dis1_score[1] > 1.0 # score[3] at [0.0], required for disabling
-        @test aggscore(dis1_prob, [1.0]) > aggscore(dis1_prob, [0.5]) > aggscore(dis1_prob, [0.0])
+        @test aggscore([1.0], dis1_prob) > aggscore([0.5], dis1_prob) > aggscore([0.0], dis1_prob)
         dis1_res = optimize(dis1_prob)
         @test dis1_res.weights == zeros(Float64, 1)
 
@@ -69,12 +69,12 @@
 
         problem_def = MultiobjCoverProblem(sm_ab) # cd set is dropped
 
-        @test OESC.miscover_score(problem_def, [0.0, 0.0]) == (2.0, 0.0)
-        @test OESC.miscover_score(problem_def, [0.25, 0.0]) == (1.5, 0.0)
-        @test OESC.miscover_score(problem_def, [0.75, 0.0]) == (0.5, 0.0)
-        @test OESC.miscover_score(problem_def, [1.0, 0.0]) == (0.0, 0.0)
-        @test OESC.miscover_score(problem_def, [1.0, 1.0]) == (0.0, 1.0)
-        @test OESC.miscover_score(problem_def, [0.0, 1.0]) == (0.0, 1.0)
+        @test OESC.miscover_score([0.0, 0.0], problem_def) == (2.0, 0.0)
+        @test OESC.miscover_score([0.25, 0.0], problem_def) == (1.5, 0.0)
+        @test OESC.miscover_score([0.75, 0.0], problem_def) == (0.5, 0.0)
+        @test OESC.miscover_score([1.0, 0.0], problem_def) == (0.0, 0.0)
+        @test OESC.miscover_score([1.0, 1.0], problem_def) == (0.0, 1.0)
+        @test OESC.miscover_score([0.0, 1.0], problem_def) == (0.0, 1.0)
 
         res_def = optimize(problem_def)
         @test res_def.weights ≈ [1.0, 0.0] atol=0.01
@@ -97,19 +97,19 @@
         problem_b = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_prob=0.5))
         res_b = optimize(problem_b)
         # [:a :b] is as good as [:b :c]
-        @test aggscore(problem_b, [0.0, 1.0, 0.0]) < aggscore(problem_b, [0.0, 0.0, 1.0])
-        @test aggscore(problem_b, [0.0, 1.0, 0.0]) < aggscore(problem_b, [0.0, 0.0, 0.0])
-        @test aggscore(problem_b, [0.0, 1.0, 0.0]) == aggscore(problem_b, [1.0, 0.0, 0.0])
+        @test aggscore([0.0, 1.0, 0.0], problem_b) < aggscore([0.0, 0.0, 1.0], problem_b)
+        @test aggscore([0.0, 1.0, 0.0], problem_b) < aggscore([0.0, 0.0, 0.0], problem_b)
+        @test aggscore([0.0, 1.0, 0.0], problem_b) == aggscore([1.0, 0.0, 0.0], problem_b)
         @test max(res_b.weights[1], res_b.weights[2]) ≈ 1.0 atol=0.01
         @test res_b.weights[3] ≈ 0.0 atol = 0.01
 
-        @test OESC.miscover_score(problem_b, [1.0, 0.0, 0.0]) == (0.0, 1.0)
-        @test OESC.miscover_score(problem_b, [0.0, 1.0, 0.0]) == (0.0, 1.0)
-        @test OESC.miscover_score(problem_b, [0.0, 0.5, 0.0]) == (0.5, 0.5)
-        @test OESC.miscover_score(problem_b, [0.0, 0.0, 1.0]) == (0.0, 2.0)
-        @test OESC.miscover_score(problem_b, [1.0, 0.0, 1.0]) == (0.0, 2.0)
-        @test OESC.miscover_score(problem_b, [1.0, 1.0, 1.0]) == (0.0, 2.0)
-        @test OESC.miscover_score(problem_b, [1.0, 1.0, 0.5]) == (0.0, 2.0)
+        @test OESC.miscover_score([1.0, 0.0, 0.0], problem_b) == (0.0, 1.0)
+        @test OESC.miscover_score([0.0, 1.0, 0.0], problem_b) == (0.0, 1.0)
+        @test OESC.miscover_score([0.0, 0.5, 0.0], problem_b) == (0.5, 0.5)
+        @test OESC.miscover_score([0.0, 0.0, 1.0], problem_b) == (0.0, 2.0)
+        @test OESC.miscover_score([1.0, 0.0, 1.0], problem_b) == (0.0, 2.0)
+        @test OESC.miscover_score([1.0, 1.0, 1.0], problem_b) == (0.0, 2.0)
+        @test OESC.miscover_score([1.0, 1.0, 0.5], problem_b) == (0.0, 2.0)
     end
 
     @testset "[a b d] [b c d] [c] [d] [a b c d e] [c d e], mask=[a b c]" begin # FIXME take weights into account
@@ -122,16 +122,16 @@
         prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, uncovered_factor=1.0, sel_prob=0.1))
         @test nvars(prob_hi_sXs) == 5 # d is out
 
-        @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
-        @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 1.0, 0.0, 0.0, 0.0])
+        @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
+        @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 1.0, 0.0, 0.0, 0.0], prob_hi_sXs)
         res_ignore_overlap = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
-        @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [1.0, 0.0, 0.0, 0.0, 0.0])
+        @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([1.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0]
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
         problem_low_penalty = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_prob=0.9))
-        @test aggscore(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(problem_low_penalty, [1.0, 1.0, 0.0, 0.0, 0.0])
-        @test aggscore(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(problem_low_penalty, [0.0, 0.0, 0.0, 1.0, 0.0])
+        @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], problem_low_penalty) < aggscore([1.0, 1.0, 0.0, 0.0, 0.0], problem_low_penalty)
+        @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], problem_low_penalty) < aggscore([0.0, 0.0, 0.0, 1.0, 0.0], problem_low_penalty)
         res_low_penalty = optimize(problem_low_penalty, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
         @test res_low_penalty.weights ≈ [1.0, 0.0, 1.0, 0.0, 0.0]
     end
@@ -147,25 +147,25 @@
         @test_skip nmasks(prob_hi_sXs) == 2
         @test nvars(prob_hi_sXs) == 5 # d is out: abd bcd c abcde cdef
 
-        @test OESC.miscover_score(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0]) == (5.0, 0.0)
-        @test OESC.miscover_score(prob_hi_sXs, [1.0, 0.0, 0.0, 0.0, 0.0]) == (2.0, 1.0)
-        @test OESC.miscover_score(prob_hi_sXs, [0.0, 1.0, 0.0, 0.0, 0.0]) == (2.0, 1.0)
-        @test OESC.miscover_score(prob_hi_sXs, [0.0, 0.0, 1.0, 0.0, 0.0]) == (4.0, 0.0)
+        @test OESC.miscover_score([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (5.0, 0.0)
+        @test OESC.miscover_score([1.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0)
+        @test OESC.miscover_score([0.0, 1.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0)
+        @test OESC.miscover_score([0.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) == (4.0, 0.0)
 
-        @test aggscore(prob_hi_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
-        @test aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0]) < aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
-        @test aggscore(prob_hi_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) > aggscore(prob_hi_sXs, [0.0, 0.0, 0.0, 1.0, 0.0])
+        @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
+        @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
+        @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) > aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs)
         res_hi_sXs = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
         @test res_hi_sXs.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0] atol=1E-2
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcd, c and abcde + cdef
         prob_low_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=0.01, covered_factor=1E-5, uncovered_factor=1.0, sel_prob=0.9))
         @test_skip nmasks(prob_low_sXs) == 2
-        @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 0.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 0.0, 0.0, 0.0])
-        @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 0.0, 0.0])
-        @test aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
-        @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [0.0, 0.0, 1.0, 1.0, 0.0])
-        @test aggscore(prob_low_sXs, [1.0, 1.0, 1.0, 1.0, 0.0]) < aggscore(prob_low_sXs, [1.0, 0.0, 1.0, 1.0, 0.0])
+        @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_low_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_low_sXs)
+        @test aggscore([1.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs) < aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_low_sXs)
+        @test aggscore([1.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs) < aggscore([0.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs)
+        @test aggscore([1.0, 1.0, 1.0, 1.0, 0.0], prob_low_sXs) < aggscore([0.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs)
+        @test aggscore([1.0, 1.0, 1.0, 1.0, 0.0], prob_low_sXs) < aggscore([1.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs)
         res_low_sXs = optimize(prob_low_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
         @test res_low_sXs.weights ≈ [1.0, 1.0, 1.0, 1.0, 0.0] atol=1E-2# [1.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2
     end
