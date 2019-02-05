@@ -500,12 +500,94 @@ generate_modifier(problem::MultiobjCoverProblemBBOWrapper, params) =
                                  MutationClock(UniformMutation(search_space(problem)), 1/numdims(problem))],
                                  [0.5, 0.3, 0.2])
 
+"""
+Result of `optimize(MultiobjCoverProblem)`.
+"""
+struct MultiobjCoverProblemResult
+    var2set::Vector{Int}        # indices of sets in the original SetMosaic
+    varscores::Vector{Float64}  # scores of the sets
+
+    varweights::Matrix{Float64} # weights of the vars for each solution on Pareto front
+    raw_scores::Vector{RawScore}# raw scores for each solution
+    folded_scores::Vector{FoldedScore}
+    agg_scores::Vector{Float64}
+    best_ix::Int                # index of the best solution (agg_score minimum)
+end
+
+function MultiobjCoverProblemResult(problem::MultiobjCoverProblem,
+                                    optres::BlackBoxOptim.OptimizationResults)
+    # initialize solutions
+    wmtx = similar(best_candidate(optres), nvars(problem),
+                   length(pareto_frontier(optres)))
+    folded_scores = [archived_fitness(sol).orig for sol in pareto_frontier(optres)]
+    front_perm = sortperm(folded_scores) # sort lexicographically
+    @inbounds for i in axes(wmtx, 2)
+        wmtx[:, i] = BlackBoxOptim.params(pareto_frontier(optres)[front_perm[i]])
+    end
+    # remove small non-zero probabilities due to optimization method errors
+    minw = problem.params.min_weight
+    maxw = 1.0 - problem.params.min_weight
+    @inbounds for i in eachindex(wmtx)
+        if wmtx[i] <= minw
+            wmtx[i] = 0.0
+        elseif wmtx[i] >= maxw
+            wmtx[i] = 1.0
+        end
+    end
+    # calculate raw scores for the corrected weights
+    raw_scores = dropdims(mapslices(w -> score(w, problem), wmtx; dims=1), dims=1)
+    agg_scores = aggscore.(raw_scores, Ref(problem.params))
+
+    return MultiobjCoverProblemResult(problem.var2set, problem.var_scores,
+                                      wmtx, raw_scores, folded_scores, agg_scores,
+                                      findmin(agg_scores)[2])
+end
+
+nvars(res::MultiobjCoverProblemResult) = length(res.var2set)
+nsolutions(res::MultiobjCoverProblemResult) = size(res.varweights, 2)
+
+Base.isempty(res::MultiobjCoverProblemResult) = isempty(res.varweights)
+
+varweights(res::MultiobjCoverProblemResult, sol_ix::Integer) =
+    view(res.varweights, :, sol_ix)
+
+best_index(res::MultiobjCoverProblemResult, ::Nothing=nothing) = res.best_ix
+
+function best_index(res::MultiobjCoverProblemResult, params::CoverParams)
+    # FIXME replace with findmin(aggscore, res) when Julia 1.0 support is dropped
+    best_ix = 1
+    min_score = aggscore(res.raw_scores[best_ix], params)
+    @inbounds for i in 2:nsolutions(res)
+        sol_score = aggscore(res.raw_scores[i], params)
+        if sol_score < min_score
+            best_ix = i
+            min_score = sol_score
+        end
+    end
+    return best_ix
+end
+
+best_varweights(result::MultiobjCoverProblemResult) =
+    @inbounds(view(result.varweights, :, best_index(result)))
+
+best_aggscore(result::MultiobjCoverProblemResult) =
+    @inbounds(result.agg_scores[best_index(result)])
+
+function set2var(result::MultiobjCoverProblemResult, setix::Int)
+    varix = searchsortedlast(result.var2set, setix)
+    if varix > 0 && result.var2set[varix] == setix
+        return varix
+    else
+        return 0
+    end
+end
+
 function optimize(problem::MultiobjCoverProblem,
                   opt_params::MultiobjOptimizerParams = MultiobjOptimizerParams())
     if nvars(problem) == 0
-        w = Vector{Float64}()
-        return CoverProblemResult(Vector{Int}(), w, Vector{Float64}(),
-                                  score(problem, w), 0.0, nothing)
+        return MultiobjCoverProblemResult(
+            Vector{Int}(), Vector{Float64}(), Matrix{Float64}(undef, 0, 0),
+            Vector{RawScore}(), Vector{FoldedScore}(), Vector{Float64}(), 0)
     end
 
     fitfolding = MultiobjProblemSoftFold2d(problem.params)
@@ -537,25 +619,5 @@ function optimize(problem::MultiobjCoverProblem,
                  bbo_ctrl_params(opt_params))
     bbores = bboptimize(bboctrl)
     BlackBoxOptim.isinterrupted(bbores) && throw(InterruptException())
-    w = best_candidate(bbores)
-
-    # remove small non-zero probabilities due to optimization method errors
-    minw = problem.params.min_weight
-    maxw = 1.0 - problem.params.min_weight
-    @inbounds for i in eachindex(w)
-        if w[i] <= minw
-            w[i] = 0.0
-        elseif w[i] >= maxw
-            w[i] = 1.0
-        end
-    end
-
-    fitness_frontier = [archived_fitness(af).orig for af in pareto_frontier(bbores)]
-    raw_fitness_frontier = score.(BlackBoxOptim.params.(pareto_frontier(bbores)), Ref(problem))
-    frontier_perm = sortperm(raw_fitness_frontier)
-
-    return CoverProblemResult(problem.var2set, w, problem.var_scores .* w,
-                              score(w, problem), aggscore(w, problem),
-                              (fitness(w, bbowrapper), fitness_frontier[frontier_perm],
-                               raw_fitness_frontier[frontier_perm]))
+    return MultiobjCoverProblemResult(problem, bbores)
 end

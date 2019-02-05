@@ -43,7 +43,7 @@ global tested_problem_types = [:multiobjective]
         cover_coll = collect(mask(sm, [Set([:a, :b])], min_nmasked=1), CoverParams(sel_prob=1.0),
                              CoverEnumerationParams(max_set_score=10.0), problem_type=problem_type, ϵ=0.01)
         @test length(cover_coll) == 2
-        @test cover_coll.results[1].agg_total_score <= cover_coll.results[2].agg_total_score
+        @test best_aggscore(cover_coll.results[1]) <= best_aggscore(cover_coll.results[2])
     end
 
     @testset "DataFrame(CoverCollection)" begin

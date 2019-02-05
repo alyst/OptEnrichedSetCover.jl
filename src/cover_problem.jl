@@ -176,42 +176,9 @@ __check_vars(w::AbstractVector{Float64}, problem::AbstractCoverProblem) =
     length(w) == nvars(problem) ||
         throw(DimensionMismatch("Incorrect length of parameters vector: $(length(w)) ($(nvars(problem)) expected)"))
 
-"""
-Result of `optimize(AbstractCoverProblem)`.
-"""
-struct CoverProblemResult{T}
-    var2set::Vector{Int}        # indices of sets in the original SetMosaic
-    weights::Vector{Float64}    # solution: weights of the sets
-    var_scores::Vector{Float64} # scores of the sets
-    total_score::T
-    agg_total_score::Float64
-    extra
-
-    function CoverProblemResult(
-            var2set::AbstractVector{Int},
-            weights::AbstractVector{Float64},
-            var_scores::AbstractVector{Float64},
-            total_score::T, agg_total_score::Float64, extra = nothing) where T
-        length(var2set) == length(weights) == length(var_scores) ||
-            throw(DimensionMismatch("Lengths of CoverProblemResult components do not match"))
-        new{T}(var2set, weights, var_scores,
-               total_score, agg_total_score, extra)
-    end
-end
-
-function set2var(result::CoverProblemResult, setix::Int)
-    varix = searchsortedlast(result.var2set, setix)
-    if varix > 0 && result.var2set[varix] == setix
-        return varix
-    else
-        return 0
-    end
-end
-
 function selectvars(problem::AbstractCoverProblem,
                     mosaic::MaskedSetMosaic,
-                    weights::AbstractVector{Float64}
-)
+                    weights::AbstractVector{Float64})
     @assert length(weights) == nvars(problem)
     return findall(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
 end

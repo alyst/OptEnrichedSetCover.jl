@@ -9,12 +9,13 @@ export SetMosaic, CoverParams,
     AbstractCoverProblem, MultiobjCoverProblem,
     AbstractOptimizerParams, MultiobjOptimizerParams,
     CoverEnumerationParams, CoverCollection, CoverProblemResult,
-    nelements, ntiles, nsets, nmaskedsets, nmasks, nvars,
+    nelements, ntiles, nsets, nmaskedsets, nmasks, nvars, nsolutions,
     nmasked, nunmasked, maskedset,
     tile, tiles, set, setsize,
     unmask, mask,
     set_relevance,
     aggscore, score, # any conflicts
+    best_aggscore, best_index, best_varweights, varweights,
     optimize # conflicts with Optim.jl
 
 import BlackBoxOptim: OptimizationProblem
