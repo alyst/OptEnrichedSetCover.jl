@@ -381,13 +381,14 @@ function score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     return (a, b, c, d)
 end
 
-function aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
-    s = score(w, problem)
+aggscore(s::RawScore, params::CoverParams) =
     s[1] +
-    problem.params.setXset_factor * s[2] +
-    problem.params.uncovered_factor * s[3] +
-    problem.params.covered_factor * s[4]
-end
+    params.setXset_factor * s[2] +
+    params.uncovered_factor * s[3] +
+    params.covered_factor * s[4]
+
+aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
+    aggscore(score(w, problem), problem.params)
 
 # wraps MultiobjCoverProblem as BlackBoxOptim OptimizationProblem
 struct MultiobjCoverProblemBBOWrapper{FF <: FitnessFolding, FS <: FitnessScheme, SS <: SearchSpace} <:
