@@ -1,13 +1,6 @@
 # defines how to fold fitness into N components
 abstract type FitnessFolding{N} end
 
-# raw cover score:
-# 1 => covered set scores,
-# 2 => covered setXset penalties,
-# 3 => uncovered masked elements penalties
-# 4 => covered unmasked elements penalties
-const RawScore = NTuple{4, Float64}
-
 # soft Fold2D score
 const FoldedScore = NTuple{2, Float64}
 
@@ -369,12 +362,6 @@ function score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     end
     return (a, b, c, d)
 end
-
-aggscore(s::RawScore, params::CoverParams) =
-    s[1] +
-    params.setXset_factor * s[2] +
-    params.uncovered_factor * s[3] +
-    params.covered_factor * s[4]
 
 aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
     aggscore(score(w, problem), problem.params)

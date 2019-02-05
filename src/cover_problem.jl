@@ -143,6 +143,19 @@ function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
     return vXv_scores
 end
 
+# raw cover score:
+# 1 => covered set scores,
+# 2 => covered setXset penalties,
+# 3 => uncovered masked elements penalties
+# 4 => covered unmasked elements penalties
+const RawScore = NTuple{4, Float64}
+
+aggscore(s::RawScore, params::CoverParams) =
+    s[1] +
+    params.setXset_factor * s[2] +
+    params.uncovered_factor * s[3] +
+    params.covered_factor * s[4]
+
 """
 Optimal Enriched-Set Cover problem -- choose the sets from the collection `𝒞` to cover
 the masked(selected) elements `M`.
