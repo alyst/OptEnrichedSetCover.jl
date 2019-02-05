@@ -1,9 +1,4 @@
 global tested_problem_types = [:multiobjective]
-if OESC.__quadratic_problem_supported__
-    push!(tested_problem_types, :quadratic)
-else
-    @warn "Quadratic problem not supported and not tested"
-end
 
 @testset "CoverEnumerator problem_type=$problem_type" for problem_type in tested_problem_types # FIXME use weights
     @testset "[a b c abc], mask=[a b]" begin

@@ -1,9 +1,4 @@
 global pcollect_opt_methods = [MultiobjOptimizerParams()]
-if OptEnrichedSetCover.__quadratic_problem_supported__
-    push!(pcollect_opt_methods, QuadraticOptimizerParams())
-else
-    @warn "pcollect(): Quadratic problem not supported and not tested"
-end
 
 @testset "pcollect(opt_params=$opt_params)" for opt_params in pcollect_opt_methods
     mosaics = Dict("A" => SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
