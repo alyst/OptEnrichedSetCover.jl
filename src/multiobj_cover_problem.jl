@@ -162,6 +162,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     fitness_tolerance::Float64
     min_delta_fitness_tolerance::Float64
     trace_interval::Float64
+    fold_ratio_threshold::Float64
     workers::Vector{Int}
     borg_params::BlackBoxOptim.ParamsDict
 
@@ -174,6 +175,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         MaxStepsWithoutProgress::Integer = 50_000,
         FitnessTolerance::Real = 0.1,
         MinDeltaFitnessTolerance::Real = 1E-5,
+        FoldRatioThreshold::Real = 5.0,
         TraceInterval::Real = 5.0,
         kwargs...
     )
@@ -185,8 +187,8 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
             Workers = workers()[1:NWorkers]
         end
         new(PopulationSize, WeightDigits, MaxSteps, MaxStepsWithoutProgress,
-            FitnessTolerance, MinDeltaFitnessTolerance, TraceInterval,
-            Workers,
+            FitnessTolerance, MinDeltaFitnessTolerance, FoldRatioThreshold,
+            TraceInterval, Workers,
             BlackBoxOptim.kwargs2dict(kwargs...))
     end
 end
@@ -577,7 +579,7 @@ function optimize(problem::MultiobjCoverProblem,
             Vector{RawScore}(), Vector{FoldedScore}(), Vector{Float64}(), 0)
     end
 
-    fitfolding = MultiobjProblemSoftFold2d(problem.params)
+    fitfolding = MultiobjProblemSoftFold2d(problem.params, opt_params.fold_ratio_threshold)
     bbowrapper = MultiobjCoverProblemBBOWrapper(problem, fitfolding,
                                                 opt_params.weight_digits)
     popmatrix = rand_individuals(search_space(bbowrapper), opt_params.pop_size, method=:latin_hypercube)
