@@ -410,7 +410,7 @@ BlackBoxOptim.show_fitness(io::IO, score::NTuple{3,Float64},
 
 BlackBoxOptim.show_fitness(io::IO, score::FoldedScore,
                            problem::MultiobjCoverProblemBBOWrapper) =
-    @printf(io, "(sets+k·sets²=%.3f sets²+k·sets=%.3f)\n", score[1], score[2])
+    @printf(io, "(sets+k·miscover=%.3f sets²=%.3f)\n", score[1], score[2])
 
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
