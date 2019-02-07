@@ -4,6 +4,7 @@ Parameters for the `AbstractCoverProblem` (Optimal Enriched-Set Cover).
 struct CoverParams
     sel_prob::Float64           # prior probability to select the set, penalizes non-zero weights
     min_weight::Float64         # minimal non-zero set probability
+    mask_discount::Float64      # how much the overlap score of each subsequent mask (from most to less enriched) is discounted
     set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
     set_relevance_min::Float64  # if shaped relevance is below, it's set to set_relevance_min
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
@@ -12,18 +13,21 @@ struct CoverParams
 
     function CoverParams(;
                          sel_prob::Real=0.5, min_weight::Real=1E-2,
+                         mask_discount::Real=0.9,
                          set_relevance_shape::Real=0.5,
                          set_relevance_min::Real=0.5,
                          setXset_factor::Real=1.0,
                          uncovered_factor::Real=0.1, covered_factor::Real=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
+        (0.0 <= mask_discount <= 1.0) || throw(ArgumentError("`mask_discount` must be within [0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
         (0.0 <= set_relevance_min <= 1) || throw(ArgumentError("`set_relevance_min` must be within [0, 1] range"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= uncovered_factor) || throw(ArgumentError("`uncovered_factor` must be ≥0"))
         (0.0 <= covered_factor) || throw(ArgumentError("`covered_factor` must be ≥0"))
-        new(sel_prob, min_weight, set_relevance_shape, set_relevance_min,
+        new(sel_prob, min_weight, mask_discount,
+            set_relevance_shape, set_relevance_min,
             setXset_factor, uncovered_factor, covered_factor)
     end
 end
@@ -104,10 +108,18 @@ function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, param
     # calculate the sum of scores of given set in each mask
     sel_penalty = -log(params.sel_prob)
     v_scores = Vector{Float64}(undef, length(var2set))
+    olap_scores = Vector{Float64}()
     @inbounds for (varix, setix) in enumerate(var2set)
+        resize!(olap_scores, length(mosaic.set2masks[setix]))
+        for (i, molap) in enumerate(mosaic.set2masks[setix])
+            @inbounds olap_scores[i] = overlap_score(molap, setix, mosaic, params)
+        end
+        sort!(olap_scores)
         scoresum = 0.0
-        for molap in mosaic.set2masks[setix]
-            scoresum = overlap_score(molap, setix, mosaic, params)
+        discount = 1.0
+        for score in olap_scores
+            scoresum += score * discount
+            discount *= params.mask_discount
         end
         v_scores[varix] = scoresum + sel_penalty
     end
