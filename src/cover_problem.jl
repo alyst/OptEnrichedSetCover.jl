@@ -10,11 +10,12 @@ struct CoverParams
     uncovered_factor::Float64   # how much masked uncovered elements penalize the score
     covered_factor::Float64     # how much unmasked covered elements penalize the score
 
-    function CoverParams(; sel_prob::Number=0.5, min_weight::Number = 1E-2,
-                         set_relevance_shape::Number=0.5,
-                         set_relevance_min::Number=0.5,
-                         setXset_factor::Number=1.0,
-                         uncovered_factor::Number=0.1, covered_factor::Number=0.025)
+    function CoverParams(;
+                         sel_prob::Real=0.5, min_weight::Real=1E-2,
+                         set_relevance_shape::Real=0.5,
+                         set_relevance_min::Real=0.5,
+                         setXset_factor::Real=1.0,
+                         uncovered_factor::Real=0.1, covered_factor::Real=0.025)
         (0.0 < sel_prob <= 1.0) || throw(ArgumentError("`set_prob` must be within (0,1] range"))
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
