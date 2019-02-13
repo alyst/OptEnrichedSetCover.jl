@@ -1,9 +1,4 @@
 @testset "QuadraticCoverProblem" begin
-    @testset "CoverParams" begin
-        @test_throws ArgumentError CoverParams(sel_prob=-0.1)
-        @test_throws ArgumentError CoverParams(sel_prob=1.1)
-    end
-
     @testset "empty" begin
         sm = SetMosaic(Set{Symbol}[])
         msm = mask(sm, [Set{Symbol}()])
@@ -34,7 +29,7 @@
         # enabled because there is :a and :b
         en_problem = QuadraticCoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])),
                                                 [Set{Symbol}([:a])], min_nmasked=1),
-                                           CoverParams(sel_prob=0.9))
+                                           CoverParams(sel_tax=-log(0.9)))
         @test nvars(en_problem) == 1
         en_res = optimize(en_problem)
         @test en_res.weights == fill(1.0, 1)
@@ -48,7 +43,7 @@
         res_def = optimize(problem_def)
         @test res_def.weights == [1.0, 0.0]
 
-        problem_no_penalty = QuadraticCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, sel_prob=1.0))
+        problem_no_penalty = QuadraticCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, sel_tax=0.0))
         @test nvars(problem_no_penalty) == 2
         res_no_penalty = optimize(problem_no_penalty)
         @test res_no_penalty.weights == [1.0, 1.0]
@@ -58,7 +53,7 @@
         sm = SetMosaic([Set([:a, :b]), Set([:b, :c]), Set([:a, :b, :c])])
         sm_b = mask(sm, [Set([:b])], min_nmasked=1)
 
-        problem_ignore_overlap = QuadraticCoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_prob=1E-25))
+        problem_ignore_overlap = QuadraticCoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_tax=-log(1E-25)))
         @test nvars(problem_ignore_overlap) == 3
         res_ignore_overlap = optimize(problem_ignore_overlap)
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0]# atol=1E-4
@@ -77,7 +72,7 @@
         sm_abc = mask(sm, [Set([:a, :b, :c])], min_nmasked=1)
 
         # low prior probability to select sets, high probability to miss active element, so select abc
-        problem_ignore_overlap = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_prob=0.1))
+        problem_ignore_overlap = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, sel_tax=-log(0.1)))
         @test nvars(problem_ignore_overlap) == 5 # d is out
         @test score(problem_ignore_overlap, [0.0, 0.0, 0.0, 1.0, 0.0]) < score(problem_ignore_overlap, [1.0, 1.0, 0.0, 0.0, 0.0])
         res_ignore_overlap = optimize(problem_ignore_overlap)
@@ -85,7 +80,7 @@
         @test_broken res_ignore_overlap.weights ≈ [0.0, 0.0, 0.0, 1.0, 0.0]# atol=1E-4
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
-        problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.9))
+        problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_tax=-log(0.9)))
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [1.0, 1.0, 0.0, 0.0, 0.0])
         @test score(problem_low_penalty, [1.0, 0.0, 1.0, 0.0, 0.0]) < score(problem_low_penalty, [0.0, 0.0, 0.0, 1.0, 0.0])
         res_low_penalty = optimize(problem_low_penalty)
@@ -99,14 +94,14 @@
         sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
         # lower prior probability to select sets, high overlap penalty, so select abd and c
-        problem_ignore_overlap = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_prob=0.6))
+        problem_ignore_overlap = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, sel_tax=-log(0.6)))
         @test_skip nmasks(problem_ignore_overlap) == 2
         @test nvars(problem_ignore_overlap) == 5 # d is out
         res_ignore_overlap = optimize(problem_ignore_overlap)
         @test res_ignore_overlap.weights ≈ [0.0, 0.0, 1.0, #=d,=# 0.0, 0.0] atol=1E-4
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcde, c and abcde + cdef
-        problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=0.05, sel_prob=0.9))
+        problem_low_penalty = QuadraticCoverProblem(sm_abc, CoverParams(setXset_factor=0.05, sel_tax=-log(0.9)))
         res_low_penalty = optimize(problem_low_penalty)
         #@show res_low_penalty.weights
         @test findall(res_low_penalty.weights) == [3]# [1, 3, 4]

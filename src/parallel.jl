@@ -8,7 +8,7 @@ struct CollectCovers{MC,SC}
 
     function CollectCovers(
         mosaics::MC, sets::SC,
-        cover_params::CoverParams=CoverParams(sel_prob=0.1),
+        cover_params::CoverParams=CoverParams(),
         enum_params::CoverEnumerationParams=CoverEnumerationParams(),
         opt_params::AbstractOptimizerParams=QuadraticOptimizerParams()
     ) where {MC,SC}
@@ -18,7 +18,7 @@ end
 
 function (worker::CollectCovers)(mosaic_key, set_key; verbose::Bool=false)
     mosaic_masked = mask(worker.mosaics[mosaic_key], [worker.sets[set_key]],
-                         max_overlap_logpvalue=worker.enum_params.max_set_score+log(worker.cover_params.sel_prob))
+                         max_overlap_logpvalue=worker.enum_params.max_set_score+worker.cover_params.sel_tax)
     covers_coll = collect(mosaic_masked, worker.cover_params, worker.enum_params, worker.opt_params,
                           verbose)
     ((mosaic_key, set_key), !isempty(covers_coll) ? covers_coll : nothing)
@@ -27,7 +27,7 @@ end
 function pcollect(
     mosaics::Dict{MK}, sets::Dict{SK};
     mode=:parallel,
-    cover_params::CoverParams=CoverParams(sel_prob=0.1),
+    cover_params::CoverParams=CoverParams(),
     enum_params::CoverEnumerationParams=CoverEnumerationParams(),
     opt_params::AbstractOptimizerParams=QuadraticOptimizerParams(),
     pids=workers(),
@@ -70,7 +70,7 @@ end
 
 function pcollect(sets1_colls, sets2;
     problem_type::Symbol=:quadratic, mode::Symbol=:sequential,
-    cover_params::CoverParams=CoverParams(sel_prob=0.1),
+    cover_params::CoverParams=CoverParams(),
     enum_params::CoverEnumerationParams=CoverEnumerationParams(),
     verbose::Bool=false, pids=workers(),
     kwargs...

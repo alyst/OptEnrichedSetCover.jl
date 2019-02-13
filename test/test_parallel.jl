@@ -8,7 +8,7 @@ global pcollect_opt_methods = [MultiobjOptimizerParams()]
                  3 => Set([:a, :c, :d]))
     res = OptEnrichedSetCover.pcollect(mosaics, masks, mode=:sequential,
                                        opt_params=opt_params,
-                                       cover_params=CoverParams(sel_prob=0.75),
+                                       cover_params=CoverParams(sel_tax=-log(0.75)),
                                        enum_params=CoverEnumerationParams(max_set_score=10.0))
     @test length(res) == 2
     @test isa(res, Dict{Tuple{String, Int}, CoverCollection})

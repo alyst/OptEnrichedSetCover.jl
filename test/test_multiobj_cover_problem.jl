@@ -31,7 +31,7 @@
 
         # enabled because sel prob is high, and although :a is all elements it needs to be covered
         prob1_mosaic = mask(SetMosaic([Set([:a])], Set([:a])), [Set([:a])], min_nmasked=1)
-        en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.5, uncovered_factor=1.0))
+        en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_tax=-log(0.5), uncovered_factor=1.0))
         @test nvars(en1_prob) == 1
         @test_throws DimensionMismatch score(Float64[], en1_prob)
         @test OESC.miscover_score([0.0], en1_prob) == (1.0, 0.0)
@@ -48,7 +48,7 @@
         @test best_varweights(en1_res) == ones(Float64, 1)
 
         # disabled because :a is all elements and selection probability low
-        dis1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_prob=0.01, uncovered_factor=1.0))
+        dis1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_tax=-log(0.01), uncovered_factor=1.0))
         @test nvars(dis1_prob) == 1
         @test dis1_prob.var_scores[1] > en1_prob.var_scores[1]
         dis1_score = score([1.0], dis1_prob)
@@ -64,7 +64,7 @@
         # enabled because there is :a and :b
         en2_prob = MultiobjCoverProblem(mask(SetMosaic([Set([:a])], Set([:a, :b])),
                                              [Set([:a])], min_nmasked=1),
-                                        CoverParams(sel_prob=0.9))
+                                        CoverParams(sel_tax=-log(0.9)))
         @test nvars(en2_prob) == 1
         en2_res = optimize(en2_prob)
         @test nsolutions(en2_res) > 0
@@ -89,7 +89,7 @@
         @test nsolutions(res_def) > 0
         @test best_varweights(res_def) ≈ [1.0, 0.0] atol=0.01
 
-        problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_prob=1.0))
+        problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_tax=0.0))
         @test nvars(problem_no_penalty) == 2
         res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.01, 0.01], WeightDigits=nothing))
         @test nvars(res_no_penalty) == 2
@@ -100,13 +100,13 @@
         sm = SetMosaic([Set([:a, :b]), Set([:b, :c]), Set([:a, :b, :c])])
         sm_b = mask(sm, [Set([:b])], min_nmasked=1)
 
-        prob_hi_sXs = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_prob=1E-25))
+        prob_hi_sXs = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=10.0, sel_tax=-log(1E-25)))
         @test nvars(prob_hi_sXs) == 3
         res_ignore_overlap = optimize(prob_hi_sXs, MultiobjOptimizerParams(ϵ=0.001))
         @test nvars(res_ignore_overlap) == 3
         @test best_varweights(res_ignore_overlap) ≈ [0.0, 0.0, 0.0] atol=0.01
 
-        problem_b = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_prob=0.5))
+        problem_b = MultiobjCoverProblem(sm_b, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_tax=-log(0.5)))
         res_b = optimize(problem_b)
         @test nsolutions(res_b) > 0
         @test nvars(res_b) == 3
@@ -133,7 +133,7 @@
         sm_abc = mask(sm, [Set([:a, :b, :c])], min_nmasked=1)
 
         # low prior probability to select sets, high probability to miss active element, so select abc
-        prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, uncovered_factor=1.0, sel_prob=0.1))
+        prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=10.0, uncovered_factor=1.0, sel_tax=-log(0.1)))
         @test nvars(prob_hi_sXs) == 5 # d is out
 
         @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
@@ -143,7 +143,7 @@
         @test best_varweights(res_ignore_overlap) ≈ [0.0, 0.0, 0.0, 1.0, 0.0]
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b
-        problem_low_penalty = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_prob=0.9))
+        problem_low_penalty = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, sel_tax=-log(0.9)))
         @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], problem_low_penalty) < aggscore([1.0, 1.0, 0.0, 0.0, 0.0], problem_low_penalty)
         @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], problem_low_penalty) < aggscore([0.0, 0.0, 0.0, 1.0, 0.0], problem_low_penalty)
         res_low_penalty = optimize(problem_low_penalty, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
@@ -157,7 +157,7 @@
         sm_abc = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
 
         # lower prior probability to select sets, high overlap penalty, so select abd and c FIXME update desc
-        prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, covered_factor=0.5, sel_prob=0.6))
+        prob_hi_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=1.0, uncovered_factor=1.0, covered_factor=0.5, sel_tax=-log(0.6)))
         @test_skip nmasks(prob_hi_sXs) == 2
         @test nvars(prob_hi_sXs) == 5 # d is out: abd bcd c abcde cdef
 
@@ -173,7 +173,7 @@
         @test best_varweights(res_hi_sXs) ≈ [0.0, 0.0, 0.0, 1.0, 0.0] atol=1E-2
 
         # higher prior probability to select sets, no overlap penalty, so select abd, bcd, c and abcde + cdef
-        prob_low_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=0.01, covered_factor=1E-5, uncovered_factor=1.0, sel_prob=0.9))
+        prob_low_sXs = MultiobjCoverProblem(sm_abc, CoverParams(setXset_factor=0.01, covered_factor=1E-5, uncovered_factor=1.0, sel_tax=-log(0.9)))
         @test_skip nmasks(prob_low_sXs) == 2
         @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_low_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_low_sXs)
         @test aggscore([1.0, 0.0, 1.0, 1.0, 0.0], prob_low_sXs) < aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_low_sXs)
