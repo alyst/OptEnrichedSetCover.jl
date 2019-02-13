@@ -277,9 +277,8 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
                 push!(set_score_enriched_v, set_score)
                 push!(nmasked_v, nmasked_mtx[selix, maskix])
                 push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
-                push!(set_score_overlap_v, overlap_score(last(nmasked_v), selsize_v[selix],
-                                                   covers.total_masked[maskix], nelements(mosaic),
-                                                   1.0 #= ignore relevance =#, covers.cover_params))
+                push!(set_score_overlap_v, logpvalue(last(nmasked_v), selsize_v[selix],
+                                                     covers.total_masked[maskix], nelements(mosaic)))
             end
         end
     end
