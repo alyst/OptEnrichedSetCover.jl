@@ -3,31 +3,33 @@ Parameters for the `AbstractCoverProblem` (Optimal Enriched-Set Cover).
 """
 struct CoverParams
     sel_tax::Float64            # the constant added to the set score of each selected set
+    set_shape::Float64          # ^set_shape is applied to set or setXset scores
     min_weight::Float64         # minimal non-zero set probability
     mask_discount::Float64      # how much the overlap score of each subsequent mask (from most to less enriched) is discounted
-    set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
-    set_relevance_min::Float64  # if shaped relevance is below, it's set to set_relevance_min
     setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
     uncovered_factor::Float64   # how much masked uncovered elements penalize the score
     covered_factor::Float64     # how much unmasked covered elements penalize the score
+    set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
+    set_relevance_min::Float64  # if shaped relevance is below, it's set to set_relevance_min
 
     function CoverParams(;
-                         sel_tax::Real=0.0, min_weight::Real=1E-2,
-                         mask_discount::Real=0.9,
-                         set_relevance_shape::Real=0.5,
-                         set_relevance_min::Real=0.5,
+                         sel_tax::Real=0.0, set_shape::Real=1.0,
+                         min_weight::Real=1E-2, mask_discount::Real=0.9,
                          setXset_factor::Real=1.0,
-                         uncovered_factor::Real=0.1, covered_factor::Real=0.025)
+                         uncovered_factor::Real=0.1, covered_factor::Real=0.025,
+                         set_relevance_shape::Real=0.5,
+                         set_relevance_min::Real=0.5)
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
         (0.0 <= mask_discount <= 1.0) || throw(ArgumentError("`mask_discount` must be within [0,1] range"))
-        (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
-        (0.0 <= set_relevance_min <= 1) || throw(ArgumentError("`set_relevance_min` must be within [0, 1] range"))
+        (0.0 <= set_shape) || throw(ArgumentError("`set_shape` must be ≥0"))
         (0.0 <= setXset_factor) || throw(ArgumentError("`setXset_factor` must be ≥0"))
         (0.0 <= uncovered_factor) || throw(ArgumentError("`uncovered_factor` must be ≥0"))
         (0.0 <= covered_factor) || throw(ArgumentError("`covered_factor` must be ≥0"))
-        new(sel_tax, min_weight, mask_discount,
-            set_relevance_shape, set_relevance_min,
-            setXset_factor, uncovered_factor, covered_factor)
+        (0.0 <= set_relevance_shape) || throw(ArgumentError("`set_relevance_shape` must be ≥0"))
+        (0.0 <= set_relevance_min <= 1) || throw(ArgumentError("`set_relevance_min` must be within [0, 1] range"))
+        new(sel_tax, set_shape, min_weight, mask_discount,
+            setXset_factor, uncovered_factor, covered_factor,
+            set_relevance_shape, set_relevance_min)
     end
 end
 
@@ -38,7 +40,7 @@ Doesn't take into account the overlap with the other selected sets.
 function overlap_score(masked::Number, set::Number, total_masked::Number, total::Number,
                        relevance::Number, params::CoverParams)
     # FIXME is it just tail=:both for one set of parameters
-    #= P-value for masked-vs-set overlap enriched =# res = logpvalue(masked, set, total_masked, total)*max(relevance^params.set_relevance_shape, params.set_relevance_min) #-
+    #= P-value for masked-vs-set overlap enriched =# res = -(-logpvalue(masked, set, total_masked, total))^params.set_shape*max(relevance^params.set_relevance_shape, params.set_relevance_min) #-
     #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
     @assert !isnan(res) "masked=$masked set=$set total_masked=$total_masked total=$total relevance=$relevance res=NaN"
     return res
@@ -125,7 +127,7 @@ function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, param
 end
 
 varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
-    ifelse(scale, setXset * params.setXset_factor, setXset)
+    ifelse(scale, -(-setXset)^params.set_shape * params.setXset_factor, setXset)
 
 function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
