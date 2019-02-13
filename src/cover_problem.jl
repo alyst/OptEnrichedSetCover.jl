@@ -105,11 +105,11 @@ end
 # the sum of overlap scores with all masked sets
 # minus the log(var selection probability)
 # plus nets*log(nsets), where nsets arr all masked sets overlapping with var
-function var_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int}, params::CoverParams)
+function var_scores(mosaic::MaskedSetMosaic, var2setix::AbstractVector{Int}, params::CoverParams)
     # calculate the sum of scores of given set in each mask
-    v_scores = Vector{Float64}(undef, length(var2set))
+    v_scores = Vector{Float64}(undef, length(var2setix))
     olap_scores = Vector{Float64}()
-    @inbounds for (varix, setix) in enumerate(var2set)
+    @inbounds for (varix, setix) in enumerate(var2setix)
         resize!(olap_scores, length(mosaic.set2masks[setix]))
         for (i, molap) in enumerate(mosaic.set2masks[setix])
             @inbounds olap_scores[i] = overlap_score(molap, setix, mosaic, params)
@@ -129,10 +129,10 @@ end
 varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
     ifelse(scale, -(-setXset)^params.set_shape * params.setXset_factor, setXset)
 
-function varXvar_scores(mosaic::MaskedSetMosaic, var2set::AbstractVector{Int},
+function varXvar_scores(mosaic::MaskedSetMosaic, var2setix::AbstractVector{Int},
                         params::CoverParams, scale::Bool = false)
-    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2set, var2set], Ref(params), scale)
-    for i in eachindex(var2set) # don't consider self-intersections
+    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2setix, var2setix], Ref(params), scale)
+    for i in eachindex(var2setix) # don't consider self-intersections
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
     vXv_min = Inf # minimum finite varXvar_scores element
