@@ -83,19 +83,24 @@ function tilemaskXvar(mosaic::MaskedSetMosaic, var2setix::AbstractVector{Int} = 
 
     tileXvar = mosaic.original.tileXset[tileixs, var2setix]
     if !isempty(tileXvar)
-        # find tiles that refer to the identical set of vars and merge their stats
+        # try to optimize tileXvar: find tiles that refer to the identical set of vars and merge their stats
         varXtile = transpose(tileXvar)
-        vars2tiles = Dict{Vector{Int}, Vector{Int}}()
+        vars2tiles = Vector{Tuple{Vector{Int}, Vector{Int}}}()
         for tileix in axes(varXtile, 2)
             varixs = varXtile[:, tileix]
-            tileixs = get!(() -> Vector{Int}(), vars2tiles, varixs)
-            push!(tileixs, tileix)
+            v2tpos = searchsortedfirst(vars2tiles, (varixs, 0), by=first)
+            if v2tpos > length(vars2tiles) || first(vars2tiles[v2tpos]) != varixs
+                insert!(vars2tiles, v2tpos, (varixs, [tileix]))
+            else
+                push!(vars2tiles[v2tpos], tileix)
+            end
         end
         if length(vars2tiles) < size(tileXvar, 1) # there are tiles to merge
-            tileXvar = tileXvar[[first(tileixs) for tileixs in values(vars2tiles)], :] # take the 1st of merged tiles
+            # take the 1st (it's also minimal since tileixs are sorted) of each merged tiles
+            tileXvar = tileXvar[[first(tileixs) for (_, tileixs) in vars2tiles], :]
             # aggregate n[un]masked over duplicated tiles
-            tile2nmasked = [sum(i -> tile2nmasked[i], tileixs) for tileixs in values(vars2tiles)]
-            tile2nunmasked = [sum(i -> tile2nunmasked[i], tileixs) for tileixs in values(vars2tiles)]
+            tile2nmasked = [sum(i -> tile2nmasked[i], tileixs) for (_, tileixs) in vars2tiles]
+            tile2nunmasked = [sum(i -> tile2nunmasked[i], tileixs) for (_, tileixs) in vars2tiles]
         end
     end
     return tileXvar, tile2nmasked, tile2nunmasked
