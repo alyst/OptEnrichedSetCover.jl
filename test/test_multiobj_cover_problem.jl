@@ -162,9 +162,9 @@
         @test nvars(prob_hi_sXs) == 5 # d is out: abd bcd c abcde cdef
 
         @test OESC.miscover_score([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (5.0, 0.0)
-        @test OESC.miscover_score([1.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0)
-        @test OESC.miscover_score([0.0, 1.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0)
-        @test OESC.miscover_score([0.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) == (4.0, 0.0)
+        @test OESC.miscover_score([1.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0 + 0.9 * 2.0)
+        @test OESC.miscover_score([0.0, 1.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0 + 0.9 * 2.0)
+        @test OESC.miscover_score([0.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) == (4.0, 0.0 + 0.0 * 1.0)
 
         @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
         @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)

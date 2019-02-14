@@ -78,7 +78,7 @@ global tested_problem_types = [:multiobjective]
 
         # higher prior probability to select sets, high overlap penalty,
         # high penalty for covering unmasked, so select [abd c], [bcd] and [abcde]
-        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=1.0, covered_factor=0.5, uncovered_factor=0.1, sel_tax=-log(0.9)),
+        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=1.0, covered_factor=0.05, uncovered_factor=0.1, sel_tax=-log(0.9)),
                              CoverEnumerationParams(max_set_score=0.0),
                              problem_type==:quadratic ?
                                 OESC.QuadraticOptimizerParams() :

@@ -2,7 +2,7 @@
 module OptEnrichedSetCover
 
 using Requires, DataFrames, Distributions, BlackBoxOptim
-using LinearAlgebra, Distributed, StatsBase
+using LinearAlgebra, SparseArrays, Distributed, StatsBase
 using Printf: @printf
 
 export SetMosaic, CoverParams,

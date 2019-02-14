@@ -117,7 +117,8 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{RawScore}
     var_scores::Vector{Float64}
     varXvar_scores::Matrix{Float64}
 
-    tileXvar::SparseMaskMatrix      # tile-in-mask X set(var)
+    tileXvar::SparseMaskMatrix      # tile X set(var)
+    varXmaskxtile::SparseMatrixCSC{Float64} # tile-in-mask X set(var)
     nmasked_tile::Vector{Int}       # sum of masked elements for each tile in all masks (els counted for each mask separately)
     nunmasked_tile::Vector{Int}     # number of unmasked elements for each tile in the union of all masks (each el counted once)
 
@@ -129,18 +130,19 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{RawScore}
                         var_scores::AbstractVector{Float64},
                         varXvar_scores::AbstractMatrix{Float64},
                         tileXvar::SparseMaskMatrix,
+                        varXmaskxtile::SparseMatrixCSC,
                         nmasked_tile::AbstractVector{Int},
                         nunmasked_tile::AbstractVector{Int}
     )
         length(var2set) == length(var_scores) ==
-        size(varXvar_scores, 1) == size(varXvar_scores, 2) ==
+        size(varXvar_scores, 1) == size(varXvar_scores, 2) == size(varXmaskxtile, 1) ==
         size(tileXvar, 2) ||
             throw(ArgumentError("var2set, var_scores and varXvar_scores counts do not match"))
         size(tileXvar, 1) == length(nmasked_tile) == length(nunmasked_tile) ||
             throw(ArgumentError("tileXvar and nmasked_tile rows count does not match"))
         new(params, var2set,
             var_scores, varXvar_scores,
-            tileXvar, nmasked_tile, nunmasked_tile,
+            tileXvar, varXmaskxtile, nmasked_tile, nunmasked_tile,
             Vector{Vector{Float64}}(), Vector{Vector{Float64}}())
     end
 end
@@ -223,12 +225,11 @@ genop_params(opt_params::MultiobjOptimizerParams) =
 
 function MultiobjCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     v2set = var2set(mosaic)
-    v_scores = var_scores(mosaic, v2set, params)
-    vXv_scores = varXvar_scores(mosaic, v2set, params, false)
-    tXv, nmasked_tile, nunmasked_tile = tilemaskXvar(mosaic)
+    v_scores, tXv, vXmt, nmasked_tile, nunmasked_tile = var_scores_and_Xtiles(mosaic, params, v2set)
+    vXv_scores = varXvar_scores(mosaic, params, v2set, false)
     MultiobjCoverProblem(params,
                          v2set, v_scores, vXv_scores,
-                         tXv, nmasked_tile, nunmasked_tile)
+                         tXv, vXmt, nmasked_tile, nunmasked_tile)
 end
 
 # \sum_{i, j} A_{i, j} min(w_i, w_j)
@@ -285,6 +286,24 @@ function minplus_bilinear!(foldl::Function,
     return res
 end
 
+function maxplus_linear(v::AbstractVector,
+                          A::SparseMatrixCSC)
+    length(v) == size(A, 1) ||
+        throw(DimensionMismatch("v ($(length(v))) and A $(size(A)) size mismatch"))
+    Arows = rowvals(A)
+    Avals = nonzeros(A)
+    res = 0.0
+    @inbounds for i in 1:size(A, 2)
+        wmax = 0.0
+        for j in nzrange(A, i)
+            jr = Arows[j]
+            wmax = max(wmax, v[jr] * Avals[j])
+        end
+        res += wmax
+    end
+    return res
+end
+
 take2(u, v) = v
 
 function exclude_vars(problem::MultiobjCoverProblem,
@@ -307,12 +326,13 @@ function exclude_vars(problem::MultiobjCoverProblem,
                 problem.var2set[varmask],
                 v_scores, problem.varXvar_scores[varmask, varmask],
                 problem.tileXvar[:, varmask], # FIXME can also remove unused tiles
+                problem.varXmaskxtile[varmask, :], # FIXME can also remove unused tiles
                 problem.nmasked_tile, problem.nunmasked_tile)
 end
 
 # the tuple of:
 # - total number of uncovered masked elements (in all masks overlapping with the cover)
-# -`` total number of covered unmasked elements (in all masks overlapping with the cover)
+# - total number of covered unmasked elements (in all masks overlapping with the cover)
 function miscover_score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     __check_vars(w, problem)
     isempty(problem.nmasked_tile) && return (0.0, 0.0)
@@ -331,7 +351,7 @@ function miscover_score(w::AbstractVector{Float64}, problem::MultiobjCoverProble
         end
     end
     res = sum(problem.nmasked_tile) - dot(problem.nmasked_tile, wtile),
-          dot(problem.nunmasked_tile, wtile)
+          maxplus_linear(w, problem.varXmaskxtile)
     push!(problem.tilepool, wtile) # release to the pool
     return res
 end
