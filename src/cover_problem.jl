@@ -132,7 +132,7 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
             if v2tpos > length(vars2tiles) || first(vars2tiles[v2tpos]) != varixs
                 insert!(vars2tiles, v2tpos, (varixs, [tileix]))
             else
-                push!(vars2tiles[v2tpos], tileix)
+                push!(vars2tiles[v2tpos][2], tileix)
             end
         end
         if length(vars2tiles) < size(tileXvar, 1) # there are tiles to merge
