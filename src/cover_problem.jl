@@ -114,7 +114,7 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
                 nmaskxtile = sum(view(mosaic.elmasks, tile_elms, molap.mask))
                 olap_w = olap_weights[i]
                 if nmaskxtile < length(tile_elms) && # there are unmasked tile elements
-                   olap_w >= 0.01                    # the mask has relevant overlap with the var
+                   olap_w >= 0.1                     # the mask has relevant overlap with the var
                     push!(vXmt_els, (varix, molap.mask, tileix, olap_w * (length(tile_elms) - nmaskxtile)))
                 end
             end
