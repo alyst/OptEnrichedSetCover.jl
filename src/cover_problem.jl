@@ -170,10 +170,10 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
         @inbounds for (i, (varix, maskix, tileix, v)) in enumerate(vXmt_els)
             vXmt_els[i] = (varix, maskxtile2ix[(maskix, tileix)], 0, v)
         end
-        # sort vxmxt_els by maskxtile index, then by varix to match SpraseMatrixCSC order
-        sort!(vXmt_els, lt=(a,b) -> (a[2] < b[2]) || ((a[2] == b[2]) && (a[1] < b[1])))
+        # sort vxmxt_els by varix, the by maskxtile index to match SpraseMatrixCSC order
+        sort!(vXmt_els, lt=(a,b) -> (a[1] < b[1]) || ((a[1] == b[1]) && (a[2] < b[2])))
         # construct sparse matrix
-        colptrs = Vector{Int}(undef, length(vars2maskxtiles) + 1)
+        colptrs = Vector{Int}(undef, length(var2setix) + 1)
         rowvals = Vector{Int}(undef, mapreduce(x -> length(first(x)), +, vars2maskxtiles, init=0))
         nzvals = fill!(Vector{Float64}(undef, length(rowvals)), 0)
         last_coord = (0, 0)
@@ -182,22 +182,24 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
             if last_coord != (varix, maskxtileix)
                 @assert i < length(rowvals)
                 i += 1
-                if last_coord[2] != maskxtileix
-                    @assert last_coord[2] + 1 == maskxtileix
-                    colptrs[maskxtileix] = i
+                if last_coord[1] != varix
+                    @assert last_coord[1] < varix
+                    colptrs[last_coord[1]+1:varix] .= i
+                else
+                    @assert maskxtileix > last_coord[2]
                 end
                 last_coord = (varix, maskxtileix)
             end
-            rowvals[i] = varix
+            rowvals[i] = maskxtileix
             nzvals[i] += v
         end
         @assert i == length(rowvals)
-        colptrs[end] = length(rowvals) + 1
-        varXmaskxtile = SparseMatrixCSC{Float64, Int}(length(var2setix), length(vars2maskxtiles),
+        colptrs[last_coord[1]+1:end] .= length(rowvals) + 1
+        maskxtileXvar = SparseMatrixCSC{Float64, Int}(length(vars2maskxtiles), length(var2setix),
                                                       colptrs, rowvals, nzvals)
-        @show size(varXmaskxtile)
+        @show size(maskxtileXvar) nnz(maskxtileXvar)
     end
-    return v_scores, tileXvar, varXmaskxtile, tile2nmasked, tile2nunmasked
+    return v_scores, tileXvar, maskxtileXvar, tile2nmasked, tile2nunmasked
 end
 
 varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
