@@ -599,7 +599,7 @@ function best_index(res::MultiobjCoverProblemResult, params::CoverParams)
 end
 
 best_varweights(result::MultiobjCoverProblemResult) =
-    @inbounds(view(result.varweights, :, best_index(result)))
+    @inbounds(varweights(result, best_index(result)))
 
 best_aggscore(result::MultiobjCoverProblemResult) =
     @inbounds(result.agg_scores[best_index(result)])
