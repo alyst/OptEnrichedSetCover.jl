@@ -269,7 +269,7 @@ function minplus_bilinear!(foldl::Function,
     length(v) == size(A, 1) ||
         throw(DimensionMismatch("v ($(length(v))) and A $(size(A)) size mismatch"))
     n = length(res)
-    @inbounds for i in 1:size(A, 2)
+    @inbounds for i in axes(A, 2)
         ui = u[i]
         ioffset = (i-1)*size(A, 1)
         x = zero(T)
@@ -294,7 +294,7 @@ function maxplus_linear(v::AbstractVector,
     Arows = rowvals(A)
     Avals = nonzeros(A)
     res = 0.0
-    @inbounds for i in 1:size(A, 2)
+    @inbounds for i in axes(A, 2)
         wmax = 0.0
         for j in nzrange(A, i)
             jr = Arows[j]
