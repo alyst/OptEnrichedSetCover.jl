@@ -287,8 +287,7 @@ function minplus_bilinear!(foldl::Function,
     return res
 end
 
-function maxplus_linear(v::AbstractVector,
-                          A::SparseMatrixCSC)
+function maxplus_linear(v::AbstractVector, A::SparseMatrixCSC)
     length(v) == size(A, 1) ||
         throw(DimensionMismatch("v ($(length(v))) and A $(size(A)) size mismatch"))
     Arows = rowvals(A)

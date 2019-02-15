@@ -149,7 +149,7 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
             varixs = get!(() -> Vector{Int}(), maskxtile2vars, (maskix, tileix))
             push!(varixs, varix)
         end
-        # each varixs should be sorted, because they are tranersed in asc order when constructing vXmt_els 
+        # each varixs should be sorted, because they are tranersed in asc order when constructing vXmt_els
         vars2maskxtiles = Vector{Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
         for (maskxtile, varixs) in pairs(maskxtile2vars)
             v2mtpos = searchsortedfirst(vars2maskxtiles, (varixs, 0), by=first)
