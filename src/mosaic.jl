@@ -107,7 +107,7 @@ struct SetMosaic{T,S}
     function SetMosaic(setids::AbstractVector{S},
                        sets::AbstractVector{<:Union{AbstractVector{T},Set{T}}},
                        all_elms::Set{T},
-                       set_relevances::AbstractVector{<:Real};
+                       set_relevances::Union{AbstractVector{<:Real}, Nothing} = nothing;
                        setXset_nextra_elms::Integer=0) where {T, S}
         length(setids) == length(sets) ||
             throw(ArgumentError("Number of set IDs does not match the number of sets"))
@@ -131,7 +131,7 @@ struct SetMosaic{T,S}
         function sets_isless(i, j)
             els_diff = setels_compare(view(tileXset, :, i), view(tileXset, :, j))
             (els_diff != 0) && return els_diff < 0
-            rel_diff = set_relevances[i] - set_relevances[j]
+            rel_diff = set_relevances === nothing ? 0.0 : set_relevances[i] - set_relevances[j]
             (rel_diff != 0.0) && return rel_diff > 0.0 # descending relevance
             return setids[i] < setids[j]
         end
@@ -158,7 +158,7 @@ struct SetMosaic{T,S}
         set_sizes = _set_sizes(tileXset, tile_sizes)
         new{T, S}(ix2elm, elm2ix, setids[new2ix],
                   Dict(id => ix2new[ix] for (ix, id) in enumerate(setids)),
-                  set_sizes, set_relevances[new2ix],
+                  set_sizes, set_relevances === nothing ? fill(1.0, length(new2ix)) : set_relevances[new2ix],
                   setXelm[new2ix, :], elmXset[:, new2ix], elmXtile, tileXset,
                   _setXset_scores(tileXset, length(all_elms) + setXset_nextra_elms, set_sizes, tile_sizes))
     end
@@ -168,7 +168,7 @@ end
 Construct `SetMosaic` for a given nameless sets collection.
 """
 SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = foldl(union!, sets, init=Set{T}()),
-          set_relevances::AbstractVector{Float64} = fill(1.0, length(sets));
+          set_relevances::Union{AbstractVector{Float64}, Nothing} = nothing;
           kwargs...) where {T} =
     SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances; kwargs...)
 
@@ -176,10 +176,11 @@ SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = foldl(union!, sets, i
 Constructs `SetMosaic` for a given named sets collection.
 """
 SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = foldl(union!, values(sets), init=Set{T}()),
-          set_relevances::Dict{S, Float64} = Dict(k => 1.0 for k in keys(sets));
+          set_relevances::Union{Dict{S, Float64}, Nothing} = nothing;
           kwargs...) where {S, T} =
     SetMosaic(collect(keys(sets)), collect(values(sets)), all_elms,
-              [set_relevances[k] for k in keys(sets)]; kwargs...)
+              set_relevances === nothing ? nothing :
+              get.(Ref(set_relevances), keys(sets), 1.0); kwargs...)
 
 nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
 ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)
