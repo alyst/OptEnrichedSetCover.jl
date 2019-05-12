@@ -49,7 +49,7 @@ global tested_problem_types = [:multiobjective]
     @testset "DataFrame(CoverCollection)" begin
         sm = SetMosaic([Set([:a]), Set([:b]), Set([:c]), Set([:a, :b, :c])],
                        Set([:a, :b, :c, :d, :e]))
-        sm_ab = mask(sm, [Set([:a, :b])], min_nmasked=1)
+        sm_ab = mask(sm, Dict(:X => Set([:a, :b])), min_nmasked=1)
 
         # higher prior probability to select sets, lower probability to miss active element, so select a and b, then a b c
         cover_coll = collect(sm_ab, CoverParams(sel_tax=0.0),
@@ -60,6 +60,8 @@ global tested_problem_types = [:multiobjective]
         @test size(df, 1) == 3
         @test df.cover_ix == [1, 1, 2]
         @test df.set_id == [1, 2, 4]
+        @test df.mask_ix == [1, 1, 1]
+        @test df.mask_id == [:X, :X, :X]
         @test df == DataFrame(cover_coll, sm, min_nmasked=1)
 
         df2 = DataFrame(cover_coll, sm, min_nmasked=0)
@@ -74,7 +76,7 @@ global tested_problem_types = [:multiobjective]
                             "abcde" => Set([:a, :b, :c, :d, :e]),
                             "cdef" => Set([:c, :d, :e, :f])),
                         Set([:a, :b, :c, :d, :e, :f]))
-        sm_abc_be = mask(sm, [Set([:a, :b, :c]), Set([:b, :e])], min_nmasked=1)
+        sm_abc_be = mask(sm, Dict(:X => Set([:a, :b, :c]), :Y => Set([:b, :e])), min_nmasked=1)
 
         # higher prior probability to select sets, high overlap penalty,
         # high penalty for covering unmasked, so select [abd c], [bcd] and [abcde]
@@ -89,6 +91,7 @@ global tested_problem_types = [:multiobjective]
         @test size(df, 1) == 8
         @test df.cover_ix == [1, 1, 1, 1, 2, 2, 3, 3]
         @test df.mask_ix == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df.mask_id == [:X, :Y, :X, :Y, :X, :Y, :X, :Y]
         @test df.set_id == ["c", "c", "abd", "abd", "abcde", "abcde", "bcd", "bcd"]
     end
 end

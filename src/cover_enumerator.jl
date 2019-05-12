@@ -20,6 +20,7 @@ struct CoverCollection
     cover_params::CoverParams
     enum_params::CoverEnumerationParams
     total_masked::Vector{Int}         # total masked elements in the mosaic
+    ix2mask::Vector                   # vector of mask IDs, copied from masked mosaic mask
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # sets referenced by the MaskedSetMosaic
     base_selscores::Vector{Float64}   # base selected set scores
@@ -32,7 +33,7 @@ struct CoverCollection
         nvars(problem) == nsets(mosaic) ||
                 throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of vars and sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new(problem.params, params, mosaic.total_masked, mosaic.elmasks,
+        new(problem.params, params, mosaic.total_masked, mosaic.ix2mask, mosaic.elmasks,
             problem.var2set, copy(problem.var_scores), zeros(Int, nvars(problem)),
             Vector{MultiobjCoverProblemResult}())
     end
@@ -286,6 +287,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
               set_ix = setix_v,
               set_id = mosaic.ix2set[setix_v],
               mask_ix = maskix_v,
+              mask_id = covers.ix2mask[maskix_v],
               cover_score = cover_score_v,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,

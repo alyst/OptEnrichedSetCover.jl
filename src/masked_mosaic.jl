@@ -54,7 +54,7 @@ Optionally the filtering can include testing for the minimal overlap significanc
 The tiles of non-overlapped sets are removed, the tiles that have identical membership
 for all the masked sets are squashed into a single tile.
 """
-mutable struct MaskedSetMosaic{T,S}
+mutable struct MaskedSetMosaic{T,S,M}
     original::SetMosaic{T,S}        # original mosaic
     elmasks::BitMatrix              # elements×masks
     elunionmask::BitVector          # all masked elements
@@ -63,21 +63,32 @@ mutable struct MaskedSetMosaic{T,S}
     # info for all non-empty overlaps with all masks
     # masks in MaskOverlap vector are ordered by mask indices
     set2masks::Dict{Int, Vector{MaskOverlap}}
+
+    ix2mask::Vector{M}              # mask index to the ID of the mask
+    mask2ix::Dict{M, Int}           # mask ID to index
 end
 
 function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
-                         set2masks::Dict{Int, Vector{MaskOverlap}}) where {T,S}
+                         set2masks::Dict{Int, Vector{MaskOverlap}},
+                         mask_ids::Union{AbstractVector{M}, AbstractSet{M}, Nothing} = nothing
+                        ) where {T,S,M}
     size(elmasks, 1) == nelements(mosaic) ||
         throw(ArgumentError("Elements mask length ($(length(elmasks))) should match the number of elements ($(nelements(mosaic)))"))
     nmasks = size(elmasks, 2)
+    (mask_ids === nothing) || (nmasks == length(mask_ids)) ||
+        throw(ArgumentError("Number of masks ($nmasks) should match the number of mask IDs ($(length(masks_ids)))"))
     bit_elmasks = convert(BitMatrix, elmasks)
     bit_elunionmask = dropdims(any(bit_elmasks, dims=2), dims=2)
     @assert length(bit_elunionmask) == size(bit_elmasks, 1)
     MaskedSetMosaic(mosaic, bit_elmasks, bit_elunionmask,
-                    dropdims(sum(elmasks, dims=1), dims=1), set2masks)
+                    dropdims(sum(elmasks, dims=1), dims=1), set2masks,
+                    collect(mask_ids !== nothing ? mask_ids : 1:nmasks),
+                    # FIXME use vector container if mask_ids === nothing or if ids are integers
+                    Dict(id => ix for (ix, id) in enumerate(mask_ids !== nothing ? mask_ids : 1:nmasks)))
 end
 
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
+              mask_ids::Union{AbstractVector, AbstractSet, Nothing} = nothing,
               min_nmasked::Integer=1, max_setsize::Union{Integer, Nothing} = nothing,
               max_overlap_logpvalue::Float64=0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
 )
@@ -105,13 +116,20 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
         end
     end
 
-    return MaskedSetMosaic(mosaic, elmasks, set2masks)
+    return MaskedSetMosaic(mosaic, elmasks, set2masks, mask_ids)
 end
 
-function mask(mosaic::SetMosaic{T}, elmasks #= iterable with eltype()==Set{T} =#;
+function mask(mosaic::SetMosaic{T}, elmasks::AbstractVector #= iterable with eltype()==Set{T} =#;
               kwargs...) where T
     @assert eltype(elmasks) === Set{T}
     mask(mosaic, Bool[in(e, elmask::Set{T}) for e in mosaic.ix2elm, elmask in elmasks]; kwargs...)
+end
+
+function mask(mosaic::SetMosaic{T}, elmasks::AbstractDict #= iterable with eltype()==Set{T} =#;
+              kwargs...) where T
+    @assert valtype(elmasks) === Set{T}
+    mask(mosaic, Bool[in(e, elmask::Set{T}) for e in mosaic.ix2elm, elmask in values(elmasks)];
+         mask_ids = keys(elmasks), kwargs...)
 end
 
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
@@ -128,4 +146,5 @@ nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.tot
 Base.copy(mosaic::MaskedSetMosaic) =
     MaskedSetMosaic(mosaic.original, copy(mosaic.elmasks), copy(mosaic.elunionmask),
                     copy(mosaic.total_masked),
-                    deepcopy(mosaic.set2masks))
+                    deepcopy(mosaic.set2masks),
+                    copy(mosaic.ix2mask), copy(mosaic.mask2ix))

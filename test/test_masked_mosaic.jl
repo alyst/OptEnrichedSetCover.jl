@@ -9,6 +9,7 @@
         @test nelements(msm) == 0
         @test nsets(msm) == 0
         @test nmasks(msm) == 1
+        @test msm.ix2mask == [1]
     end
 
     @testset "empty but with elements" begin
@@ -20,6 +21,17 @@
         @test nmasks(msm) == 1
         @test nmasked(msm, 1) == 1
         @test nunmasked(msm, 1) == 1
+        @test msm.ix2mask == [1]
+
+        # named
+        nmsm = mask(sm, Dict(:X => Set([:a])))
+        @test unmask(nmsm) == sm
+        @test nelements(nmsm) == 2
+        @test nsets(nmsm) == 0
+        @test nmasks(nmsm) == 1
+        @test nmasked(nmsm, 1) == 1
+        @test nunmasked(nmsm, 1) == 1
+        @test nmsm.ix2mask == [:X]
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c :d], mask=[:a :b]" begin
@@ -88,5 +100,11 @@
         @test nsets(msm2) == 2
         @test msm2.set2masks == Dict(1 => [MaskOverlap(1, 2, 0), MaskOverlap(2, 2, 0), MaskOverlap(3, 2, 0)],
                                      3 => [MaskOverlap(1, 2, 2), MaskOverlap(2, 3, 1), MaskOverlap(3, 3, 1)])
+
+        nmsm2 = mask(sm, Dict(:X => Set([:a, :b]), :Y => Set([:a, :b, :c]), :Z => Set([:a, :b, :d])), min_nmasked=2)
+        @test nsets(nmsm2) == 2
+        @test nmsm2.ix2mask == [:Z, :X, :Y]
+        @test nmsm2.set2masks == Dict(1 => [MaskOverlap(1, 2, 0), MaskOverlap(2, 2, 0), MaskOverlap(3, 2, 0)],
+                                      3 => [MaskOverlap(1, 3, 1), MaskOverlap(2, 2, 2), MaskOverlap(3, 3, 1)])
     end
 end
