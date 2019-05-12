@@ -73,7 +73,7 @@ function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
                          mask_ids::Union{AbstractVector{M}, AbstractSet{M}, Nothing} = nothing
                         ) where {T,S,M}
     size(elmasks, 1) == nelements(mosaic) ||
-        throw(ArgumentError("Elements mask length ($(length(elmasks))) should match the number of elements ($(nelements(mosaic)))"))
+        throw(ArgumentError("Elements mask length ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
     nmasks = size(elmasks, 2)
     (mask_ids === nothing) || (nmasks == length(mask_ids)) ||
         throw(ArgumentError("Number of masks ($nmasks) should match the number of mask IDs ($(length(masks_ids)))"))

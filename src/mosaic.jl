@@ -111,7 +111,7 @@ struct SetMosaic{T,S}
                        setXset_nextra_elms::Integer=0) where {T, S}
         length(setids) == length(sets) ||
             throw(ArgumentError("Number of set IDs does not match the number of sets"))
-        length(set_relevances) == length(sets) ||
+        (set_relevances === nothing) || (length(set_relevances) == length(sets)) ||
             throw(ArgumentError("Number of set relevance scores does not match the number of sets"))
         ix2elm, elm2ix = _encode_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
