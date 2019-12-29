@@ -164,12 +164,13 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     min_delta_fitness_tolerance::Float64
     trace_interval::Float64
     fold_ratio_threshold::Float64
-    workers::Vector{Int}
+    #workers::Vector{Int}
+    nworkers::Int
     borg_params::BlackBoxOptim.ParamsDict
 
     function MultiobjOptimizerParams(;
         # default Borg/BBO Opt.Controller parameter overrides
-        NWorkers::Integer = 1, Workers::AbstractVector{Int} = Vector{Int}(),
+        NWorkers::Integer = max(1, Threads.nthreads() - 1), #Workers::AbstractVector{Int} = Vector{Int}(),
         PopulationSize::Integer = 100,
         WeightDigits::Union{Integer, Nothing} = 2, # precision digits for set weights
         MaxSteps::Integer = 10_000_000,
@@ -180,16 +181,16 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         TraceInterval::Real = 5.0,
         kwargs...
     )
-        if isempty(Workers) && NWorkers > nworkers()
-            @warn("Requested NWorkers=$NWorkers, while only $(nworkers()) available, reducing")
-            NWorkers = nworkers()
+        if #=isempty(Workers) &&=# NWorkers > max(1, Threads.nthreads()-1)
+            @warn("Requested NWorkers=$NWorkers, while only $(Threads.nthreads()) worker thread(s) available, reducing")
+            NWorkers = Threads.nthreads()-1
         end
-        if isempty(Workers) && NWorkers > 1
-            Workers = workers()[1:NWorkers]
-        end
+        #if isempty(Workers) && NWorkers > 1
+        #    Workers = workers()[1:NWorkers]
+        #end
         new(PopulationSize, WeightDigits, MaxSteps, MaxStepsWithoutProgress,
             FitnessTolerance, MinDeltaFitnessTolerance, FoldRatioThreshold,
-            TraceInterval, Workers,
+            TraceInterval, NWorkers,
             BlackBoxOptim.kwargs2dict(kwargs...))
     end
 end
@@ -205,7 +206,7 @@ function borg_params(opt_params::MultiobjOptimizerParams,
     end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
         ParamsDict(:PopulationSize=>opt_params.pop_size,
-                   :Workers=>opt_params.workers,
+                   :NThreads=>opt_params.nworkers > 1 ? opt_params.nworkers : 0,
                    :ϵ=>eps),
         opt_params.borg_params)
 end
