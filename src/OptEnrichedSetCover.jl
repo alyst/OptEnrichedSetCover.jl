@@ -20,6 +20,7 @@ export SetMosaic, CoverParams,
 
 import BlackBoxOptim: OptimizationProblem
 
+include("array_pool.jl")
 include("sparse_mask_matrix.jl")
 include("set_score.jl")
 include("mosaic.jl")
