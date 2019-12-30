@@ -16,7 +16,7 @@ struct CoverParams
                          sel_tax::Real=0.0, set_shape::Real=1.0,
                          min_weight::Real=1E-2, mask_discount::Real=0.9,
                          setXset_factor::Real=1.0,
-                         uncovered_factor::Real=0.1, covered_factor::Real=0.025,
+                         uncovered_factor::Real=0.1, covered_factor::Real=0.001,
                          set_relevance_shape::Real=0.5,
                          set_relevance_min::Real=0.5)
         (0.0 < min_weight <= 1.0) || throw(ArgumentError("`min_weight` must be within (0,1] range"))
