@@ -288,7 +288,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
               set_id = mosaic.ix2set[setix_v],
               mask_ix = maskix_v,
               mask_id = covers.ix2mask[maskix_v],
-              cover_total_score = cover_score_v,
+              cover_total_score = cover_total_score_v,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
               set_relevance = mosaic.set_relevances[setix_v],
