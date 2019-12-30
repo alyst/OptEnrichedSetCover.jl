@@ -252,9 +252,9 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
     nmasked_v = Vector{Int}()
     nunmasked_v = Vector{Int}()
     weight_v = Vector{Float64}()
-    cover_score_v = Vector{Float64}()
-    set_score_enriched_v = Vector{Float64}()
-    set_score_overlap_v = Vector{Float64}()
+    cover_total_score_v = Vector{Float64}()
+    set_cover_score_v = Vector{Float64}()
+    set_overlap_logpvalue_v = Vector{Float64}()
 
     @inbounds for (coverix, cover) in enumerate(covers.results)
         sol_ix = best_index(cover, params)
@@ -274,12 +274,12 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
                 push!(setix_v, setix)
                 push!(maskix_v, maskix)
                 push!(weight_v, set_weight)
-                push!(cover_score_v, sol_aggscore)
-                push!(set_score_enriched_v, set_score)
+                push!(cover_total_score_v, sol_aggscore)
+                push!(set_cover_score_v, set_score)
                 push!(nmasked_v, nmasked_mtx[selix, maskix])
                 push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
-                push!(set_score_overlap_v, logpvalue(last(nmasked_v), selsize_v[selix],
-                                                     covers.total_masked[maskix], nelements(mosaic)))
+                push!(set_overlap_logpvalue_v, logpvalue(last(nmasked_v), selsize_v[selix],
+                                                         covers.total_masked[maskix], nelements(mosaic)))
             end
         end
     end
@@ -288,11 +288,11 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
               set_id = mosaic.ix2set[setix_v],
               mask_ix = maskix_v,
               mask_id = covers.ix2mask[maskix_v],
-              cover_score = cover_score_v,
+              cover_total_score = cover_score_v,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
               set_relevance = mosaic.set_relevances[setix_v],
               set_weight = weight_v,
-              set_score_enriched = set_score_enriched_v,
-              set_score_overlap = set_score_overlap_v)
+              set_cover_score = set_cover_score_v,
+              set_overlap_log10pvalue = set_overlap_logpvalue_v ./ log(10))
 end
