@@ -545,6 +545,7 @@ function MultiobjCoverProblemResult(problem::MultiobjCoverProblem,
                    length(pareto_frontier(optres)))
     folded_scores = [archived_fitness(sol).orig for sol in pareto_frontier(optres)]
     front_perm = sortperm(folded_scores) # sort lexicographically
+    folded_scores = folded_scores[front_perm]
     @inbounds for i in axes(wmtx, 2)
         wmtx[:, i] = BlackBoxOptim.params(pareto_frontier(optres)[front_perm[i]])
     end
