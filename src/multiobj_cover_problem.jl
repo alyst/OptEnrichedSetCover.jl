@@ -45,8 +45,8 @@ struct MultiobjProblemSoftFold2d <: FitnessFolding{2}
     shape::Float64              # controls folding smoothness (smaller are smoother)
 
     MultiobjProblemSoftFold2d(params::CoverParams,
-                              ratio_threshold::Float64 = 3.0,
-                              shape::Float64=0.05) =
+                              ratio_threshold::Float64 = 1.0,
+                              shape::Float64=0.1) =
         new(params.setXset_factor, params.uncovered_factor, params.covered_factor,
             ratio_threshold, shape)
 end
