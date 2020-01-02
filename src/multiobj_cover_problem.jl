@@ -49,7 +49,7 @@ struct MultiobjProblemSoftFold2d <: RawscoreFolding{2}
 
     MultiobjProblemSoftFold2d(params::CoverParams,
                               ratio_threshold::Float64 = 1.0,
-                              shape::Float64=0.1) =
+                              shape::Float64=0.5) =
         new(params.setXset_factor, params.uncovered_factor, params.covered_factor,
             ratio_threshold, shape)
 end
