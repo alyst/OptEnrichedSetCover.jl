@@ -165,22 +165,23 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     max_steps_without_progress::Int
     fitness_tolerance::Float64
     min_delta_fitness_tolerance::Float64
-    trace_interval::Float64
     fold_ratio_threshold::Float64
     #workers::Vector{Int}
     nworkers::Int
+    trace_interval::Float64
+
     borg_params::BlackBoxOptim.ParamsDict
 
     function MultiobjOptimizerParams(;
         # default Borg/BBO Opt.Controller parameter overrides
-        NWorkers::Integer = max(1, Threads.nthreads() - 1), #Workers::AbstractVector{Int} = Vector{Int}(),
         PopulationSize::Integer = 100,
         WeightDigits::Union{Integer, Nothing} = 2, # precision digits for set weights
         MaxSteps::Integer = 10_000_000,
         MaxStepsWithoutProgress::Integer = 50_000,
         FitnessTolerance::Real = 0.1,
         MinDeltaFitnessTolerance::Real = 1E-5,
-        FoldRatioThreshold::Real = 5.0,
+        FoldRatioThreshold::Real = 1.0,
+        NWorkers::Integer = max(1, Threads.nthreads() - 1), #Workers::AbstractVector{Int} = Vector{Int}(),
         TraceInterval::Real = 5.0,
         kwargs...
     )
@@ -191,9 +192,10 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
         #if isempty(Workers) && NWorkers > 1
         #    Workers = workers()[1:NWorkers]
         #end
-        new(PopulationSize, WeightDigits, MaxSteps, MaxStepsWithoutProgress,
+        new(PopulationSize, WeightDigits,
+            MaxSteps, MaxStepsWithoutProgress,
             FitnessTolerance, MinDeltaFitnessTolerance, FoldRatioThreshold,
-            TraceInterval, NWorkers,
+            NWorkers, TraceInterval,
             BlackBoxOptim.kwargs2dict(kwargs...))
     end
 end
