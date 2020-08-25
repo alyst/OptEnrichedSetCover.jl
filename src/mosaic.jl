@@ -1,4 +1,8 @@
-function _encode_elements(all_elms::Set{T}) where T
+# assign index (1..n) to each elements of the set
+# returns the tuple:
+#   - the vector of elements ordered by their index
+#   - the dictionary from element to its index
+function _index_elements(all_elms::Set{T}) where T
     ix2elm = collect(all_elms)
     sort!(ix2elm)
     # map from element to its index
@@ -113,7 +117,7 @@ struct SetMosaic{T,S}
             throw(ArgumentError("Number of set IDs does not match the number of sets"))
         (set_relevances === nothing) || (length(set_relevances) == length(sets)) ||
             throw(ArgumentError("Number of set relevance scores does not match the number of sets"))
-        ix2elm, elm2ix = _encode_elements(all_elms)
+        ix2elm, elm2ix = _index_elements(all_elms)
         setXelm, elmXset, elmXtile, tileXset = _prepare_tiles(sets, elm2ix)
 
         # elementwise sets comparison
