@@ -60,13 +60,13 @@ function (f::MultiobjProblemSoftFold2d)(fitness::RawScore)
         f.covered_factor * fitness[4]
     b = fitness[2]
     if f.ratio_threshold !== nothing
-        t = b/max(1, -a)
-        (t <= f.ratio_threshold) && return (a, b)
+        k = b/max(1, -a)
+        (k <= f.ratio_threshold) && return (a, b)
 
-        ts = f.shape * (t - f.ratio_threshold)
-        # 1/(1 + exp(1/ts - ts)) allows smooth transition from ts = 0 (f(0)=0) to f(∞)=1
-        k = 1 / (t * f.setXset_factor) / (1 + exp(1/ts - ts))
-        return (a + k * f.setXset_factor * b, (1.0 - k) * b)
+        s = f.shape * (k - f.ratio_threshold)
+        # 1/(1 + exp(1/s - s)) allows smooth transition from s = 0 (f(0)=0) to f(∞)=1
+        t = inv(k * (f.setXset_factor + exp(inv(s) - s)))
+        return (a + t * f.setXset_factor * b, (1.0 - t) * b)
     else
         return (a, b)
     end
