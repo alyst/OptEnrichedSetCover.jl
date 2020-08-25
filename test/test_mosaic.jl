@@ -1,4 +1,9 @@
 @testset "SetMosaic" begin
+    elms(sm::SetMosaic, ixs::AbstractVector) =
+        getindex.(Ref(sm.ix2elm), ixs)
+    tile_elms(sm::SetMosaic, ix::Integer) =
+        elms(sm, tile(sm, ix))
+
     @testset "no sets, no elements" begin
         sm = SetMosaic(Set{Symbol}[])
 
@@ -39,7 +44,7 @@
 
         @test nelements(sm) == 1
         @test ntiles(sm) == 1
-        @test tile(sm, 1) == [1]
+        @test tile_elms(sm, 1) == [:a]
         @test nsets(sm) == 1
         @test setsize(sm, 1) == 1
     end
@@ -60,8 +65,8 @@
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
-        @test tile(sm, 1) == [1]
-        @test tile(sm, 2) == [2]
+        @test tile_elms(sm, 1) == [:b]
+        @test tile_elms(sm, 2) == [:a]
         @test nsets(sm) ==2
     end
 
@@ -70,7 +75,7 @@
 
         @test nelements(sm) == 1
         @test ntiles(sm) == 1
-        @test tile(sm, 1) == [1]
+        @test tile_elms(sm, 1) == [:a]
         @test nsets(sm) == 1
         @test sm.set2ix == Dict(1=>1, 2=>1)
         @test sm.ix2set == [1]
@@ -81,8 +86,8 @@
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
-        @test tile(sm, 1) == [1]
-        @test tile(sm, 2) == [2]
+        @test tile_elms(sm, 1) == [:a]
+        @test tile_elms(sm, 2) == [:b]
         @test setsize(sm, 1) == 1
         @test setsize(sm, 2) == 1
         @test setsize(sm, 3) == 2
@@ -95,9 +100,9 @@
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 3
-        @test tile(sm, 1) == [1, 2]
-        @test tile(sm, 2) == [3]
-        @test tile(sm, 3) == [4]
+        @test tile_elms(sm, 1) == [:a, :b]
+        @test tile_elms(sm, 2) == [:d]
+        @test tile_elms(sm, 3) == [:c]
         @test nsets(sm) == 3
     end
 
