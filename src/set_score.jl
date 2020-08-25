@@ -122,16 +122,16 @@ end
 
 """
     set_relevance(nset_observed::Integer, nset::Integer,
-                  nobserved::Integer, ntotal::Integer)
+                  nobserved::Integer, ntotal::Integer) -> Float64
 
 Calculates the relevance weight of the set that contains `nset` elements,
 `nset_observed` of which were present (not necessarily enriched) in the data
-that identified `nobserved` of `ntotal` all known elements.
-It is used by `SetMosaic` to penalize the sets,
+that identified `nobserved` elements out of all known (`ntotal`).
+It is used by [`SetMosaic`](@ref) to penalize the sets,
 which could not be observed in the data (e.g. biological processes or pathways
 that involve proteins not expressed by the cells used in the experiments).
 
-While for `MaskedSetMosaic` it's recommended to use the IDs of data entities
+While for [`MaskedSetMosaic`](@ref) it's recommended to use the IDs of data entities
 (e.g. protein group IDs for proteomic data) to correctly count the set sizes
 and estimate enrichment; `set_relevance()` should use the counts derived from
 the original IDs of the annotation database (e.g. UniProt accession codes).

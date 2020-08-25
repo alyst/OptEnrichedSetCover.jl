@@ -1,16 +1,38 @@
 """
-Parameters for the `AbstractCoverProblem` (Optimal Enriched-Set Cover).
+    CoverParams(; [sel_tax=0.0], [set_shape=1.0],
+                  [min_weight=1E-2], [mask_discount=0.9], [setXset_factor=1.0],
+                  [uncovered_factor=0.1], [covered_factor=0.001],
+                  [set_relevance_shape=0.5], [set_relevance_min=0.5]) -> CoverParams
+
+Specify parameters for the [`AbstractCoverProblem`](@ref).
+One can specify a non-default value for a particular parameter.
+
+See [cover quality score](@ref cover_quality) for the detailed description of the parameters.
+
+# Arguments
+  * `sel_tax`: ``\\epsilon``, the constant added to the set score of each selected set to penalize
+     the number of sets in the cover
+  * `set_shape`: ``\\beta``, applied to set or set×set scores
+  * `min_weight`: minimal non-zero set probability ???
+  * `mask_discount`: ``\\alpha``, how much the overlap score of each subsequent mask (from most to less enriched)
+    is discounted
+  * `setXset_factor`: ``w_r``, the weight of *redundancy* [cover quality](@ref cover_quality) component
+    (`setXset_score` scale), 0 = no redunancy penalty
+  * `uncovered_factor`: ``w_u``, the weight of *uncovered hits* component in [cover quality](@ref cover_quality)
+  * `covered_factor`: ``w_c``, the weight of *covered non-hits* component in [cover quality](@ref cover_quality)
+  * `set_relevance_shape`: ``\\beta_L``, how much set relevance affects set score, 0 = no effect
+  * `set_relevance_min`: ``L_{\\min``, if shaped relevance is below, it's set to `set_relevance_min`
 """
 struct CoverParams
-    sel_tax::Float64            # the constant added to the set score of each selected set
-    set_shape::Float64          # ^set_shape is applied to set or setXset scores
-    min_weight::Float64         # minimal non-zero set probability
-    mask_discount::Float64      # how much the overlap score of each subsequent mask (from most to less enriched) is discounted
-    setXset_factor::Float64     # how much set-set overlaps are penalized (setXset_score scale), 0 = no penalty
-    uncovered_factor::Float64   # how much masked uncovered elements penalize the score
-    covered_factor::Float64     # how much unmasked covered elements penalize the score
-    set_relevance_shape::Float64# how much set relevance affects set score, 0 = no effect
-    set_relevance_min::Float64  # if shaped relevance is below, it's set to set_relevance_min
+    sel_tax::Float64
+    set_shape::Float64
+    min_weight::Float64
+    mask_discount::Float64
+    setXset_factor::Float64
+    uncovered_factor::Float64
+    covered_factor::Float64
+    set_relevance_shape::Float64
+    set_relevance_min::Float64
 
     function CoverParams(;
                          sel_tax::Real=0.0, set_shape::Real=1.0,
@@ -149,13 +171,14 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
             varixs = get!(() -> Vector{Int}(), maskxtile2vars, (maskix, tileix))
             push!(varixs, varix)
         end
-        # each varixs should be sorted, because they are tranersed in asc order when constructing vXmt_els
+        # each varixs should be sorted, because they are traversed in asc order when constructing vXmt_els
         vars2maskxtiles = Vector{Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
         for (maskxtile, varixs) in pairs(maskxtile2vars)
             v2mtpos = searchsortedfirst(vars2maskxtiles, (varixs, 0), by=first)
             if v2mtpos > length(vars2maskxtiles) || first(vars2maskxtiles[v2mtpos]) != varixs
                 insert!(vars2maskxtiles, v2mtpos, (varixs, [maskxtile]))
             else
+                # FIXME use OrderedDict to avoid searchsorted?
                 maskxtiles = last(vars2maskxtiles[v2mtpos])
                 insert!(maskxtiles, searchsortedfirst(maskxtiles, maskxtile), maskxtile)
             end
@@ -212,7 +235,8 @@ function varXvar_scores(mosaic::MaskedSetMosaic, params::CoverParams,
     for i in eachindex(var2setix) # don't consider self-intersections
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
-    vXv_min = Inf # minimum finite varXvar_scores element
+    # find minimum finite varXvar_scores element
+    vXv_min = Inf
     @inbounds for vXv in vXv_scores
         if isfinite(vXv) && vXv < vXv_min
             vXv_min = vXv
@@ -247,6 +271,8 @@ aggscore(s::RawScore, params::CoverParams) =
     params.covered_factor * s[4]
 
 """
+    AbstractCoverProblem{T}
+
 Optimal Enriched-Set Cover problem -- choose the sets from the collection `𝒞` to cover
 the masked(selected) elements `M`.
 The optimal sets cover `C = {c₁, c₂, ..., cₙ} ⊂ 𝒞` has to deliver 3 goals:

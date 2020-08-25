@@ -35,11 +35,19 @@ end
     agg.uncovered_factor * score[3] + agg.covered_factor * score[4]
 =#
 
-# Sums significance (1st), uncovered (3rd) and covered (4th) components of the score into a single score (`a`)
-# if `-b/a` (b = 2nd component) is below ratio_threshold, keeps the score as is (`(a, b)`)
-# otherwise, mixes in `b` into `a` and `a` into `b` (`(a + k sXs b, (1-k) b)`) with an increasing strength `k`,
-# so that when `-b/a → ∞`, `(a#, b#) → (0, a/setXset_factor + b)`
-# The transform keeps the aggregated score intact
+"""
+Transforms the 4-component cover quality score into 2-component score that makes
+the highly redundant solutions dominated by any less redundant ones.
+
+See ["Cover score convolution"](@ref cover_score_convolution) section for the discussion.
+
+# Arguments
+  * `setXset_factor`: ``w_r``, same as in [`CoverParams`](@ref)
+  * `uncovered_factor`: ``w_u``, same as in [`CoverParams`](@ref)
+  * `covered_factor`: ``w_c``, same as in [`CoverParams`](@ref)
+  * `ratio_threshold`: ``k_{\\max}``, defaults to 1
+  * `shape`: ``\\alpha_k``, defaults to 0.5.
+"""
 struct MultiobjProblemSoftFold2d <: RawscoreFolding{2}
     setXset_factor::Float64
     uncovered_factor::Float64
@@ -111,6 +119,8 @@ end
 
 """
 Multi-objective optimal Enriched-Set Cover problem.
+
+See ["Method Description"](@ref method) for more details.
 """
 struct MultiobjCoverProblem <: AbstractCoverProblem{RawScore}
     params::CoverParams
@@ -158,6 +168,11 @@ function score_scales(problem::MultiobjCoverProblem)
             max(sXs_max - sXs_min, 0.1))
 end
 
+"""
+Parameters for the Borg-based optimization of [`MultiobjCoverProblem`](@ref).
+
+See [`optimize`](@ref).
+"""
 struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     pop_size::Int
     weight_digits::Union{Int, Nothing}
@@ -378,9 +393,13 @@ function miscover_score(w::AbstractVector{Float64}, problem::MultiobjCoverProble
 end
 
 """
+    score(w::AbstractVector{Float64}, problem) -> NTuple{4, Float64}
+
 Unfolded multiobjective score (fitness) of the OESC coverage.
 
-* `w` probabilities of the sets being covered
+* `w`: probabilities of the sets being covered
+
+See ["Cover quality"](@ref cover_quality).
 """
 function score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     __check_vars(w, problem)
@@ -411,7 +430,9 @@ aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
 const MultiobjCoverProblemFitnessScheme =
     ParetoFitnessScheme{2,Float64,true,MultiobjCoverProblemScoreAggregator{MultiobjProblemSoftFold2d}}
 
-# wraps MultiobjCoverProblem as BlackBoxOptim OptimizationProblem
+"""
+Wraps [`MultiobjCoverProblem`](@ref) as [`BlackBoxOptim.OptimizationProblem`]
+"""
 struct MultiobjCoverProblemBBOWrapper{SS <: RectSearchSpace} <:
         BlackBoxOptim.OptimizationProblem{MultiobjCoverProblemFitnessScheme}
     orig::MultiobjCoverProblem
@@ -533,7 +554,8 @@ generate_modifier(problem::MultiobjCoverProblemBBOWrapper, params) =
                                  [0.5, 0.3, 0.2])
 
 """
-Result of `optimize(MultiobjCoverProblem)`.
+The result of [`optimize`](@ref).
+Contains the solutions on the Pareto front: weights of the annotation terms and corresponding cover scores.
 """
 struct MultiobjCoverProblemResult
     var2set::Vector{Int}        # indices of sets in the original SetMosaic
@@ -615,6 +637,13 @@ function set2var(result::MultiobjCoverProblemResult, setix::Int)
     end
 end
 
+"""
+    optimize(problem::MultiobjCoverProblem,
+             [opt_params::MultiobjOptimizerParams]) -> MultiobjCoverProblemResult
+
+Optimize [`MultiobjCoverProblem`](@ref) and return the result.
+Uses Borf multi-objective optimization method from *BlackBoxOptim.jl* package.
+"""
 function optimize(problem::MultiobjCoverProblem,
                   opt_params::MultiobjOptimizerParams = MultiobjOptimizerParams())
     if nvars(problem) == 0
