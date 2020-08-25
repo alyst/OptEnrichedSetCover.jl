@@ -47,12 +47,17 @@ struct MaskOverlap
 end
 
 """
-`SetMosaic` with an elements mask (selection) on top.
-Sets that are not overlapping with the mask are excluded(skipped) from `MaskedSetMosaic`.
-Optionally the filtering can include testing for the minimal overlap significance P-value.
+[`SetMosaic`](@ref) with the elements masks (selections) on top.
+Sets that are not overlapping with the masks are excluded(skipped) from `MaskedSetMosaic`.
+Optionally, the filtering can include testing for the minimal overlap significance P-value.
 
 The tiles of non-overlapped sets are removed, the tiles that have identical membership
 for all the masked sets are squashed into a single tile.
+
+## Type parameters
+* `T`: the type of elements
+* `S`: the type of set ids
+* `M`: the type of mask ids
 """
 mutable struct MaskedSetMosaic{T,S,M}
     original::SetMosaic{T,S}        # original mosaic
@@ -87,6 +92,21 @@ function MaskedSetMosaic(mosaic::SetMosaic{T, S}, elmasks::AbstractMatrix{Bool},
                     Dict(id => ix for (ix, id) in enumerate(mask_ids !== nothing ? mask_ids : 1:nmasks)))
 end
 
+"""
+    mask(mosaic::SetMosaic, elmasks;
+         mask_ids::Union{AbstractVector, AbstractSet, Nothing} = nothing,
+         [min_nmasked=1], [max_setsize=nothing],
+         [max_overlap_logpvalue=0.0]) -> MaskedSetMosaic
+
+Construct [`MaskedSetMosaic`](@ref) from the [`SetMosaic`] and the collection of element masks.
+
+## Arguments
+* `min_nmasked`: the minimal number of masked elements in a set to include in the mosaic
+* `max_setsize` (optional): ignore the annotation sets bigger than the specified size
+* `max_overlap_logpvalue`: the threshold of Fisher's Exact Test log P-value of the overlap
+   between the set and the mask for the inclusion of the set into the mosaic.
+   *0* accepts all sets.
+"""
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
               mask_ids::Union{AbstractVector, AbstractSet, Nothing} = nothing,
               min_nmasked::Integer=1, max_setsize::Union{Integer, Nothing} = nothing,
@@ -132,6 +152,11 @@ function mask(mosaic::SetMosaic{T}, elmasks::AbstractDict #= iterable with eltyp
          mask_ids = keys(elmasks), kwargs...)
 end
 
+"""
+    unmask(mosaic::MaskedSetMosaic) -> SetMosaic
+
+Get the original [`SetMosaic`](@ref).
+"""
 unmask(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)

@@ -14,6 +14,12 @@ function _index_elements(all_elms::Set{T}) where T
     return ix2elm, elm2ix
 end
 
+# prepares disjoint tiles for the sets collection
+# returns the tuple of :
+#   - transposed version of the next sparse mask (set×element)
+#   - sparse mask representation of sets collection (element×set)
+#   - sparse mask representation of tiles collecttion (element×tile)
+#   - sparse mask representation of sets composition using tiles (tile×set)
 function _prepare_tiles(sets, elm2ix::Dict{<:Any, Int})
     if isempty(sets)
         # no sets -- no tiles
@@ -85,11 +91,14 @@ function _set_sizes(tileXset::SparseMaskMatrix,
 end
 
 """
-A collection of (potentially overlapping) sets as
+    SetMosaic{T,S}
+
+Represents a collection of (potentially overlapping) sets as
 a "mosaic" of non-overlapping "tiles".
 
-* `T` type of elements
-* `S` type of set keys
+# Type parameters
+* `T`: type of set elements
+* `S`: type of set keys
 """
 struct SetMosaic{T,S}
     ix2elm::Vector{T}           # element index to element
@@ -169,16 +178,23 @@ struct SetMosaic{T,S}
 end
 
 """
-Construct `SetMosaic` for a given nameless sets collection.
+    SetMosaic(sets, [all_elms::Set{T}],
+              [set_relevances::AbstractVector{Float64}];
+              [setXset_nextra_elms=0]) where {T, S} -> SetMosaic{T, S}
+
+Construct `SetMosaic` for a given sets collection.
+
+# Arguments
+  * `sets`: a mapping from the set ids (of type `S`) to its elements (`Set{T}`).
+     Could be either a dictionary or a vector (then *S* is *Int*).
+  * `setXset_nextra_elms`: added to the number of total elements to adjust
+    redundancy scores (so that overlaps of very big terms are still penalized)
 """
 SetMosaic(sets::AbstractVector{Set{T}}, all_elms::AbstractSet{T} = foldl(union!, sets, init=Set{T}()),
           set_relevances::Union{AbstractVector{Float64}, Nothing} = nothing;
           kwargs...) where {T} =
     SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances; kwargs...)
 
-"""
-Constructs `SetMosaic` for a given named sets collection.
-"""
 SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = foldl(union!, values(sets), init=Set{T}()),
           set_relevances::Union{Dict{S, Float64}, Nothing} = nothing;
           kwargs...) where {S, T} =
@@ -186,11 +202,44 @@ SetMosaic(sets::Dict{S, Set{T}}, all_elms::Set{T} = foldl(union!, values(sets), 
               set_relevances === nothing ? nothing :
               get.(Ref(set_relevances), keys(sets), 1.0); kwargs...)
 
+"""
+    nelements(mosaic::SetMosaic) -> Int
+
+The number of distinct elements (i.e. genes) in the sets collection.
+"""
 nelements(mosaic::SetMosaic) = length(mosaic.ix2elm)
+
+"""
+    nsets(mosaic::SetMosaic) -> Int
+
+The number of tiles (pairwise disjoint sets) in the mosaic representation of the set collection.
+"""
 ntiles(mosaic::SetMosaic) = size(mosaic.tileXset, 1)
+
+"""
+    nsets(mosaic::SetMosaic) -> Int
+
+The number of sets in the collection.
+"""
 nsets(mosaic::SetMosaic) = size(mosaic.tileXset, 2)
 
+"""
+    tile(mosaic::SetMosaic, i::Integer) -> AbstractVector{Int}
+
+Get the `i`-th mosaic tile as the vector of indices of its elements.
+"""
 tile(mosaic::SetMosaic, tile_ix::Integer) = view(mosaic.elmXtile, :, tile_ix)
+
+"""
+    set(mosaic::SetMosaic, i::Integer) -> AbstractVector{Int}
+
+Get the `i`-th set as the vector of indices of its elements.
+"""
 set(mosaic::SetMosaic, set_ix::Integer) = view(mosaic.elmXset, :, set_ix)
 
+"""
+    set(mosaic::SetMosaic, i::Integer) -> Int
+
+Get the size of the `i`-th set.
+"""
 setsize(mosaic::SetMosaic, set_ix::Integer) = mosaic.set_sizes[set_ix]
