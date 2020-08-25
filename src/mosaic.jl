@@ -171,7 +171,7 @@ end
 """
 Construct `SetMosaic` for a given nameless sets collection.
 """
-SetMosaic(sets::AbstractVector{Set{T}}, all_elms::Set{T} = foldl(union!, sets, init=Set{T}()),
+SetMosaic(sets::AbstractVector{Set{T}}, all_elms::AbstractSet{T} = foldl(union!, sets, init=Set{T}()),
           set_relevances::Union{AbstractVector{Float64}, Nothing} = nothing;
           kwargs...) where {T} =
     SetMosaic(collect(1:length(sets)), sets, all_elms, set_relevances; kwargs...)

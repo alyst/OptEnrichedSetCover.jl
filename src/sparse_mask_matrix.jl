@@ -32,7 +32,7 @@ Base.copy(mtx::SparseMaskMatrix) = SparseMaskMatrix(mtx.m, mtx.n, copy(mtx.colpt
 """
 Construct `SparseMaskMatrix` given vector of true row indices per each column.
 """
-function SparseMaskMatrix(m::Integer, rowvals_percol::Vector{Vector{Int}})
+function SparseMaskMatrix(m::Integer, rowvals_percol::AbstractVector{Vector{Int}})
     colptr = sizehint!(Vector{Int}(), length(rowvals_percol)+1)
     nrowvals_cumlenp1 = 1
     for rowvals in rowvals_percol
@@ -53,7 +53,7 @@ Construct `SparseMaskMatrix` from the family of sets.
  * `sets` family of sets, one set per result column
  * `elm2ix` mapping from set element to its index (mask row index)
 """
-function SparseMaskMatrix(sets, elm2ix::Dict{T, Int}) where T
+function SparseMaskMatrix(sets, elm2ix::AbstractDict{T, Int}) where T
     isempty(sets) && return SparseMaskMatrix(length(elm2ix), 0, fill(0, 1), Vector{Int}())
 
     elm_ixs = Vector{Int}()
