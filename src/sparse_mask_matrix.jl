@@ -30,7 +30,10 @@ Base.:(==)(x::SparseMaskMatrix, y::SparseMaskMatrix) = isequal(x, y)
 Base.copy(mtx::SparseMaskMatrix) = SparseMaskMatrix(mtx.m, mtx.n, copy(mtx.colptr), copy(mtx.rowval))
 
 """
-Construct `SparseMaskMatrix` given vector of true row indices per each column.
+    SparseMaskMatrix(m::Integer, rowvals_percol::Vector{Vector{Int}}) -> SparseMaskMatrix
+
+Construct `SparseMaskMatrix` given the vector of true row indices per each column
+and the total number of rows (`m`).
 """
 function SparseMaskMatrix(m::Integer, rowvals_percol::AbstractVector{Vector{Int}})
     colptr = sizehint!(Vector{Int}(), length(rowvals_percol)+1)
@@ -48,10 +51,13 @@ function SparseMaskMatrix(m::Integer, rowvals_percol::AbstractVector{Vector{Int}
 end
 
 """
-Construct `SparseMaskMatrix` from the family of sets.
+    SparseMaskMatrix(sets, elm2ix::Dict{T, Int}) where T -> SparseMaskMatrix
 
- * `sets` family of sets, one set per result column
- * `elm2ix` mapping from set element to its index (mask row index)
+Construct `SparseMaskMatrix` from the collection of sets.
+
+# Arguments
+ * `sets`: a collection of sets, one set per mask matrix column
+ * `elm2ix`: maps set element to its index (mask row index)
 """
 function SparseMaskMatrix(sets, elm2ix::AbstractDict{T, Int}) where T
     isempty(sets) && return SparseMaskMatrix(length(elm2ix), 0, fill(0, 1), Vector{Int}())
@@ -67,6 +73,11 @@ function SparseMaskMatrix(sets, elm2ix::AbstractDict{T, Int}) where T
     return SparseMaskMatrix(length(elm2ix), length(sets), set_ranges, elm_ixs)
 end
 
+"""
+    SparseMaskMatrix(mtx::AbstractMatrix{Bool}) -> SparseMaskMatrix
+
+Sparse representation of boolean matrix.
+"""
 function SparseMaskMatrix(mtx::AbstractMatrix{Bool})
     colptr = sizehint!(Vector{Int}(), size(mtx, 2)+1)
     rowval = Vector{Int}()
