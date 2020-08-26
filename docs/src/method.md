@@ -19,7 +19,7 @@ Let
     of the sets ``A \subset \mathrm{All}`` (e.g. annotation term) and ``H \subset \mathrm{All}`` (e.g. hits) is significant
 
 ```@raw html
-<img alt="Figure: Basic definitions" src="assets/method_defs.svg" width="80%"/>
+<img alt="Figure: Basic definitions" src="../assets/method_defs.svg" width="80%"/>
 ```
 
 ## [Cover quality](@id cover_quality)
