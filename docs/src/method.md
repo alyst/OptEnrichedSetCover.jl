@@ -18,6 +18,10 @@ Let
     [Fisher's Exact Test](https://en.wikipedia.org/wiki/Fisher%27s_exact_test) that the overlap
     of the sets ``A \subset \mathrm{All}`` (e.g. annotation term) and ``H \subset \mathrm{All}`` (e.g. hits) is significant
 
+```@raw html
+<img alt="Figure: Basic definitions" src="assets/method_defs.svg" width="80%"/>
+```
+
 ## [Cover quality](@id cover_quality)
 
 The method works by defining the *cover quality* ``q(C, \mathcal{X})`` of how well the selected
