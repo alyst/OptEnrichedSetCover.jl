@@ -10,11 +10,11 @@ export SetMosaic, CoverParams,
     AbstractOptimizerParams, MultiobjOptimizerParams,
     CoverEnumerationParams, CoverCollection, CoverProblemResult,
     nelements, ntiles, nsets, nmaskedsets, nmasks, nvars, nsolutions,
-    nmasked, nunmasked, maskedset,
+    nmasked, nunmasked, maskedset, overlap,
     tile, tiles, set, setsize,
     unmask, mask,
     set_relevance,
-    aggscore, score, # any conflicts
+    logpvalue, aggscore, score, # any conflicts
     best_aggscore, best_index, best_varweights, varweights,
     optimize # conflicts with Optim.jl
 

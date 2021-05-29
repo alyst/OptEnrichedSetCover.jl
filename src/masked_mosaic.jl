@@ -149,7 +149,7 @@ function mask(mosaic::SetMosaic{T}, elmasks::AbstractDict #= iterable with eltyp
               kwargs...) where T
     @assert valtype(elmasks) === Set{T}
     mask(mosaic, Bool[in(e, elmask::Set{T}) for e in mosaic.ix2elm, elmask in values(elmasks)];
-         mask_ids = keys(elmasks), kwargs...)
+         mask_ids = collect(keys(elmasks)), kwargs...)
 end
 
 """
@@ -164,8 +164,28 @@ nsets(mosaic::MaskedSetMosaic) = length(mosaic.set2masks) # only sets overlappin
 nsets(mosaic::MaskedSetMosaic, maskix::Int) = # number of sets overlapping with given mask
     mapreduce(olaps -> any(olap -> olap.mask == maskix), sum, values(mosaic.set2masks), init=0)
 nmasks(mosaic::MaskedSetMosaic) = length(mosaic.total_masked)
-nmasked(mosaic::MaskedSetMosaic, maskix::Int) = mosaic.total_masked[maskix]
-nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.total_masked[maskix]
+_nmasked(mosaic::MaskedSetMosaic, maskix::Int) = mosaic.total_masked[maskix]
+_nunmasked(mosaic::MaskedSetMosaic, maskix::Int) = nelements(mosaic) - mosaic.total_masked[maskix]
+
+nmasked(mosaic::MaskedSetMosaic, mask::Any) = _nmasked(mosaic, mosaic.mask2ix[mask])
+nunmasked(mosaic::MaskedSetMosaic, mask::Any) = _nunmasked(mosaic, mosaic.mask2ix[mask])
+
+function overlap(mosaic::MaskedSetMosaic, mask::Any, set::Any)
+    maskix = mosaic.mask2ix[mask]
+    setix = mosaic.original.set2ix[set]
+    olaps = get(mosaic.set2masks, setix, nothing)
+    isnothing(olaps) && return nothing
+    olapix = searchsortedfirst(olaps, MaskOverlap(maskix, -1, -1), by=x -> x.mask)
+    ((olapix > length(olaps)) || (olaps[olapix].mask != maskix)) && return nothing
+    return olaps[olapix]
+end
+
+function logpvalue(mosaic::MaskedSetMosaic, mask::Any, set::Any)
+    olap = overlap(mosaic, mask, set)
+    isnothing(olap) && return missing
+    return logpvalue(olap.nmasked, olap.nmasked + olap.nunmasked,
+                     nmasked(mosaic, mask), nelements(mosaic))
+end
 
 # copy everything, except the original mosaic (leave the reference to the same object)
 Base.copy(mosaic::MaskedSetMosaic) =

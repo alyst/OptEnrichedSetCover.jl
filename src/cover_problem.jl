@@ -70,7 +70,7 @@ end
 
 overlap_score(molap::MaskOverlap, setix::Int, mosaic::MaskedSetMosaic, params::CoverParams) =
     overlap_score(molap.nmasked, molap.nmasked + molap.nunmasked,
-                  nmasked(mosaic, molap.mask), nelements(mosaic),
+                  _nmasked(mosaic, molap.mask), nelements(mosaic),
                   mosaic.original.set_relevances[setix], params)
 
 var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.set2masks)))
