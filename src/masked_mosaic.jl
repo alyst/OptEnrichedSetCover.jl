@@ -110,7 +110,8 @@ Construct [`MaskedSetMosaic`](@ref) from the [`SetMosaic`] and the collection of
 function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
               mask_ids::Union{AbstractVector, AbstractSet, Nothing} = nothing,
               min_nmasked::Integer=1, max_setsize::Union{Integer, Nothing} = nothing,
-              max_overlap_logpvalue::Float64=0.0 # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+              max_overlap_logpvalue::Number=0.0, # 0.0 would accept any overlap (as log(Fisher Exact Test P-value))
+              max_min_overlap_logpvalue::Number=max_overlap_logpvalue
 )
     size(elmasks, 1) == nelements(mosaic) ||
         throw(ArgumentError("Elements mask rows ($(size(elmasks, 1))) should match the number of elements ($(nelements(mosaic)))"))
@@ -122,6 +123,7 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
     set2masks = Dict{Int, Vector{MaskOverlap}}()
     emptyoverlap = Vector{MaskOverlap}()
     ntotal = nelements(mosaic)
+    min_overlap_logpvalue = fill(0.0, size(nmasked_orgsets, 1))
     @inbounds for maskix in axes(nmasked_orgsets, 2)
         ntotal_masked = sum(view(elmasks, :, maskix))
         orgsets_mask = view(nmasked_orgsets, :, maskix)
@@ -131,10 +133,12 @@ function mask(mosaic::SetMosaic, elmasks::AbstractMatrix{Bool};
             (max_setsize !== nothing) && (nset > max_setsize) && continue # skip very big and generic sets
             overlap_pvalue = logpvalue(nmasked, nset, ntotal_masked, ntotal)
             (overlap_pvalue > max_overlap_logpvalue) && continue # skip non-signif overlaps
+            (overlap_pvalue < min_overlap_logpvalue[setix]) && (min_overlap_logpvalue[setix] = overlap_pvalue)
             setmasks = get!(() -> Vector{MaskOverlap}(), set2masks, setix)
             push!(setmasks, MaskOverlap(maskix, nmasked, setsize(mosaic, setix) - nmasked))
         end
     end
+    filter!(kv -> min_overlap_logpvalue[kv[1]] <= max_min_overlap_logpvalue, pairs(set2masks))
 
     return MaskedSetMosaic(mosaic, elmasks, set2masks, mask_ids)
 end
