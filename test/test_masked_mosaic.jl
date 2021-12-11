@@ -5,7 +5,7 @@
         sm = SetMosaic(Set{Symbol}[])
         msm = mask(sm, [Set{Symbol}()])
         @test msm isa MaskedSetMosaic
-        @test unmask(msm) == sm
+        @test originalmosaic(msm) == sm
         @test nelements(msm) == 0
         @test nsets(msm) == 0
         @test nmasks(msm) == 1
@@ -15,7 +15,7 @@
     @testset "empty but with elements" begin
         sm = SetMosaic(Set{Symbol}[], Set([:a, :b]))
         msm = mask(sm, [Set([:a])])
-        @test unmask(msm) == sm
+        @test originalmosaic(msm) == sm
         @test nelements(msm) == 2
         @test nsets(msm) == 0
         @test nmasks(msm) == 1
@@ -25,7 +25,7 @@
 
         # named
         nmsm = mask(sm, Dict(:X => Set([:a])))
-        @test unmask(nmsm) == sm
+        @test originalmosaic(nmsm) == sm
         @test nelements(nmsm) == 2
         @test nsets(nmsm) == 0
         @test nmasks(nmsm) == 1

@@ -157,11 +157,11 @@ function mask(mosaic::SetMosaic{T}, elmasks::AbstractDict #= iterable with eltyp
 end
 
 """
-    unmask(mosaic::MaskedSetMosaic) -> SetMosaic
+    originalmosaic(mosaic::MaskedSetMosaic) -> SetMosaic
 
 Get the original [`SetMosaic`](@ref).
 """
-unmask(mosaic::MaskedSetMosaic) = mosaic.original
+originalmosaic(mosaic::MaskedSetMosaic) = mosaic.original
 
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
 nsets(mosaic::MaskedSetMosaic) = length(mosaic.set2masks) # only sets overlapping with masks

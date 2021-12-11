@@ -13,7 +13,7 @@ export SetMosaic, CoverParams,
     nmasked, nunmasked, maskedset, overlap,
     tile, tiles, set, setsize,
     setidtype,
-    unmask, mask,
+    originalmosaic, mask,
     set_relevance,
     logpvalue, aggscore, score, # any conflicts
     best_aggscore, best_index, best_varweights, varweights,
