@@ -1,16 +1,16 @@
-# defines how to fold raw score into N components
-abstract type RawscoreFolding{N} end
+# defines how to fold detailed score into N components
+abstract type DetailedScoreFolding{N} end
 
 # soft Fold2D score
 const FoldedScore = NTuple{2, Float64}
 
-BlackBoxOptim.fitness_scheme_type(scorefold::RawscoreFolding) =
+BlackBoxOptim.fitness_scheme_type(scorefold::DetailedScoreFolding) =
     fitness_scheme_type(typeof(scorefold))
 
-BlackBoxOptim.fitness_scheme_type(::Type{SF}) where SF <: RawscoreFolding{N} where N =
+BlackBoxOptim.fitness_scheme_type(::Type{SF}) where SF <: DetailedScoreFolding{N} where N =
     ParetoFitnessScheme{N, Float64, true, MultiobjCoverProblemScoreAggregator{SF}}
 
-struct MultiobjCoverProblemScoreAggregator{SF <: RawscoreFolding}
+struct MultiobjCoverProblemScoreAggregator{SF <: DetailedScoreFolding}
     score_folding::SF
     setXset_factor::Float64
     uncovered_factor::Float64
@@ -26,11 +26,11 @@ end
 
 #=
 # no folding of fitness components
-struct MultiobjProblemNoFolding <: RawscoreFolding{4}
+struct MultiobjProblemNoFolding <: DetailedScoreFolding{4}
 end
-(::MultiobjProblemNoFolding)(fitness::RawScore) = fitness
+(::MultiobjProblemNoFolding)(fitness::DetailedScore) = fitness
 
-(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemNoFolding})(score::RawScore) =
+(agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemNoFolding})(score::DetailedScore) =
     score[1] + agg.setXset_factor * score[2] +
     agg.uncovered_factor * score[3] + agg.covered_factor * score[4]
 =#
@@ -48,7 +48,7 @@ See ["Cover score convolution"](@ref cover_score_convolution) section for the di
   * `ratio_threshold`: ``k_{\\max}``, defaults to 1
   * `shape`: ``\\alpha_k``, defaults to 0.5.
 """
-struct MultiobjProblemSoftFold2d <: RawscoreFolding{2}
+struct MultiobjProblemSoftFold2d <: DetailedScoreFolding{2}
     setXset_factor::Float64
     uncovered_factor::Float64
     covered_factor::Float64
@@ -62,7 +62,7 @@ struct MultiobjProblemSoftFold2d <: RawscoreFolding{2}
             ratio_threshold, shape)
 end
 
-function (f::MultiobjProblemSoftFold2d)(fitness::RawScore)
+function (f::MultiobjProblemSoftFold2d)(fitness::DetailedScore)
     a = fitness[1] +
         f.uncovered_factor * fitness[3] +
         f.covered_factor * fitness[4]
@@ -85,9 +85,9 @@ end
 
 #=
 # Sums uncovered (3rd) and covered (4th) components of the score into a single score
-# that to every score component mixes in the other 2 components with the weight k
+# that to every score component mixes in the other 2 components with the score k
 # The transform keeps the aggregated score intact
-struct MultiobjProblemFold3d <: RawscoreFolding{3}
+struct MultiobjProblemFold3d <: DetailedScoreFolding{3}
     k::Float64
     k_sXs::Float64
     k_u::Float64
@@ -104,7 +104,7 @@ struct MultiobjProblemFold3d <: RawscoreFolding{3}
             params.uncovered_factor > 0.0 ? params.covered_factor/params.uncovered_factor : 1.0)
 end
 
-function (f::MultiobjProblemFold3d)(fitness::RawScore)
+function (f::MultiobjProblemFold3d)(fitness::DetailedScore)
     a = fitness[1]
     b = fitness[2]
     c = fitness[3] + f.covered_factor * fitness[4]
@@ -114,7 +114,7 @@ function (f::MultiobjProblemFold3d)(fitness::RawScore)
 end
 
 (agg::MultiobjCoverProblemScoreAggregator{MultiobjProblemFold3d})(score::NTuple{3, Float64}) =
-    score[1] + agg.setXset_factor * score[2] + agg.uncovered_factor * score[3
+    score[1] + agg.setXset_factor * score[2] + agg.uncovered_factor * score[3]
 =#
 
 """
@@ -122,7 +122,7 @@ Multi-objective optimal Enriched-Set Cover problem.
 
 See ["Method Description"](@ref method) for more details.
 """
-struct MultiobjCoverProblem <: AbstractCoverProblem{RawScore}
+struct MultiobjCoverProblem <: AbstractCoverProblem{DetailedScore}
     params::CoverParams
 
     var2set::Vector{Int}
@@ -442,7 +442,7 @@ struct MultiobjCoverProblemBBOWrapper{SS <: RectSearchSpace} <:
 
     function MultiobjCoverProblemBBOWrapper(
         orig::MultiobjCoverProblem,
-        score_folding::RawscoreFolding,
+        score_folding::DetailedScoreFolding,
         dimdigits::Union{Integer,Nothing}=2
     )
         fitness_scheme = MultiobjCoverProblemFitnessScheme(
@@ -455,7 +455,7 @@ end
 Base.copy(problem::MultiobjCoverProblemBBOWrapper) =
     MultiobjCoverProblemBBOWrapper(problem.orig, dimdigits(search_space(problem), 1))
 #=
-BlackBoxOptim.show_fitness(io::IO, score::RawScore,
+BlackBoxOptim.show_fitness(io::IO, score::DetailedScore,
                            problem::MultiobjCoverProblemBBOWrapper{MultiobjProblemNoFolding}) =
     @printf(io, "(sets=%.3f set×set=%.3f uncovered=%.3f covered=%.3f)\n",
             score[1], score[2], score[3], score[4])
@@ -477,8 +477,8 @@ BlackBoxOptim.show_fitness(io::IO, score::FoldedScore,
 BlackBoxOptim.show_fitness(io::IO, score::IndexedTupleFitness, problem::MultiobjCoverProblemBBOWrapper) =
     BlackBoxOptim.show_fitness(io, score.orig, problem)
 
-fold_score(rawscore::NTuple{4, Float64}, p::MultiobjCoverProblemBBOWrapper) =
-    p.fitness_scheme.aggregator.score_folding(rawscore)
+fold_score(score::NTuple{4, Float64}, p::MultiobjCoverProblemBBOWrapper) =
+    p.fitness_scheme.aggregator.score_folding(score)
 
 BlackBoxOptim.fitness(x::BlackBoxOptim.AbstractIndividual,
                       p::MultiobjCoverProblemBBOWrapper) =
@@ -562,7 +562,7 @@ struct MultiobjCoverProblemResult
     varscores::Vector{Float64}  # scores of the sets
 
     varweights::Matrix{Float64} # weights of the vars for each solution on Pareto front
-    raw_scores::Vector{RawScore}# raw scores for each solution
+    raw_scores::Vector{DetailedScore}# raw scores for each solution
     folded_scores::Vector{FoldedScore}
     agg_scores::Vector{Float64}
     best_ix::Int                # index of the best solution (agg_score minimum)
@@ -649,7 +649,7 @@ function optimize(problem::MultiobjCoverProblem,
     if nvars(problem) == 0
         return MultiobjCoverProblemResult(
             Vector{Int}(), Vector{Float64}(), Matrix{Float64}(undef, 0, 0),
-            Vector{RawScore}(), Vector{FoldedScore}(), Vector{Float64}(), 0)
+            Vector{DetailedScore}(), Vector{FoldedScore}(), Vector{Float64}(), 0)
     end
 
     score_folding = MultiobjProblemSoftFold2d(problem.params, opt_params.fold_ratio_threshold)
