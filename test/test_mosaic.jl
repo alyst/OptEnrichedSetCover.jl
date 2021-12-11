@@ -70,8 +70,8 @@
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
-        @test tile_elms(sm, 1) == [:b]
-        @test tile_elms(sm, 2) == [:a]
+        @test tile_elms(sm, 1) == [:a]
+        @test tile_elms(sm, 2) == [:b]
         @test nsets(sm) ==2
     end
 
@@ -106,8 +106,8 @@
         @test nelements(sm) == 4
         @test ntiles(sm) == 3
         @test tile_elms(sm, 1) == [:a, :b]
-        @test tile_elms(sm, 2) == [:d]
-        @test tile_elms(sm, 3) == [:c]
+        @test tile_elms(sm, 2) == [:c]
+        @test tile_elms(sm, 3) == [:d]
         @test nsets(sm) == 3
     end
 

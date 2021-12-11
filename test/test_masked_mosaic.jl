@@ -29,8 +29,8 @@
         @test nelements(nmsm) == 2
         @test nsets(nmsm) == 0
         @test nmasks(nmsm) == 1
-        @test nmasked(nmsm, 1) == 1
-        @test nunmasked(nmsm, 1) == 1
+        @test nmasked(nmsm, :X) == 1
+        @test nunmasked(nmsm, :X) == 1
         @test nmsm.ix2mask == [:X]
     end
 
