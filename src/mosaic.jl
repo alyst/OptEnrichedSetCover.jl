@@ -177,6 +177,12 @@ struct SetMosaic{T,S}
     end
 end
 
+Base.eltype(::Type{SetMosaic{T, S}}) where {T, S} = T
+Base.eltype(mosaic::SetMosaic) = eltype(typeof(mosaic))
+
+setidtype(::Type{SetMosaic{T, S}}) where {T, S} = S
+setidtype(mosaic::SetMosaic) = setidtype(typeof(mosaic))
+
 """
     SetMosaic(sets, [all_elms::Set{T}],
               [set_relevances::AbstractVector{Float64}];

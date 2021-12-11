@@ -12,6 +12,7 @@ export SetMosaic, CoverParams,
     nelements, ntiles, nsets, nmaskedsets, nmasks, nvars, nsolutions,
     nmasked, nunmasked, maskedset, overlap,
     tile, tiles, set, setsize,
+    setidtype,
     unmask, mask,
     set_relevance,
     logpvalue, aggscore, score, # any conflicts

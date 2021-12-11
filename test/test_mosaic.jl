@@ -7,6 +7,11 @@
     @testset "no sets, no elements" begin
         sm = SetMosaic(Set{Symbol}[])
 
+        @test setidtype(SetMosaic{Char, Symbol}) === Symbol
+        @test eltype(SetMosaic{Char, Symbol}) === Char
+
+        @test setidtype(sm) === Int
+        @test eltype(sm) === Symbol
         @test nelements(sm) == 0
         @test ntiles(sm) == 0
         @test nsets(sm) == 0
