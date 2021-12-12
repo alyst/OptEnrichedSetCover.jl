@@ -12,7 +12,7 @@ export SetMosaic, CoverParams,
     nelements, ntiles, nsets, nmaskedsets, nmasks, nexperiments, nvars, nsolutions,
     nmasked, nunmasked, maskedset, overlap,
     tile, tiles, set, setsize,
-    setidtype,
+    setidtype, experimentidtype, weighttype,
     originalmosaic, mask,
     set_relevance,
     logpvalue, aggscore, score, # any conflicts
@@ -25,6 +25,7 @@ include("array_pool.jl")
 include("sparse_mask_matrix.jl")
 include("set_score.jl")
 include("mosaic.jl")
+include("weighted_mosaic.jl")
 include("masked_mosaic.jl")
 include("cover_problem.jl")
 include("multiobj_cover_problem_utils.jl")

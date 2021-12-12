@@ -59,7 +59,7 @@ for all the masked sets are squashed into a single tile.
 * `S`: the type of set ids
 * `E`: the type of experiment ids
 """
-mutable struct MaskedSetMosaic{T, S, E}
+mutable struct MaskedSetMosaic{T, S, E} <: AbstractWeightedSetMosaic{T, S, E, Float64}
     original::SetMosaic{T, S}       # original mosaic
     elmasks::BitMatrix              # elements×masks
     elunionmask::BitVector          # all masked elements
@@ -156,18 +156,13 @@ function mask(mosaic::SetMosaic{T}, elmasks::AbstractDict #= iterable with eltyp
          experiment_ids = collect(keys(elmasks)), kwargs...)
 end
 
-"""
-    originalmosaic(mosaic::MaskedSetMosaic) -> SetMosaic
-
-Get the original [`SetMosaic`](@ref).
-"""
-originalmosaic(mosaic::MaskedSetMosaic) = mosaic.original
-
 nelements(mosaic::MaskedSetMosaic) = nelements(mosaic.original)
 nsets(mosaic::MaskedSetMosaic) = length(mosaic.set2experiments) # only sets overlapping with masks
 nsets(mosaic::MaskedSetMosaic, expix::Int) = # number of sets overlapping with given mask
     mapreduce(olaps -> any(olap -> olap.mask == expix), sum, values(mosaic.set2experiments), init=0)
 nmasks(mosaic::MaskedSetMosaic) = length(mosaic.total_masked)
+nexperiments(mosaic::MaskedSetMosaic) = nmasks(mosaic)
+
 _nmasked(mosaic::MaskedSetMosaic, expix::Int) = mosaic.total_masked[expix]
 _nunmasked(mosaic::MaskedSetMosaic, expix::Int) = nelements(mosaic) - mosaic.total_masked[expix]
 

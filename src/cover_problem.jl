@@ -73,7 +73,7 @@ overlap_score(molap::MaskOverlap, setix::Int, mosaic::MaskedSetMosaic, params::C
                   _nmasked(mosaic, molap.expix), nelements(mosaic),
                   mosaic.original.set_relevances[setix], params)
 
-var2set(mosaic::MaskedSetMosaic) = sort!(collect(keys(mosaic.set2experiments)))
+var2set(mosaic::AbstractWeightedSetMosaic) = sort!(collect(keys(mosaic.set2experiments)))
 
 # prepares
 # 1) var scores
@@ -227,7 +227,7 @@ end
 varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
     ifelse(scale, -(-setXset)^params.set_shape * params.setXset_factor, setXset)
 
-function varXvar_scores(mosaic::MaskedSetMosaic, params::CoverParams,
+function varXvar_scores(mosaic::AbstractWeightedSetMosaic, params::CoverParams,
                         var2setix::AbstractVector{Int} = var2set(mosaic),
                         scale::Bool = false)
     vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2setix, var2setix], Ref(params), scale)
@@ -305,10 +305,10 @@ __check_vars(w::AbstractVector{Float64}, problem::AbstractCoverProblem) =
         throw(DimensionMismatch("Incorrect length of parameters vector: $(length(w)) ($(nvars(problem)) expected)"))
 
 function selectvars(problem::AbstractCoverProblem,
-                    mosaic::MaskedSetMosaic,
+                    _::AbstractWeightedSetMosaic,
                     weights::AbstractVector{Float64})
     @assert length(weights) == nvars(problem)
-    return findall(w -> w > problem.params.min_weight, weights) # > to make it work with min_weight=0
+    return findall(>(problem.params.min_weight), weights) # > to make it work with min_weight=0
 end
 
 abstract type AbstractOptimizerParams{P <: AbstractCoverProblem} end;

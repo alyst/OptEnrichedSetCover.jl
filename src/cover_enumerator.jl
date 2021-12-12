@@ -85,7 +85,7 @@ function setscore(covers::CoverCollection, setix::Int, selix::Int=0, solix::Int=
     end
 end
 
-nexperiments(covers::CoverCollection) = size(covers.elmasks, 2)
+nexperiments(covers::CoverCollection) = nexperiments(covers.mosaic)
 Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
@@ -118,7 +118,7 @@ Base.collect(mosaic::MaskedSetMosaic,
             OptimizerParams(problem_type, ParamsDict(optargs)),
             verbose)
 
-function Base.collect(mosaic::MaskedSetMosaic,
+function Base.collect(mosaic::AbstractWeightedSetMosaic,
                       cover_params::CoverParams,
                       enum_params::CoverEnumerationParams,
                       opt_params::AbstractOptimizerParams,
@@ -131,7 +131,7 @@ end
 # append the optimal covers of `cover_problem` into `cover_coll`
 function Base.append!(cover_coll::CoverCollection,
                       cover_problem::AbstractCoverProblem,
-                      mosaic::MaskedSetMosaic,
+                      mosaic::AbstractWeightedSetMosaic,
                       params::CoverEnumerationParams,
                       opt_params::AbstractOptimizerParams,
                       verbose::Bool=false
