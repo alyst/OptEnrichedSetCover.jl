@@ -134,6 +134,27 @@ end
 aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
     aggscore(score(w, problem), problem.params)
 
+# exclude given vars from the problem and
+# adjust the remaining scores
+function mask_vars(problem::MultiobjCoverProblem,
+                   vars::AbstractVector{Int};
+                   penalize_overlaps::Bool = true)
+    varmask = fill(true, nvars(problem))
+    varmask[vars] .= false
+    v_scores = problem.var_scores[varmask]
+    if penalize_overlaps
+        # penalize overlapping sets
+        pweights = fill(0.0, nvars(problem))
+        pweights[vars] .= 1.0
+        v_penalties = similar(pweights)
+        minplus_bilinear!(take2, v_penalties,
+                          problem.varXvar_scores,
+                          pweights, pweights)
+        v_scores .-= view(v_penalties, varmask) .* problem.params.setXset_factor
+    end
+    return varmask, v_scores
+end
+
 """
 Multi-objective optimal Enriched-Set Cover problem that uses MaskedSetMosaic
 to define the coverage scores based on the set weights and masked elements coverage.
@@ -190,21 +211,9 @@ ntiles(problem::MaskedSetCoverProblem) = length(problem.nmasked_tile)
 
 function exclude_vars(problem::MaskedSetCoverProblem,
                       vars::AbstractVector{Int};
-                      penalize_overlaps::Bool = true)
-    varmask = fill(true, nvars(problem))
-    varmask[vars] .= false
-    v_scores = problem.var_scores[varmask]
-    if penalize_overlaps
-        # penalize overlapping sets
-        pweights = fill(0.0, nvars(problem))
-        pweights[vars] .= 1.0
-        varscore_penalties = similar(pweights)
-        minplus_bilinear!(take2, varscore_penalties,
-                          problem.varXvar_scores,
-                          pweights, pweights)
-        v_scores .-= view(varscore_penalties, varmask) .* problem.params.setXset_factor
-    end
-    return MultiobjCoverProblem(problem.params,
+                      kwargs...)
+    varmask, v_scores = mask_vars(problem, vars; kwargs...)
+    return MaskedSetCoverProblem(problem.params,
                 problem.var2set[varmask],
                 v_scores, problem.varXvar_scores[varmask, varmask],
                 problem.tileXvar[:, varmask], # FIXME can also remove unused tiles
