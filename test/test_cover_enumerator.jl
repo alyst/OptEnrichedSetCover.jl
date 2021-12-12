@@ -56,15 +56,15 @@ global tested_problem_types = [:multiobjective]
                              CoverEnumerationParams(max_set_score=10.0),
                              problem_type=problem_type, ϵ=0.01)
 
-        df = DataFrame(cover_coll, sm)
+        df = DataFrame(cover_coll)
         @test size(df, 1) == 3
         @test df.cover_ix == [1, 1, 2]
         @test df.set_id == [1, 2, 4]
         @test df.experiment_ix == [1, 1, 1]
         @test df.experiment_id == [:X, :X, :X]
-        @test df == DataFrame(cover_coll, sm, min_nmasked=1)
+        @test df == DataFrame(cover_coll, min_nmasked=1)
 
-        df2 = DataFrame(cover_coll, sm, min_nmasked=0)
+        df2 = DataFrame(cover_coll, min_nmasked=0)
         @test size(df2, 1) == 3
         @test df2.cover_ix == [1, 1, 2]
         @test df2.set_id == [1, 2, 4]
@@ -87,7 +87,7 @@ global tested_problem_types = [:multiobjective]
                                 OESC.MultiobjOptimizerParams(ϵ=0.01),
                              false)
 
-        df = DataFrame(cover_coll, sm, best_only=true)
+        df = DataFrame(cover_coll, best_only=true)
         @test size(df, 1) == 8
         @test df.cover_ix == [1, 1, 1, 1, 2, 2, 3, 3]
         @test df.experiment_ix == [1, 2, 1, 2, 1, 2, 1, 2]

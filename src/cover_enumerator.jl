@@ -16,26 +16,27 @@ end
 """
 The collection of masked set covers.
 """
-struct CoverCollection
+struct CoverCollection{M <: AbstractWeightedSetMosaic}
     cover_params::CoverParams
     enum_params::CoverEnumerationParams
-    total_masked::Vector{Int}         # total masked elements in the mosaic
-    ix2experiment::Vector             # vector of experiment Ids, copied from masked mosaic
-    elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
-    setixs::Vector{Int}               # sets referenced by the MaskedSetMosaic
+    setixs::Vector{Int}               # sets referenced by the problem (global ixs from SetMosaic)
     base_selscores::Vector{Float64}   # base selected set scores
     sel2cover::Vector{Int}            # best-scoring cover for the given selected set
+
+    mosaic::M
+
     results::Vector{MultiobjCoverProblemResult}
 
-    function CoverCollection(problem::MultiobjCoverProblem, mosaic::MaskedSetMosaic,
-                             params::CoverEnumerationParams)
+    function CoverCollection(problem::MultiobjCoverProblem, mosaic::M,
+                             params::CoverEnumerationParams
+    ) where M <: AbstractWeightedSetMosaic
         # check the problem is compatible with the mosaic
         nvars(problem) == nsets(mosaic) ||
                 throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of vars and sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new(problem.params, params, mosaic.total_masked, mosaic.ix2experiment, mosaic.elmasks,
-            problem.var2set, copy(problem.var_scores), zeros(Int, nvars(problem)),
-            Vector{MultiobjCoverProblemResult}())
+        new{M}(problem.params, params,
+               problem.var2set, copy(problem.var_scores), zeros(Int, nvars(problem)),
+               mosaic, Vector{MultiobjCoverProblemResult}())
     end
 end
 
@@ -237,15 +238,15 @@ end
 """
 Convert `covers`, a collection of the covers of `mosaic`, into a `DataFrame`.
 """
-function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
+function DataFrames.DataFrame(covers::CoverCollection{<:MaskedSetMosaic};
                               min_nmasked::Integer=0, min_weight::Real=0.0,
                               best_only::Bool=true, params::Union{CoverParams, Nothing} = nothing)
     # collect all sets that are covered in at least one mask
-    selsets = Set{Int}(covers.setixs)
     nexps = nexperiments(covers)
+    mosaic = originalmosaic(covers.mosaic)
     selsize_v = setsize.(Ref(mosaic), covers.setixs)
     set2sel = Dict(zip(covers.setixs, eachindex(covers.setixs)))
-    nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2sel)
+    nmasked_mtx = nmasked_perset(mosaic, covers.mosaic.elmasks, set2sel)
     coverix_v = Vector{Int}()
     setix_v = Vector{Int}()
     expix_v = Vector{Int}()
@@ -279,7 +280,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
                 push!(nmasked_v, nmasked_mtx[selix, expix])
                 push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
                 push!(set_overlap_logpvalue_v, logpvalue(last(nmasked_v), selsize_v[selix],
-                                                         covers.total_masked[expix], nelements(mosaic)))
+                                                         covers.mosaic.total_masked[expix], nelements(mosaic)))
             end
         end
     end
@@ -287,7 +288,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
               set_ix = setix_v,
               set_id = mosaic.ix2set[setix_v],
               experiment_ix = expix_v,
-              experiment_id = covers.ix2experiment[expix_v],
+              experiment_id = covers.mosaic.ix2experiment[expix_v],
               cover_total_score = cover_total_score_v,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
