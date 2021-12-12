@@ -297,3 +297,58 @@ function DataFrames.DataFrame(covers::CoverCollection{<:MaskedSetMosaic};
               set_cover_score = set_cover_score_v,
               set_overlap_log10pvalue = set_overlap_logpvalue_v ./ log(10))
 end
+
+function DataFrames.DataFrame(covers::CoverCollection{<:WeightedSetMosaic};
+                              min_weight::Real=0.0,
+                              best_only::Bool=true, params::Union{CoverParams, Nothing} = nothing)
+    # collect all sets that are covered in at least one mask
+    nexps = nexperiments(covers)
+    mosaic = originalmosaic(covers.mosaic)
+    set2sel = Dict(zip(covers.setixs, eachindex(covers.setixs)))
+    coverix_v = Vector{Int}()
+    setix_v = Vector{Int}()
+    expix_v = Vector{Int}()
+    weight_v = Vector{Float64}()
+    cover_total_score_v = Vector{Float64}()
+    set_cover_score_v = Vector{Float64}()
+    set_orig_weight_v = Vector{Union{Missing, Float64}}()
+
+    @inbounds for (coverix, cover) in enumerate(covers.results)
+        sol_ix = best_index(cover, params)
+        sol_aggscore = params === nothing ?
+                       best_aggscore(cover) :
+                       aggscore(cover.scores[sol_ix], params)
+        sol_varweights = varweights(cover, sol_ix)
+        for (varix, setix) in enumerate(cover.var2set)
+            selix = set2sel[setix]
+            loc_setix = covers.mosaic.glob2loc_setix[setix]
+            set_weight = sol_varweights[varix]
+            set_weight <= min_weight && continue
+            set_score = setscore(covers, setix, cover, selix, sol_ix, varix)
+            best_only && covers.sel2cover[selix] != coverix && continue
+            for expix in 1:nexps
+                # FIXME filter by max_weight
+                #min_nmasked > 0 && nmasked_mtx[selix, maskix] < min_nmasked && continue
+                # FIXME original weights before filtering?
+                origw = _setweight(covers.mosaic, loc_setix, expix, filter=false)
+                push!(coverix_v, coverix)
+                push!(setix_v, setix)
+                push!(expix_v, expix)
+                push!(weight_v, set_weight)
+                push!(cover_total_score_v, sol_aggscore)
+                push!(set_cover_score_v, set_score)
+                push!(set_orig_weight_v, origw)
+            end
+        end
+    end
+    DataFrame(cover_ix = coverix_v,
+              set_ix = setix_v,
+              set_id = mosaic.ix2set[setix_v],
+              experiment_ix = expix_v,
+              experiment_id = covers.mosaic.ix2experiment[expix_v],
+              cover_total_score = cover_total_score_v,
+              set_relevance = mosaic.set_relevances[setix_v],
+              set_weight = weight_v,
+              set_cover_score = set_cover_score_v,
+              set_original_weight = set_orig_weight_v)
+end

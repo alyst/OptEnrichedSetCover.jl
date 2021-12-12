@@ -94,4 +94,33 @@ global tested_problem_types = [:multiobjective]
         @test df.experiment_id == [:X, :Y, :X, :Y, :X, :Y, :X, :Y]
         @test df.set_id == ["c", "c", "abd", "abd", "abcde", "abcde", "bcd", "bcd"]
     end
+
+    @testset "multiexperiment weighteed: [abd bcd c d abcde cde]" begin # FIXME take weights into account
+        sm = SetMosaic(Dict("abd" => Set([:a, :b, :d]), "bcd" => Set([:b, :c, :d]),
+                            "c" => Set([:c]), "d" => Set([:d]),
+                            "abcde" => Set([:a, :b, :c, :d, :e]),
+                            "cdef" => Set([:c, :d, :e, :f])),
+                        Set([:a, :b, :c, :d, :e, :f]))
+        sm_abc_be = assignweights(sm, Dict(:X => Dict("abd" => -5.0, "bcd" => -5.0,
+                                                      "c" => -2.0, "abcd" => -6.0,
+                                                      "cdef" => -3.0),
+                                           :Y => Dict("abd" => -1.0, "bcd" => -1.0,
+                                                      "abcde" => -4.0, "cdef" => -2.0)))
+
+        # higher prior probability to select sets, high overlap penalty,
+        # high penalty for covering unmasked, so select [abd c], [bcd] and [abcde]
+        cover_coll = collect(sm_abc_be, CoverParams(setXset_factor=1.0, covered_factor=0.05, uncovered_factor=0.1, sel_tax=-log(0.9)),
+                             CoverEnumerationParams(max_set_score=0.0),
+                             problem_type==:quadratic ?
+                                OESC.QuadraticOptimizerParams() :
+                                OESC.MultiobjOptimizerParams(ϵ=0.01),
+                             false)
+
+        df = DataFrame(cover_coll, best_only=true)
+        @test size(df, 1) == 8
+        @test df.cover_ix == [1, 1, 1, 1, 2, 2, 3, 3]
+        @test df.experiment_ix == [1, 2, 1, 2, 1, 2, 1, 2]
+        @test df.experiment_id == [:X, :Y, :X, :Y, :X, :Y, :X, :Y]
+        @test df.set_id == ["c", "c", "abd", "abd", "abcde", "abcde", "bcd", "bcd"]
+    end
 end

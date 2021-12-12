@@ -189,4 +189,97 @@
         res_low_sXs = optimize(prob_low_sXs, MultiobjOptimizerParams(ϵ=[0.001, 0.001]))
         @test best_varweights(res_low_sXs) ≈ [1.0, 1.0, 1.0, 1.0, 0.0] atol=1E-2# [1.0, 0.0, 1.0, 1.0, 0.0] atol=1E-2
     end
+
+    @testset "WeightedSetMosaic-based problem" begin
+        @testset "empty" begin
+            sm = SetMosaic(Set{Symbol}[])
+            wsm = assignweights(sm, [Dict{Int, Float64}()])
+            problem = MultiobjCoverProblem(wsm)
+            @test nvars(problem) == 0
+            @test_skip nexperiments(problem) == 1
+            @test_throws DimensionMismatch score([1.0], problem)
+            @test score(Float64[], problem) == (0.0, 0.0, 0.0, 0.0)
+            @test aggscore(Float64[], problem) == 0.0
+
+            res = optimize(problem)
+            @test isempty(res)
+            @test nvars(res) == 0
+            @test nsolutions(res) == 0
+            @test best_index(res) == 0
+        end
+
+        @testset "[a]" begin # FIXME take element detection probability into account
+            # empty mask problem
+            empty_prob = MultiobjCoverProblem(assignweights(SetMosaic([Set([:a])]), [Dict{Int, Float64}()]))
+            @test nvars(empty_prob) == 0
+            @test score(Float64[], empty_prob) == (0.0, 0.0, 0.0, 0.0)
+            @test aggscore(Float64[], empty_prob) == 0.0
+            empty_res = optimize(empty_prob)
+            @test isempty(empty_res)
+            @test nvars(empty_res) == 0
+            @test nsolutions(empty_res) == 0
+
+            # enabled because sel prob is high, and although :a is all elements it needs to be covered
+            prob1_mosaic = assignweights(SetMosaic([Set([:a])], Set([:a])), [Dict(1 => -1.0)])
+            en1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_tax=-log(0.5), uncovered_factor=1.0))
+            @test nvars(en1_prob) == 1
+            @test_throws DimensionMismatch score(Float64[], en1_prob)
+            en1_score = score([1.0], en1_prob)
+            @test en1_score == (en1_prob.var_scores[1], 0.0, 0.0, 0.0)
+            @test score([0.0], en1_prob) == (0.0, 0.0, 1.0, 0.0)
+            @test en1_score[1] < 1.0 # score[3] at [0.0], required for enabling
+            @test score([0.5], en1_prob) == (0.5*en1_prob.var_scores[1], 0.0, 0.5, 0.0)
+            @test aggscore([1.0], en1_prob) < aggscore([0.9], en1_prob) <
+                aggscore([0.5], en1_prob) < aggscore([0.0], en1_prob)
+            en1_res = optimize(en1_prob, MultiobjOptimizerParams(ϵ=0.001))
+            @test nsolutions(en1_res) > 0
+            @test nvars(en1_res) == 1
+            @test best_varweights(en1_res) == ones(Float64, 1)
+
+            # disabled because the weight is zero
+            dis1_prob = MultiobjCoverProblem(prob1_mosaic, CoverParams(sel_tax=-log(0.01), uncovered_factor=1.0))
+            @test nvars(dis1_prob) == 1
+            @test dis1_prob.var_scores[1] > en1_prob.var_scores[1]
+            dis1_score = score([1.0], dis1_prob)
+            @test dis1_score == (dis1_prob.var_scores[1], 0.0, 0.0, 0.0)
+            @test score([0.0], dis1_prob) == (0.0, 0.0, 1.0, 0.0)
+            @test dis1_score[1] > 1.0 # score[3] at [0.0], required for disabling
+            @test aggscore([1.0], dis1_prob) > aggscore([0.5], dis1_prob) > aggscore([0.0], dis1_prob)
+            dis1_res = optimize(dis1_prob)
+            @test nsolutions(dis1_res) > 0
+            @test nvars(dis1_res) == 1
+            @test best_varweights(dis1_res) == zeros(Float64, 1)
+
+            # enabled because the weight is negative
+            prob2_mosaic = assignweights(SetMosaic([Set([:a])], Set([:a])), [Dict(1 =>  -1)])
+            en2_prob = MultiobjCoverProblem(prob2_mosaic, CoverParams(sel_tax=-log(0.9)))
+            @test nvars(en2_prob) == 1
+            en2_res = optimize(en2_prob)
+            @test nsolutions(en2_res) > 0
+            @test nvars(en2_res) == 1
+            @test best_varweights(en2_res) == ones(Float64, 1)
+        end
+
+        @testset "[a b] [c d] [a b c d], mask=[a b]" begin # FIXME take weights into account
+            sm = SetMosaic([Set([:a, :b]), Set([:c, :d]), Set([:a, :b, :c])])
+            sm_ab = assignweights(sm, [Dict(1 => -5, 3 => -3)])
+
+            problem_def = MultiobjCoverProblem(sm_ab) # cd set is dropped
+
+            @test OESC.var_scores([0.0, 0.0], problem_def) == (0.0, 0.0)
+            @test OESC.var_scores([1.0, 0.0], problem_def)[2] == 0.0
+            @test OESC.var_scores([0.0, 1.0], problem_def)[2] == 0.0
+            @test OESC.var_scores([1.0, 1.0], problem_def)[2] > 0
+
+            res_def = optimize(problem_def)
+            @test nsolutions(res_def) > 0
+            @test best_varweights(res_def) ≈ [1.0, 0.0] atol=0.01
+
+            problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_tax=0.0))
+            @test nvars(problem_no_penalty) == 2
+            res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.001, 0.001], WeightDigits=nothing))
+            @test nvars(res_no_penalty) == 2
+            @test best_varweights(res_no_penalty) ≈ [1.0, 1.0] atol=0.01
+        end
+    end
 end

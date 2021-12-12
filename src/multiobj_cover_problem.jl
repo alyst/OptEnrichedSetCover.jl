@@ -281,3 +281,43 @@ function score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
     end
     return (a, b, c, d)
 end
+
+struct WeightedSetCoverProblem <: MultiobjCoverProblem
+    params::CoverParams
+
+    var2set::Vector{Int}
+
+    var_scores::Vector{Float64}
+    varXvar_scores::Matrix{Float64}
+
+    arrpool::ArrayPool{Float64}   # pool of vectors to reuse for evaluation FIXME move to evaluator
+
+    function WeightedSetCoverProblem(params::CoverParams,
+                        var2set::AbstractVector{Int},
+                        var_scores::AbstractVector{Float64},
+                        varXvar_scores::AbstractMatrix{Float64},
+    )
+        length(var2set) == length(var_scores) ==
+            size(varXvar_scores, 1) == size(varXvar_scores, 2)
+        new(params, var2set, var_scores, varXvar_scores, ArrayPool{Float64}())
+    end
+end
+
+function MultiobjCoverProblem(mosaic::WeightedSetMosaic, params::CoverParams = CoverParams())
+    v2set = var2set(mosaic)
+    WeightedSetCoverProblem(params, mosaic.loc2glob_setix[v2set],
+                            var_scores(mosaic, params, v2set),
+                            varXvar_scores(mosaic, params, v2set, false))
+end
+
+function exclude_vars(problem::WeightedSetCoverProblem,
+                      vars::AbstractVector{Int};
+                      kwargs...)
+    varmask, v_scores = mask_vars(problem, vars; kwargs...)
+    return WeightedSetCoverProblem(problem.params,
+                problem.var2set[varmask],
+                v_scores, problem.varXvar_scores[varmask, varmask])
+end
+
+score(w::AbstractVector{Float64}, problem::WeightedSetCoverProblem) =
+    var_scores(w, problem)..., 0.0, 0.0
