@@ -147,7 +147,7 @@ function Base.append!(cover_coll::CoverCollection,
             verbose && @info("No covers")
             break
         end
-        verbose && @info("New cover found (score=$(cur_cover.raw_scores[best_index(cur_cover)]), aggscore=$(best_aggscore(cur_cover))), processing...")
+        verbose && @info("New cover found (score=$(cur_cover.scores[best_index(cur_cover)]), aggscore=$(best_aggscore(cur_cover))), processing...")
         used_varixs = findall(w -> w > cover_problem.params.min_weight, best_varweights(cur_cover))
         if isempty(used_varixs)
             verbose && @info("Cover is empty")
@@ -260,7 +260,7 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
         sol_ix = best_index(cover, params)
         sol_aggscore = params === nothing ?
                        best_aggscore(cover) :
-                       aggscore(cover.raw_scores[sol_ix], params)
+                       aggscore(cover.scores[sol_ix], params)
         sol_varweights = varweights(cover, sol_ix)
         for (varix, setix) in enumerate(cover.var2set)
             selix = set2sel[setix]

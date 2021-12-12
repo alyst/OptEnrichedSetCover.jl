@@ -29,6 +29,7 @@ include("masked_mosaic.jl")
 include("cover_problem.jl")
 include("multiobj_cover_problem_utils.jl")
 include("multiobj_cover_problem.jl")
+include("multiobj_cover_problem_bbo.jl")
 include("cover_enumerator.jl")
 include("parallel.jl")
 
