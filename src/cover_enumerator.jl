@@ -20,7 +20,7 @@ struct CoverCollection
     cover_params::CoverParams
     enum_params::CoverEnumerationParams
     total_masked::Vector{Int}         # total masked elements in the mosaic
-    ix2mask::Vector                   # vector of mask IDs, copied from masked mosaic mask
+    ix2experiment::Vector             # vector of experiment Ids, copied from masked mosaic
     elmasks::BitMatrix                # FIXME the elements mask, a workaround to avoid copying the whole mosaic upon serialization
     setixs::Vector{Int}               # sets referenced by the MaskedSetMosaic
     base_selscores::Vector{Float64}   # base selected set scores
@@ -33,7 +33,7 @@ struct CoverCollection
         nvars(problem) == nsets(mosaic) ||
                 throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of vars and sets differ"))
         #nmasks(problem) == nmasks(mosaic) || throw(ArgumentError("CoverProblem is not compatible to the MaskedSetMosaic: number of masks differ"))
-        new(problem.params, params, mosaic.total_masked, mosaic.ix2mask, mosaic.elmasks,
+        new(problem.params, params, mosaic.total_masked, mosaic.ix2experiment, mosaic.elmasks,
             problem.var2set, copy(problem.var_scores), zeros(Int, nvars(problem)),
             Vector{MultiobjCoverProblemResult}())
     end
@@ -85,7 +85,7 @@ function setscore(covers::CoverCollection, setix::Int, selix::Int=0, solix::Int=
     end
 end
 
-nmasks(covers::CoverCollection) = size(covers.elmasks, 2)
+nexperiments(covers::CoverCollection) = size(covers.elmasks, 2)
 Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
@@ -242,13 +242,13 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
                               best_only::Bool=true, params::Union{CoverParams, Nothing} = nothing)
     # collect all sets that are covered in at least one mask
     selsets = Set{Int}(covers.setixs)
-    nmasks = size(covers.elmasks, 2)
+    nexps = nexperiments(covers)
     selsize_v = setsize.(Ref(mosaic), covers.setixs)
     set2sel = Dict(zip(covers.setixs, eachindex(covers.setixs)))
     nmasked_mtx = nmasked_perset(mosaic, covers.elmasks, set2sel)
     coverix_v = Vector{Int}()
     setix_v = Vector{Int}()
-    maskix_v = Vector{Int}()
+    expix_v = Vector{Int}()
     nmasked_v = Vector{Int}()
     nunmasked_v = Vector{Int}()
     weight_v = Vector{Float64}()
@@ -268,26 +268,26 @@ function DataFrames.DataFrame(covers::CoverCollection, mosaic::SetMosaic;
             set_weight <= min_weight && continue
             set_score = setscore(covers, setix, cover, selix, sol_ix, varix)
             best_only && covers.sel2cover[selix] != coverix && continue
-            for maskix in 1:nmasks
-                min_nmasked > 0 && nmasked_mtx[selix, maskix] < min_nmasked && continue
+            for expix in 1:nexps
+                min_nmasked > 0 && nmasked_mtx[selix, expix] < min_nmasked && continue
                 push!(coverix_v, coverix)
                 push!(setix_v, setix)
-                push!(maskix_v, maskix)
+                push!(expix_v, expix)
                 push!(weight_v, set_weight)
                 push!(cover_total_score_v, sol_aggscore)
                 push!(set_cover_score_v, set_score)
-                push!(nmasked_v, nmasked_mtx[selix, maskix])
+                push!(nmasked_v, nmasked_mtx[selix, expix])
                 push!(nunmasked_v, selsize_v[selix] - last(nmasked_v))
                 push!(set_overlap_logpvalue_v, logpvalue(last(nmasked_v), selsize_v[selix],
-                                                         covers.total_masked[maskix], nelements(mosaic)))
+                                                         covers.total_masked[expix], nelements(mosaic)))
             end
         end
     end
     DataFrame(cover_ix = coverix_v,
               set_ix = setix_v,
               set_id = mosaic.ix2set[setix_v],
-              mask_ix = maskix_v,
-              mask_id = covers.ix2mask[maskix_v],
+              experiment_ix = expix_v,
+              experiment_id = covers.ix2experiment[expix_v],
               cover_total_score = cover_total_score_v,
               nmasked = nmasked_v,
               nunmasked = nunmasked_v,
