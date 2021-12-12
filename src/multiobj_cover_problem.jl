@@ -118,11 +118,29 @@ end
 =#
 
 """
-Multi-objective optimal Enriched-Set Cover problem.
+Abstract multi-objective optimal Enriched-Set Cover problem.
 
 See ["Method Description"](@ref method) for more details.
 """
-struct MultiobjCoverProblem <: AbstractCoverProblem{DetailedScore}
+abstract type MultiobjCoverProblem <: AbstractCoverProblem{DetailedScore} end
+
+function score_scales(problem::MultiobjCoverProblem)
+    w_min, w_max = extrema(problem.var_scores)
+    sXs_min, sXs_max = length(problem.varXvar_scores) > 1 ? (Inf, -Inf) : (0.0, 0.0)
+    return (max(w_max - w_min, 0.1),
+            max(sXs_max - sXs_min, 0.1))
+end
+
+aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
+    aggscore(score(w, problem), problem.params)
+
+"""
+Multi-objective optimal Enriched-Set Cover problem that uses MaskedSetMosaic
+to define the coverage scores based on the set weights and masked elements coverage.
+
+See ["Method Description"](@ref method) for more details.
+"""
+struct MaskedSetCoverProblem <: MultiobjCoverProblem
     params::CoverParams
 
     var2set::Vector{Int}
@@ -137,7 +155,7 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{DetailedScore}
 
     arrpool::ArrayPool{Float64}   # pool of vectors to reuse for evaluation FIXME move to evaluator
 
-    function MultiobjCoverProblem(params::CoverParams,
+    function MaskedSetCoverProblem(params::CoverParams,
                         var2set::AbstractVector{Int},
                         var_scores::AbstractVector{Float64},
                         varXvar_scores::AbstractMatrix{Float64},
@@ -159,18 +177,6 @@ struct MultiobjCoverProblem <: AbstractCoverProblem{DetailedScore}
     end
 end
 
-ntiles(problem::MultiobjCoverProblem) = length(problem.nmasked_tile)
-
-function score_scales(problem::MultiobjCoverProblem)
-    w_min, w_max = extrema(problem.var_scores)
-    sXs_min, sXs_max = length(problem.varXvar_scores) > 1 ? (Inf, -Inf) : (0.0, 0.0)
-    return (max(w_max - w_min, 0.1),
-            max(sXs_max - sXs_min, 0.1))
-end
-
-aggscore(w::AbstractVector{Float64}, problem::MultiobjCoverProblem) =
-    aggscore(score(w, problem), problem.params)
-
 function MultiobjCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     v2set = var2set(mosaic)
     v_scores, tXv, mtXv, nmasked_tile, nunmasked_tile = var_scores_and_Xtiles(mosaic, params, v2set)
@@ -180,7 +186,9 @@ function MultiobjCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = Cov
                          tXv, mtXv, nmasked_tile, nunmasked_tile)
 end
 
-function exclude_vars(problem::MultiobjCoverProblem,
+ntiles(problem::MaskedSetCoverProblem) = length(problem.nmasked_tile)
+
+function exclude_vars(problem::MaskedSetCoverProblem,
                       vars::AbstractVector{Int};
                       penalize_overlaps::Bool = true)
     varmask = fill(true, nvars(problem))
@@ -207,7 +215,7 @@ end
 # the tuple of:
 # - total number of uncovered masked elements (in all masks overlapping with the cover)
 # - total number of covered unmasked elements (in all masks overlapping with the cover)
-function miscover_score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
+function miscover_score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
     __check_vars(w, problem)
     isempty(problem.nmasked_tile) && return (0.0, 0.0)
     # calculate the tile coverage weights
@@ -238,7 +246,7 @@ Unfolded multiobjective score (fitness) of the OESC coverage.
 
 See ["Cover quality"](@ref cover_quality).
 """
-function score(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
+function score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
     __check_vars(w, problem)
     a = dot(problem.var_scores, w)
     if problem.params.setXset_factor == 0.0
