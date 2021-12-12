@@ -41,8 +41,9 @@
         @test score([0.0], en1_prob) == (0.0, 0.0, 1.0, 0.0)
         @test en1_score[1] < 1.0 # score[3] at [0.0], required for enabling
         @test score([0.5], en1_prob) == (0.5*en1_prob.var_scores[1], 0.0, 0.5, 0.0)
-        @test aggscore([1.0], en1_prob) < aggscore([0.9], en1_prob) < aggscore([0.5], en1_prob) < aggscore([0.0], en1_prob)
-        en1_res = optimize(en1_prob, MultiobjOptimizerParams(ϵ=0.01))
+        @test aggscore([1.0], en1_prob) < aggscore([0.9], en1_prob) <
+              aggscore([0.5], en1_prob) < aggscore([0.0], en1_prob)
+        en1_res = optimize(en1_prob, MultiobjOptimizerParams(ϵ=0.001))
         @test nsolutions(en1_res) > 0
         @test nvars(en1_res) == 1
         @test best_varweights(en1_res) == ones(Float64, 1)
@@ -78,12 +79,17 @@
 
         problem_def = MultiobjCoverProblem(sm_ab) # cd set is dropped
 
+        @test OESC.var_scores([0.0, 0.0], problem_def) == (0.0, 0.0)
+        @test OESC.var_scores([1.0, 0.0], problem_def)[2] == 0.0
+        @test OESC.var_scores([0.0, 1.0], problem_def)[2] == 0.0
+        @test OESC.var_scores([1.0, 1.0], problem_def)[2] > 0
+
         @test OESC.miscover_score([0.0, 0.0], problem_def) == (2.0, 0.0)
         @test OESC.miscover_score([0.25, 0.0], problem_def) == (1.5, 0.0)
         @test OESC.miscover_score([0.75, 0.0], problem_def) == (0.5, 0.0)
         @test OESC.miscover_score([1.0, 0.0], problem_def) == (0.0, 0.0)
-        @test OESC.miscover_score([1.0, 1.0], problem_def) == (0.0, 1.0)
         @test OESC.miscover_score([0.0, 1.0], problem_def) == (0.0, 1.0)
+        @test OESC.miscover_score([1.0, 1.0], problem_def) == (0.0, 1.0)
 
         res_def = optimize(problem_def)
         @test nsolutions(res_def) > 0
@@ -91,7 +97,7 @@
 
         problem_no_penalty = MultiobjCoverProblem(sm_ab, CoverParams(setXset_factor=0.0, covered_factor=0.0, sel_tax=0.0))
         @test nvars(problem_no_penalty) == 2
-        res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.01, 0.01], WeightDigits=nothing))
+        res_no_penalty = optimize(problem_no_penalty, MultiobjOptimizerParams(ϵ=[0.001, 0.001], WeightDigits=nothing))
         @test nvars(res_no_penalty) == 2
         @test best_varweights(res_no_penalty) ≈ [1.0, 1.0] atol=0.01
     end
@@ -164,7 +170,7 @@
         @test OESC.miscover_score([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (5.0, 0.0)
         @test OESC.miscover_score([1.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0 + 0.9 * 2.0)
         @test OESC.miscover_score([0.0, 1.0, 0.0, 0.0, 0.0], prob_hi_sXs) == (2.0, 1.0 + 0.9 * 2.0)
-        @test OESC.miscover_score([0.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) == (4.0, 0.0 + 0.0 * 1.0)
+        @test OESC.miscover_score([0.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) == (4.0, 0.0 + 0.9 * 1.0)
 
         @test aggscore([1.0, 0.0, 1.0, 0.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)
         @test aggscore([0.0, 0.0, 0.0, 1.0, 0.0], prob_hi_sXs) < aggscore([0.0, 0.0, 0.0, 0.0, 0.0], prob_hi_sXs)

@@ -68,58 +68,82 @@ function overlap_score(masked::Number, set::Number, total_masked::Number, total:
     return res
 end
 
-overlap_score(molap::MaskOverlap, setix::Int, mosaic::MaskedSetMosaic, params::CoverParams) =
-    overlap_score(molap.nmasked, molap.nmasked + molap.nunmasked,
-                  _nmasked(mosaic, molap.expix), nelements(mosaic),
-                  mosaic.original.set_relevances[setix], params)
+function _setweight(mosaic::AbstractWeightedSetMosaic,
+                    setix::Integer, expix::Integer,
+                    relevance::Number, params::CoverParams;
+                    filter::Bool = true)
+    w = _setweight(mosaic, setix, expix, filter=filter)
+    ismissing(w) && return w
+    res = -(-w)^params.set_shape *
+            max(relevance^params.set_relevance_shape, params.set_relevance_min) #-
+    #= P-value for unmasked-vs-set overlap enriched =# #logpvalue(set - masked, set, total - total_masked, total)
+    @assert !isnan(res) "masked=$masked set=$set total_masked=$total_masked total=$total relevance=$relevance res=NaN"
+    return res
+end
 
-var2set(mosaic::AbstractWeightedSetMosaic) = sort!(collect(keys(mosaic.set2experiments)))
+var2set(mosaic::AbstractWeightedSetMosaic) = eachindex(mosaic.loc2glob_setix)
 
-# prepares
-# 1) var scores
-# 2) tile-to-var mapping (SparseMaskMatrix, only relevant tiles are considered)
-# 3) var-to-(tile-in-mask) mapping (SparseMatrixCSC, only relevant tiles are considered)
-# 4) the total number of masked elements in all masks for each tile
-# 5) the total number of unmasked elements in all active masks (overlapping with the tile) for each tile
+# calculates var scores
 # var score is:
 # the sum of overlap scores with all masked sets
 # minus the log(var selection probability)
 # plus nets*log(nsets), where nsets arr all masked sets overlapping with var
-function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
-                               var2setix::AbstractVector{Int} = var2set(mosaic))
+function var_scores(mosaic::AbstractWeightedSetMosaic, params::CoverParams,
+                    var2setix::AbstractVector{Int} = var2set(mosaic))
+    # find relevant tiles and
+    # sum masked elements per tile in all masks and unmasked elements per tile in union mask
+    # note: in masks there could be element not covered by any set/tile, so these counts refer to coverable elements
+    # calculate the sum of scores of given set in each mask
+    v_scores = Vector{Float64}(undef, length(var2setix))
+    scores = Vector{Float64}() # temp array containing var overlap scores for each mask it overlaps
+
+    @inbounds for (varix, setix) in enumerate(var2setix)
+        empty!(scores)
+        glob_setix = mosaic.loc2glob_setix[setix]
+        setrelevance = originalmosaic(mosaic).set_relevances[glob_setix]
+        for expix in 1:nexperiments(mosaic)
+            w = _setweight(mosaic, setix, expix, setrelevance, params)
+            ismissing(w) || push!(scores, w)
+        end
+        sort!(scores)
+        scoresum = 0.0
+        w = 1.0
+        @inbounds for score in scores
+            scoresum += score * w
+            w *= params.mask_discount
+        end
+        v_scores[varix] = scoresum + params.sel_tax
+    end
+    return v_scores
+end
+
+# prepares
+# 1) tile-to-var mapping (SparseMaskMatrix, only relevant tiles are considered)
+# 2) var-to-(tile-in-mask) mapping (SparseMatrixCSC, only relevant tiles are considered)
+# 3) the total number of masked elements in all masks for each tile
+# 4) the total number of unmasked elements in all active masks (overlapping with the tile) for each tile
+function varXtiles(mosaic::MaskedSetMosaic,
+                   var2setix::AbstractVector{Int},
+                   params::CoverParams)
     # find relevant tiles and
     # sum masked elements per tile in all masks and unmasked elements per tile in union mask
     # note: in masks there could be element not covered by any set/tile, so these counts refer to coverable elements
     tileixs = Vector{Int}()
     tile2nmasked = Vector{Int}()
     tile2nunmasked = Vector{Int}()
-    # calculate the sum of scores of given set in each mask
-    v_scores = Vector{Float64}(undef, length(var2setix))
-    olap_scores = Vector{Float64}() # temp array containing var overlap scores for each mask it overlaps
-    olap_weights = Vector{Float64}() # temp array containing var overlap scores weights for each mask it overlaps
-    expixs_byscore = Vector{Int}()
     vXmt_els = Vector{Tuple{Int, Int, Int, Float64}}()
+    # max rank of the setXexp overlap that is still relevant
+    setXexp_olaps = fill(0.0, nexperiments(mosaic))
 
     @inbounds for (varix, setix) in enumerate(var2setix)
-        setmasks = mosaic.set2experiments[setix]
-        resize!(olap_scores, length(setmasks))
-        resize!(olap_weights, length(setmasks))
-        resize!(expixs_byscore, length(setmasks))
-        for (i, molap) in enumerate(setmasks)
-            olap_scores[i] = overlap_score(molap, setix, mosaic, params)
+        globsetix = mosaic.loc2glob_setix[setix]
+        for expix in 1:nexperiments(mosaic)
+            setXexp_olaps[expix] = coalesce(_setweight(mosaic, setix, expix), Inf)
         end
-        sortperm!(expixs_byscore, olap_scores)
-        scoresum = 0.0
-        w = 1.0
-        for i in expixs_byscore
-            score = olap_scores[i]
-            olap_weights[i] = w
-            scoresum += score * w
-            w *= params.mask_discount
-        end
-        v_scores[varix] = scoresum + params.sel_tax
+        # rank 1 = most significant (weights are negative)
+        setXexp_olap_ranks = denserank(setXexp_olaps)
 
-        set_tiles = view(mosaic.original.tileXset, :, setix)
+        set_tiles = view(mosaic.original.tileXset, :, globsetix)
         for tileix in set_tiles
             tile_elms = view(mosaic.original.elmXtile, :, tileix)
             tilepos = searchsortedfirst(tileixs, tileix)
@@ -127,23 +151,27 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
                 insert!(tileixs, tilepos, tileix)
                 insert!(tile2nunmasked, tilepos, length(tile_elms) - sum(view(mosaic.elunionmask, tile_elms)))
                 nmasked = 0
-                for molap in mosaic.set2experiments[setix]
-                    nmasked += sum(view(mosaic.elmasks, tile_elms, molap.expix))
+                for (expix, olap) in enumerate(view(mosaic.setXexp_olaps, setix, :))
+                    if !ismissing(olap)
+                        nmasked += sum(view(mosaic.elmasks, tile_elms, expix))
+                    end
                 end
                 insert!(tile2nmasked, tilepos, nmasked)
             end
-            for (i, molap) in enumerate(setmasks)
-                nmaskxtile = sum(view(mosaic.elmasks, tile_elms, molap.expix))
-                olap_w = olap_weights[i]
+            for (expix, olap) in enumerate(view(mosaic.setXexp_olaps, setix, :))
+                ismissing(olap) && continue
+                nmaskxtile = sum(view(mosaic.elmasks, tile_elms, expix))
+                olap_rank = setXexp_olap_ranks[expix]
+                olap_w = params.mask_discount ^ (olap_rank - 1)
                 if nmaskxtile < length(tile_elms) && # there are unmasked tile elements
                    olap_w >= 0.1                     # the mask has relevant overlap with the var
-                    push!(vXmt_els, (varix, molap.expix, tileix, olap_w * (length(tile_elms) - nmaskxtile)))
+                    push!(vXmt_els, (varix, expix, tileix, olap_w * (length(tile_elms) - nmaskxtile)))
                 end
             end
         end
     end
 
-    tileXvar = mosaic.original.tileXset[tileixs, var2setix]
+    tileXvar = mosaic.original.tileXset[tileixs, mosaic.loc2glob_setix[var2setix]]
     if !isempty(tileXvar)
         # try to optimize tileXvar: find tiles that refer to the identical set of vars and merge their stats
         varXtile = transpose(tileXvar)
@@ -221,7 +249,7 @@ function var_scores_and_Xtiles(mosaic::MaskedSetMosaic, params::CoverParams,
         maskxtileXvar = SparseMatrixCSC{Float64, Int}(length(vars2maskxtiles), length(var2setix),
                                                       colptrs, rowvals, nzvals)
     end
-    return v_scores, tileXvar, maskxtileXvar, tile2nmasked, tile2nunmasked
+    return tileXvar, maskxtileXvar, tile2nmasked, tile2nunmasked
 end
 
 varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
@@ -230,7 +258,8 @@ varXvar_score(setXset::Real, params::CoverParams, scale::Bool = false) =
 function varXvar_scores(mosaic::AbstractWeightedSetMosaic, params::CoverParams,
                         var2setix::AbstractVector{Int} = var2set(mosaic),
                         scale::Bool = false)
-    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[var2setix, var2setix], Ref(params), scale)
+    glob_setixs = mosaic.loc2glob_setix[var2setix]
+    vXv_scores = varXvar_score.(mosaic.original.setXset_scores[glob_setixs, glob_setixs], Ref(params), scale)
     for i in eachindex(var2setix) # don't consider self-intersections
         @inbounds vXv_scores[i, i] = zero(eltype(vXv_scores))
     end
@@ -313,4 +342,4 @@ end
 
 abstract type AbstractOptimizerParams{P <: AbstractCoverProblem} end;
 
-problemtype(params::AbstractOptimizerParams{P}) where P = P
+problemtype(_::AbstractOptimizerParams{P}) where P = P

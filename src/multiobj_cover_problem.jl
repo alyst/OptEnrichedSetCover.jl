@@ -200,11 +200,10 @@ end
 
 function MultiobjCoverProblem(mosaic::MaskedSetMosaic, params::CoverParams = CoverParams())
     v2set = var2set(mosaic)
-    v_scores, tXv, mtXv, nmasked_tile, nunmasked_tile = var_scores_and_Xtiles(mosaic, params, v2set)
-    vXv_scores = varXvar_scores(mosaic, params, v2set, false)
-    MultiobjCoverProblem(params,
-                         v2set, v_scores, vXv_scores,
-                         tXv, mtXv, nmasked_tile, nunmasked_tile)
+    MaskedSetCoverProblem(params, mosaic.loc2glob_setix[v2set],
+                          var_scores(mosaic, params, v2set),
+                          varXvar_scores(mosaic, params, v2set, false),
+                          varXtiles(mosaic, v2set, params)...)
 end
 
 ntiles(problem::MaskedSetCoverProblem) = length(problem.nmasked_tile)
@@ -246,16 +245,7 @@ function miscover_score(w::AbstractVector{Float64}, problem::MaskedSetCoverProbl
     return res
 end
 
-"""
-    score(w::AbstractVector{Float64}, problem) -> NTuple{4, Float64}
-
-Unfolded multiobjective score (fitness) of the OESC coverage.
-
-* `w`: probabilities of the sets being covered
-
-See ["Cover quality"](@ref cover_quality).
-"""
-function score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
+function var_scores(w::AbstractVector{Float64}, problem::MultiobjCoverProblem)
     __check_vars(w, problem)
     a = dot(problem.var_scores, w)
     if problem.params.setXset_factor == 0.0
@@ -267,6 +257,20 @@ function score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
         b = -sum(setXset)
         release!(problem.arrpool, setXset)
     end
+    return a, b
+end
+
+"""
+    score(w::AbstractVector{Float64}, problem) -> NTuple{4, Float64}
+
+Unfolded multiobjective score (fitness) of the OESC coverage.
+
+* `w`: probabilities of the sets being covered
+
+See ["Cover quality"](@ref cover_quality).
+"""
+function score(w::AbstractVector{Float64}, problem::MaskedSetCoverProblem)
+    a, b = var_scores(w, problem)
     if problem.params.covered_factor == 0.0 &&
        problem.params.uncovered_factor == 0.0
         # skip miscover score calculation if it's excluded from aggregation
