@@ -15,7 +15,7 @@ export SetMosaic, CoverParams,
     setidtype, experimentidtype, weighttype,
     originalmosaic, mask, assignweights,
     set_relevance,
-    logpvalue, aggscore, score, # any conflicts
+    overlap_score, logpvalue, aggscore, score, # any conflicts
     best_aggscore, best_index, best_varweights, varweights,
     optimize # conflicts with Optim.jl
 

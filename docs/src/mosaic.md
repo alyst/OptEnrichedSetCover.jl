@@ -6,7 +6,7 @@ Gene Ontologies provide thousands of annotation terms.
 However, different genes often share the same annotations. This observation could be used to improve the
 processing of large collections. The genes could be grouped into disjoint *"tiles"* so that:
 * all genes of the same tile share the same annotations
-* the tiles don't overlap and their *mosaic* covers all the genes 
+* the tiles don't overlap and their *mosaic* covers all the genes
 * any annotation term could be represented as the (disjoint) union of the tiles
 
 This *"mosaic"* representation of the sets collection is implemented by the `SetMosaic`
@@ -47,12 +47,16 @@ definition of the *relevance score*.
 
 ```@docs
 set_relevance
+logpvalue
 ```
 
 ## Masked sets mosaic
 
 ```@docs
-MaskedSetMosaic
+OptEnrichedSetCover.AbstractWeightedSetMosaic
+originalmosaic
+OptEnrichedSetCover.MaskedSetMosaic
 mask
-unmask
+OptEnrichedSetCover.WeightedSetMosaic
+assignweights
 ```

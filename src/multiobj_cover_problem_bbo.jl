@@ -76,9 +76,9 @@ bbo_ctrl_params(opt_params::MultiobjOptimizerParams) =
 genop_params(opt_params::MultiobjOptimizerParams) =
     BlackBoxOptim.ParamsDict()
 
-"""
+#==
 Wraps [`MultiobjCoverProblem`](@ref) as [`BlackBoxOptim.OptimizationProblem`]
-"""
+==#
 struct MultiobjCoverProblemBBOWrapper{P <: MultiobjCoverProblem, SS <: RectSearchSpace} <:
         BlackBoxOptim.OptimizationProblem{MultiobjCoverProblemFitnessScheme}
     orig::P
@@ -144,10 +144,10 @@ generate_recombinators(problem::MultiobjCoverProblemBBOWrapper, params) =
                     ParentCentricCrossover{3}(chain(BlackBoxOptim.PCX_DefaultOptions, params)),
 ]
 
-"""
+#==
 Switch from one activated var to another one that is connected to it
 by the set overlap.
-"""
+==#
 struct VarSwitchMutation <: BlackBoxOptim.MutationOperator
     varXvar_probs::Vector{Tuple{Vector{Int}, Weights{Float64}}} # var -> var switching probabilities
 end

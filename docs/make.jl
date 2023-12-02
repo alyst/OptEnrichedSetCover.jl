@@ -1,4 +1,4 @@
-using OptEnrichedSetCover
+using OptEnrichedSetCover, DataFrames
 using Documenter
 
 makedocs(
