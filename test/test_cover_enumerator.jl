@@ -101,7 +101,7 @@ global tested_problem_types = [:multiobjective]
                             "abcde" => Set([:a, :b, :c, :d, :e]),
                             "cdef" => Set([:c, :d, :e, :f])),
                         Set([:a, :b, :c, :d, :e, :f]))
-        sm_abc_be = assignweights(sm, Dict(:X => Dict("abd" => -1.0, "bcd" => -1.0,
+        sm_abc_be = assignweights(sm, Dict(:X => Dict("abd" => -1.0, "bcd" => -0.9,
                                                       "c" => -0.5, "abcd" => -2.0,
                                                       "cdef" => -0.5),
                                            :Y => Dict("abd" => -0.5, "bcd" => -0.5,
