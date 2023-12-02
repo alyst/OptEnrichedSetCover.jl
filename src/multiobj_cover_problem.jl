@@ -64,8 +64,8 @@ end
 
 function (f::MultiobjProblemSoftFold2d)(fitness::DetailedScore)
     a = fitness[1] +
-        f.uncovered_factor * fitness[3] +
-        f.covered_factor * fitness[4]
+        ifelse(f.uncovered_factor != 0, f.uncovered_factor * fitness[3], zero(fitness[3])) +
+        ifelse(f.covered_factor != 0, f.covered_factor * fitness[4], zero(fitness[4]))
     b = fitness[2]
     if f.ratio_threshold !== nothing
         k = b/max(1, -a)
@@ -303,7 +303,12 @@ struct WeightedSetCoverProblem <: MultiobjCoverProblem
     end
 end
 
-function MultiobjCoverProblem(mosaic::WeightedSetMosaic, params::CoverParams = CoverParams())
+function MultiobjCoverProblem(mosaic::WeightedSetMosaic, params::CoverParams = CoverParams(; covered_factor = 0.0, uncovered_factor = 0.0))
+    params.covered_factor != 0 &&
+        throw(ArgumentError("Non-zero covered_factor not supported for WeightedSetCoverProblem"))
+    params.uncovered_factor != 0 &&
+        throw(ArgumentError("Non-zero uncovered_factor not supported for WeightedSetCoverProblem"))
+
     v2set = var2set(mosaic)
     WeightedSetCoverProblem(params, mosaic.loc2glob_setix[v2set],
                             var_scores(mosaic, params, v2set),
@@ -320,4 +325,4 @@ function exclude_vars(problem::WeightedSetCoverProblem,
 end
 
 score(w::AbstractVector{Float64}, problem::WeightedSetCoverProblem) =
-    var_scores(w, problem)..., 0.0, 0.0
+    (var_scores(w, problem)..., Inf, Inf)

@@ -295,8 +295,9 @@ const DetailedScore = NTuple{4, Float64}
 aggscore(s::DetailedScore, params::CoverParams) =
     s[1] +
     params.setXset_factor * s[2] +
-    params.uncovered_factor * s[3] +
-    params.covered_factor * s[4]
+    # ignore NaNs/Infs for uncovered/covered score components if their factors are 0
+    ifelse(params.uncovered_factor != 0, params.uncovered_factor * s[3], zero(s[3])) +
+    ifelse(params.covered_factor != 0, params.covered_factor * s[4], zero(s[4]))
 
 """
     AbstractCoverProblem{T}
