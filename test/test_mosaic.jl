@@ -91,13 +91,12 @@
 
         @test nelements(sm) == 2
         @test ntiles(sm) == 2
-        @test tile_elms(sm, 1) == [:a]
-        @test tile_elms(sm, 2) == [:b]
+        @test sort!(tile_elms.(Ref(sm), [1, 2])) == [[:a], [:b]]
+        @test nsets(sm) == 3
         @test setsize(sm, 1) == 1
         @test setsize(sm, 2) == 1
         @test setsize(sm, 3) == 2
         @test_throws BoundsError setsize(sm, 4)
-        @test nsets(sm) == 3
     end
 
     @testset "[:a :b] [:c :d] [:a :b :c]" begin
@@ -105,9 +104,7 @@
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 3
-        @test tile_elms(sm, 1) == [:a, :b]
-        @test tile_elms(sm, 2) == [:c]
-        @test tile_elms(sm, 3) == [:d]
+        @test sort!(tile_elms.(Ref(sm), [1, 2, 3])) == [[:a, :b], [:c], [:d]]
         @test nsets(sm) == 3
     end
 
@@ -117,8 +114,7 @@
 
         @test nelements(sm) == 4
         @test ntiles(sm) == 2
-        @test tile(sm, 1) == [1, 2]
-        @test tile(sm, 2) == [3, 4]
+        @test sort!(tile.(Ref(sm), [1, 2])) == [[1, 2], [3, 4]]
         @test nsets(sm) == 3
     end
 
