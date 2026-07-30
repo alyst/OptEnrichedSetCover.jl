@@ -18,7 +18,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
     nworkers::Int
     trace_interval::Float64
 
-    borg_params::BlackBoxOptim.ParamsDict
+    borg_params::Dict{Symbol,Any}
 
     function MultiobjOptimizerParams(;
         # default Borg/BBO Opt.Controller parameter overrides
@@ -44,7 +44,7 @@ struct MultiobjOptimizerParams <: AbstractOptimizerParams{MultiobjCoverProblem}
             MaxSteps, MaxStepsWithoutProgress,
             FitnessTolerance, MinDeltaFitnessTolerance, FoldRatioThreshold,
             NWorkers, TraceInterval,
-            BlackBoxOptim.kwargs2dict(kwargs...))
+            Dict{Symbol,Any}(kwargs))
     end
 end
 
@@ -58,7 +58,7 @@ function borg_params(opt_params::MultiobjOptimizerParams,
         eps = 0.01
     end
     BlackBoxOptim.chain(BlackBoxOptim.BorgMOEA_DefaultParameters,
-        ParamsDict(:PopulationSize=>opt_params.pop_size,
+        Dict{Symbol,Any}(:PopulationSize=>opt_params.pop_size,
                    :NThreads=>opt_params.nworkers > 1 ? opt_params.nworkers : 0,
                    :ϵ=>eps),
         opt_params.borg_params)
@@ -66,7 +66,7 @@ end
 
 bbo_ctrl_params(opt_params::MultiobjOptimizerParams) =
     BlackBoxOptim.chain(BlackBoxOptim.DefaultParameters,
-        ParamsDict(:PopulationSize=>opt_params.pop_size,
+        Dict{Symbol,Any}(:PopulationSize=>opt_params.pop_size,
                    :MaxSteps=>opt_params.max_steps,
                    :MaxStepsWithoutProgress=>opt_params.max_steps_without_progress,
                    :FitnessTolerance=>opt_params.fitness_tolerance,
@@ -74,7 +74,7 @@ bbo_ctrl_params(opt_params::MultiobjOptimizerParams) =
                    :TraceInterval=>opt_params.trace_interval))
 
 genop_params(opt_params::MultiobjOptimizerParams) =
-    BlackBoxOptim.ParamsDict()
+    Dict{Symbol,Any}()
 
 #==
 Wraps [`MultiobjCoverProblem`](@ref) as [`BlackBoxOptim.OptimizationProblem`]

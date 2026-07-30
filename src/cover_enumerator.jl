@@ -90,7 +90,7 @@ nexperiments(covers::CoverCollection) = nexperiments(covers.mosaic)
 Base.length(covers::CoverCollection) = length(covers.results)
 Base.isempty(covers::CoverCollection) = isempty(covers.results)
 
-function OptimizerParams(problem_type::Symbol, params::ParamsDict)
+function OptimizerParams(problem_type::Symbol, params::Dict{Symbol,Any})
     if problem_type == :quadratic
         return QuadraticOptimizerParams(;params...)
     elseif problem_type == :multiobjective
@@ -116,7 +116,7 @@ Base.collect(mosaic::MaskedSetMosaic,
              verbose::Bool=false,
              optargs...) =
     collect(mosaic, cover_params, enum_params,
-            OptimizerParams(problem_type, ParamsDict(optargs)),
+            OptimizerParams(problem_type, Dict{Symbol,Any}(optargs)),
             verbose)
 
 function Base.collect(mosaic::AbstractWeightedSetMosaic,
